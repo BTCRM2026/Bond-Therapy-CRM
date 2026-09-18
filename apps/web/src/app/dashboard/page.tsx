@@ -1,61 +1,74 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { Activity, LayoutDashboard, ShieldCheck, Users } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
-import { LogoutButton } from "@/components/logout-button";
+import Link from "next/link";
+import { Activity, Bell, FileSignature, ShieldCheck, Truck, Users } from "lucide-react";
+import { DashboardShell } from "@/components/dashboard-shell";
+import { StatRow } from "@/components/ui/stat-row";
+import { requireSession, serverApiFetch } from "@/lib/session";
 
-type SessionUser = {
-  name: string;
-  email: string;
-  roles: Array<{ key: string; name: string }>;
-  dashboardPath: string;
-};
+type UsersSummary = Array<{ status: string }>;
+type DistributorsSummary = Array<{ status: string }>;
+type AgreementsSummary = Array<{ status: string }>;
+type NotificationsSummary = Array<{ isRead: boolean }>;
 
-async function getSession() {
-  const cookieStore = await cookies();
-  let response: Response;
-  try {
-    response = await fetch(`${process.env.API_INTERNAL_URL ?? "http://localhost:3001"}/auth/session`, {
-      headers: { cookie: cookieStore.toString() },
-      cache: "no-store",
-    });
-  } catch {
-    redirect("/login");
-  }
-  if (!response.ok) redirect("/login");
-  return (await response.json()) as SessionUser;
-}
+const QUICK_LINKS = [
+  { href: "/dashboard/team", label: "Team management", description: "Create accounts and assign roles", icon: Users },
+  { href: "/dashboard/access", label: "Access management", description: "Enable or disable portal roles", icon: ShieldCheck },
+  { href: "/dashboard/distributors", label: "Distributor management", description: "Track distributor onboarding", icon: Truck },
+  { href: "/dashboard/agreements", label: "Agreements", description: "Monitor contract expiries", icon: FileSignature },
+  { href: "/dashboard/notifications", label: "Notifications", description: "Review system alerts", icon: Bell },
+  { href: "/dashboard/audit-log", label: "Audit log", description: "See every change, in order", icon: Activity },
+];
 
 export default async function DashboardPage() {
-  const user = await getSession();
-  const roleName = user.roles[0]?.name ?? "Authorized user";
+  const session = await requireSession();
+  const roleName = session.roles[0]?.name ?? "Authorized user";
+
+  const [usersRes, distributorsRes, agreementsRes, notificationsRes] = await Promise.all([
+    serverApiFetch("/users"),
+    serverApiFetch("/distributors"),
+    serverApiFetch("/agreements"),
+    serverApiFetch("/notifications"),
+  ]);
+  const users = usersRes.ok ? ((await usersRes.json()) as UsersSummary) : [];
+  const distributors = distributorsRes.ok ? ((await distributorsRes.json()) as DistributorsSummary) : [];
+  const agreements = agreementsRes.ok ? ((await agreementsRes.json()) as AgreementsSummary) : [];
+  const notifications = notificationsRes.ok ? ((await notificationsRes.json()) as NotificationsSummary) : [];
+
+  const stats = [
+    { label: "Team accounts", value: users.length },
+    { label: "Distributors", value: distributors.length },
+    { label: "Active agreements", value: agreements.filter((a) => a.status === "ACTIVE").length },
+    { label: "Unread alerts", value: notifications.filter((n) => !n.isRead).length },
+  ];
+
   return (
-    <main className="min-h-screen bg-background lg:grid lg:grid-cols-[248px_1fr]">
-      <aside className="hidden border-r bg-white p-5 lg:flex lg:flex-col">
-        <BrandMark />
-        <nav className="mt-8 space-y-1 text-sm">
-          <div className="flex h-10 items-center gap-3 rounded-lg bg-brand-soft px-3 font-medium text-brand-dark"><LayoutDashboard size={17} />Overview</div>
-          <div className="flex h-10 items-center gap-3 rounded-lg px-3 text-muted"><Users size={17} />Team management</div>
-          <div className="flex h-10 items-center gap-3 rounded-lg px-3 text-muted"><Activity size={17} />Activity</div>
-        </nav>
-        <div className="mt-auto rounded-lg border bg-background p-3"><p className="text-xs font-semibold text-foreground">{user.name}</p><p className="mt-1 truncate text-[11px] text-muted">{roleName}</p></div>
-      </aside>
-      <section>
-        <header className="flex h-16 items-center justify-between border-b bg-white px-5 sm:px-6">
-          <div className="lg:hidden"><BrandMark /></div>
-          <div className="hidden lg:block"><p className="text-sm font-semibold">{roleName} workspace</p><p className="text-xs text-muted">Secure business overview</p></div>
-          <LogoutButton />
-        </header>
-        <div className="p-5 sm:p-6">
-          <div className="mb-6"><h1 className="text-2xl font-semibold tracking-tight">Welcome, {user.name}</h1><p className="mt-1.5 text-sm text-muted">Your {roleName} access has been verified successfully.</p></div>
-          <div className="rounded-xl border bg-white p-5">
-            <div className="flex items-start gap-3">
-              <span className="grid size-10 place-items-center rounded-lg bg-brand-soft text-brand"><ShieldCheck size={20} /></span>
-              <div><h2 className="text-base font-semibold">Portal foundation is ready</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-muted">Authentication, role assignment, protected sessions and database-driven dashboard routing are active. Business dashboard modules will be added step by step.</p></div>
+    <DashboardShell
+      userName={session.name}
+      roleName={roleName}
+      headerTitle={`${roleName} workspace`}
+      headerSubtitle="Secure business overview"
+    >
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Welcome, {session.name}</h1>
+        <p className="mt-1.5 text-sm text-muted">Here is what is happening across the business right now.</p>
+      </div>
+
+      <StatRow stats={stats} className="mb-6" />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {QUICK_LINKS.map(({ href, label, description, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className="flex items-start gap-3 rounded-xl border bg-white p-5 transition-colors hover:border-brand/40 hover:bg-brand-soft/30"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"><Icon size={19} /></span>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">{label}</h2>
+              <p className="mt-1 text-xs leading-5 text-muted">{description}</p>
             </div>
-          </div>
-        </div>
-      </section>
-    </main>
+          </Link>
+        ))}
+      </div>
+    </DashboardShell>
   );
 }
