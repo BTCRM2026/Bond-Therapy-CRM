@@ -60,7 +60,7 @@ export function LoginForm() {
         {errors.password && <p className="text-xs text-danger">{errors.password.message}</p>}
       </div>
       {serverError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-danger">{serverError}</div>}
-      <Button className="w-full shadow-[0_1px_2px_rgba(49,68,115,0.18)] active:translate-y-px" type="submit" disabled={isSubmitting}>
+      <Button className="w-full shadow-[0_1px_2px_rgba(79,69,166,0.20)] active:translate-y-px" type="submit" disabled={isSubmitting}>
         {isSubmitting && <LoaderCircle className="animate-spin" size={17} />}
         {isSubmitting ? "Signing in..." : "Sign in"}
       </Button>
