@@ -27,7 +27,7 @@ export function SidebarNav() {
             href={href}
             className={cn(
               "flex h-10 items-center gap-3 rounded-lg px-3 font-medium transition-colors",
-              active ? "bg-brand-soft text-brand-dark" : "text-muted hover:bg-background hover:text-foreground",
+              active ? "bg-brand-soft text-brand-dark ring-1 ring-brand/10" : "text-muted hover:bg-background hover:text-foreground",
             )}
           >
             <Icon size={17} />

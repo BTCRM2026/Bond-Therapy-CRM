@@ -27,7 +27,7 @@ export function DashboardShell({
         </div>
       </aside>
       <section className="min-w-0">
-        <header className="flex h-16 items-center justify-between border-b bg-white px-5 sm:px-6">
+        <header className="flex h-16 items-center justify-between border-b bg-white/95 px-5 sm:px-6">
           <div className="lg:hidden"><BrandMark /></div>
           <div className="hidden lg:block">
             <p className="text-sm font-semibold text-foreground">{headerTitle}</p>

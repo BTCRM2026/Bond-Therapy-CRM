@@ -1,15 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f6f8;
+  --background: #f3f7fa;
   --surface: #ffffff;
-  --foreground: #172033;
-  --muted: #667085;
-  --subtle: #98a2b3;
-  --border: #e4e7ec;
-  --brand: #4657b8;
-  --brand-dark: #2f3d88;
-  --brand-soft: #eef0fb;
+  --foreground: #17243a;
+  --muted: #5e6b7a;
+  --subtle: #8d99a8;
+  --border: #dde5ec;
+  --brand: #4263df;
+  --brand-dark: #304ab0;
+  --brand-soft: #eaf0ff;
+  --accent: #148f82;
+  --accent-soft: #e6f7f3;
   --danger: #b42318;
 }
 
@@ -23,6 +25,8 @@
   --color-brand: var(--brand);
   --color-brand-dark: var(--brand-dark);
   --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
   --font-sans: "Inter Variable", Inter, Arial, sans-serif;
 }
@@ -36,4 +40,3 @@ body {
 }
 
 button, input { font: inherit; }
-
