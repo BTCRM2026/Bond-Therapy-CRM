@@ -44,16 +44,16 @@ export function LoginForm() {
   };
 
   return (
-    <form className="mt-8 space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
+    <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
       <div className="space-y-2">
         <label className="text-[13px] font-medium text-foreground" htmlFor="identifier">Login ID or email</label>
-        <Input id="identifier" autoComplete="username" placeholder="Enter your login ID" aria-invalid={Boolean(errors.identifier)} {...register("identifier")} />
+        <Input id="identifier" autoComplete="username" placeholder="Enter your login ID" className="h-10" aria-invalid={Boolean(errors.identifier)} {...register("identifier")} />
         {errors.identifier && <p className="text-xs text-danger">{errors.identifier.message}</p>}
       </div>
       <div className="space-y-2">
         <label className="text-[13px] font-medium text-foreground" htmlFor="password">Password</label>
         <div className="relative">
-          <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" className="pr-11" aria-invalid={Boolean(errors.password)} {...register("password")} />
+          <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" className="h-10 pr-11" aria-invalid={Boolean(errors.password)} {...register("password")} />
           <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-1 top-1 grid size-9 place-items-center rounded-md text-muted hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/20" aria-label={showPassword ? "Hide password" : "Show password"}>
             {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
           </button>
@@ -73,4 +73,3 @@ export function LoginForm() {
     </form>
   );
 }
-

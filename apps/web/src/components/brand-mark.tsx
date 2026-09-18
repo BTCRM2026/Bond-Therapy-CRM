@@ -1,14 +1,13 @@
-import { cn } from "@/lib/utils";
+import Image from "next/image";
 
-export function BrandMark({ inverse = false }: { inverse?: boolean }) {
+export function BrandMark({ className = "" }: { className?: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className={cn("grid size-9 place-items-center rounded-lg bg-brand text-sm font-bold text-white", inverse && "bg-white text-brand-dark")}>BT</div>
-      <div>
-        <p className={cn("text-sm font-semibold tracking-tight text-foreground", inverse && "text-white")}>Bond Therapy</p>
-        <p className={cn("text-[11px] text-muted", inverse && "text-white/65")}>Business Operations CRM</p>
-      </div>
-    </div>
+    <Image
+      src="/brand/bond-therapy-logo.png"
+      alt="Bond Therapy Professional"
+      width={185}
+      height={95}
+      className={`h-auto w-[150px] object-contain sm:w-[165px] ${className}`}
+    />
   );
 }
-
