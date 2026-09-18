@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 const schema = z.object({
   identifier: z.string().trim().min(2, "Enter your login ID or email."),
   password: z.string().min(8, "Password must be at least 8 characters."),
-  remember: z.boolean(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -25,7 +24,7 @@ export function LoginForm() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { identifier: "", password: "", remember: false } });
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { identifier: "", password: "" } });
 
   const onSubmit = async (values: FormValues) => {
     setServerError("");
@@ -60,12 +59,8 @@ export function LoginForm() {
         </div>
         {errors.password && <p className="text-xs text-danger">{errors.password.message}</p>}
       </div>
-      <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-muted">
-        <input type="checkbox" className="size-4 rounded border-border accent-brand" {...register("remember")} />
-        Keep me signed in on this device
-      </label>
       {serverError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-danger">{serverError}</div>}
-      <Button className="w-full" type="submit" disabled={isSubmitting}>
+      <Button className="w-full shadow-[0_1px_2px_rgba(65,25,28,0.18)] active:translate-y-px" type="submit" disabled={isSubmitting}>
         {isSubmitting ? <LoaderCircle className="animate-spin" size={17} /> : <LockKeyhole size={17} />}
         {isSubmitting ? "Signing in..." : "Sign in securely"}
         {!isSubmitting && <ArrowRight className="ml-auto" size={17} />}
