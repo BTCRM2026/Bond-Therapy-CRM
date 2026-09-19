@@ -1,39 +1,26 @@
 "use client";
 
-import { Activity, Bell, FileSignature, LayoutDashboard, ShieldCheck, Truck, Users } from "lucide-react";
+import { LayoutDashboard, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { PortalType } from "@/lib/portal-types";
 import { cn } from "@/lib/utils";
 
 const ADMIN_NAV_GROUPS = [
-  { label: "Workspace", items: [{ href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true }] },
-  {
-    label: "Operations",
-    items: [
-      { href: "/dashboard/distributors", label: "Distributors", icon: Truck },
-      { href: "/dashboard/agreements", label: "Agreements", icon: FileSignature },
-      { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
-    ],
-  },
-  {
-    label: "Administration",
-    items: [
-      { href: "/dashboard/team", label: "Team management", icon: Users },
-      { href: "/dashboard/access", label: "Access control", icon: ShieldCheck },
-      { href: "/dashboard/audit-log", label: "Audit log", icon: Activity },
-    ],
-  },
+  { label: "Workspace", items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }] },
+  { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
 ];
 
 const STAFF_NAV_GROUPS = [
   { label: "Workspace", items: [{ href: "/dashboard", label: "My workspace", icon: LayoutDashboard, exact: true }] },
+  { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
 ];
 
-export function SidebarNav({ portal = "ADMIN" }: { portal?: "ADMIN" | "STAFF" }) {
+export function SidebarNav({ portal = "ADMIN", onNavigate }: { portal?: PortalType; onNavigate?: () => void }) {
   const pathname = usePathname();
-  const groups = portal === "STAFF" ? STAFF_NAV_GROUPS : ADMIN_NAV_GROUPS;
+  const groups = portal === "ADMIN" ? ADMIN_NAV_GROUPS : STAFF_NAV_GROUPS;
   return (
-    <nav className="mt-7 space-y-6 text-sm">
+    <nav className="mt-6 space-y-6 text-sm" aria-label="Portal navigation">
       {groups.map((group) => (
         <div key={group.label}>
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle">{group.label}</p>
@@ -46,9 +33,10 @@ export function SidebarNav({ portal = "ADMIN" }: { portal?: "ADMIN" | "STAFF" })
                 <Link
                   key={href}
                   href={href}
+                  onClick={onNavigate}
                   className={cn(
-                    "flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors",
-                    active ? "bg-brand text-white shadow-[0_4px_12px_rgba(23,27,114,0.16)]" : "text-muted hover:bg-background hover:text-foreground",
+                    "relative flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors",
+                    active ? "bg-brand text-white shadow-[0_4px_12px_rgba(23,27,114,0.18)]" : "text-muted hover:bg-background hover:text-foreground",
                   )}
                 >
                   <Icon size={17} strokeWidth={1.8} />

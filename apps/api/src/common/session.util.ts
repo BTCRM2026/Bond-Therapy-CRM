@@ -7,6 +7,7 @@ export type SessionUser = {
   loginId: string;
   email: string;
   name: string;
+  status: string;
   roles: Array<{ key: string; name: string }>;
   permissions: string[];
   portal: PortalType;
@@ -39,6 +40,7 @@ export async function loadSessionUser(prisma: PrismaService, portal: PortalType,
     loginId: session.user.loginId,
     email: session.user.email,
     name: session.user.name,
+    status: session.user.status,
     roles: roles.map(({ key, name }) => ({ key, name })),
     permissions: [...new Set(roles.flatMap((role) => role.permissions.map(({ permission }) => permission.key)))],
     portal,

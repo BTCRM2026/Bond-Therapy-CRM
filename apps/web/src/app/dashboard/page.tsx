@@ -1,13 +1,6 @@
-import Link from "next/link";
-import { Activity, Bell, Boxes, Calculator, CalendarCheck, CheckCircle2, ChevronRight, CircleAlert, FileSignature, HeartHandshake, LockKeyhole, ShieldCheck, Truck, UserRoundCheck, Users } from "lucide-react";
+import { Boxes, Calculator, CalendarCheck, CheckCircle2, HeartHandshake, LockKeyhole, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
-import { StatRow } from "@/components/ui/stat-row";
-import { requireSession, serverApiFetch } from "@/lib/session";
-
-type UsersSummary = Array<{ status: string }>;
-type DistributorsSummary = Array<{ status: string }>;
-type AgreementsSummary = Array<{ status: string }>;
-type NotificationsSummary = Array<{ isRead: boolean }>;
+import { requireSession } from "@/lib/session";
 
 const STAFF_WORKSPACES = [
   { permission: "staff.sales.access", label: "Sales", description: "Manage customer relationships and the complete sales cycle.", features: ["Leads and salons", "Visits and follow-ups", "Quotations and orders"], icon: HeartHandshake, tone: "bg-info-soft text-info" },
@@ -15,15 +8,6 @@ const STAFF_WORKSPACES = [
   { permission: "staff.warehouse.access", label: "Warehouse", description: "Coordinate inventory and fulfilment from one workspace.", features: ["Inventory control", "Picking and packing", "Dispatch tracking"], icon: Boxes, tone: "bg-warning-soft text-warning" },
   { permission: "staff.hr.access", label: "Human Resources", description: "Manage people operations with controlled access.", features: ["Team records", "Attendance and leave", "Payroll inputs"], icon: UserRoundCheck, tone: "bg-magenta-soft text-magenta" },
   { permission: "staff.demo.access", label: "Demo Team", description: "Plan demos and hand qualified activity to Sales.", features: ["Demo schedules", "Training activity", "Sales handoff"], icon: CalendarCheck, tone: "bg-info-soft text-info" },
-];
-
-const QUICK_LINKS = [
-  { href: "/dashboard/team", label: "Team management", description: "Create accounts and assign roles", icon: Users },
-  { href: "/dashboard/access", label: "Access management", description: "Enable or disable portal roles", icon: ShieldCheck },
-  { href: "/dashboard/distributors", label: "Distributor management", description: "Track distributor onboarding", icon: Truck },
-  { href: "/dashboard/agreements", label: "Agreements", description: "Monitor contract expiries", icon: FileSignature },
-  { href: "/dashboard/notifications", label: "Notifications", description: "Review system alerts", icon: Bell },
-  { href: "/dashboard/audit-log", label: "Audit log", description: "See every change, in order", icon: Activity },
 ];
 
 export default async function DashboardPage() {
@@ -101,65 +85,34 @@ export default async function DashboardPage() {
     );
   }
 
-  const [usersRes, distributorsRes, agreementsRes, notificationsRes] = await Promise.all([
-    serverApiFetch("/users"),
-    serverApiFetch("/distributors"),
-    serverApiFetch("/agreements"),
-    serverApiFetch("/notifications"),
-  ]);
-  const users = usersRes.ok ? ((await usersRes.json()) as UsersSummary) : [];
-  const distributors = distributorsRes.ok ? ((await distributorsRes.json()) as DistributorsSummary) : [];
-  const agreements = agreementsRes.ok ? ((await agreementsRes.json()) as AgreementsSummary) : [];
-  const notifications = notificationsRes.ok ? ((await notificationsRes.json()) as NotificationsSummary) : [];
-
-  const stats = [
-    { label: "Team accounts", value: users.length },
-    { label: "Distributors", value: distributors.length },
-    { label: "Active agreements", value: agreements.filter((a) => a.status === "ACTIVE").length },
-    { label: "Unread alerts", value: notifications.filter((n) => !n.isRead).length },
-  ];
-  const attention = [
-    { label: "Locked team accounts", value: users.filter((user) => user.status === "LOCKED").length },
-    { label: "Distributors onboarding", value: distributors.filter((distributor) => distributor.status === "ONBOARDING").length },
-    { label: "Agreements expiring", value: agreements.filter((agreement) => agreement.status === "EXPIRING_SOON").length },
-    { label: "Unread notifications", value: notifications.filter((notification) => !notification.isRead).length },
-  ];
-
   return (
     <DashboardShell
       userName={session.name}
       roleName={roleName}
       headerTitle={`${roleName} workspace`}
-      headerSubtitle="Secure business overview"
+      headerSubtitle="Secure administration dashboard"
     >
       <div className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">Administration overview</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">Super Admin dashboard</p>
         <h1 className="mt-2 text-[26px] font-semibold tracking-[-0.025em] text-foreground">Welcome back, {session.name}</h1>
-        <p className="mt-1.5 text-sm text-muted">A clear view of access, distributors and business controls.</p>
+        <p className="mt-1.5 text-sm text-muted">Your focused administration workspace.</p>
       </div>
-
-      <StatRow stats={stats} className="mb-6" />
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,0.7fr)]">
-        <section className="overflow-hidden rounded-xl border bg-white shadow-[0_1px_2px_rgba(23,32,51,0.025)]">
-          <div className="border-b px-5 py-4"><h2 className="text-base font-semibold text-foreground">Management areas</h2><p className="mt-1 text-xs text-muted">Open the tools used to manage CRM operations.</p></div>
-          <div className="grid sm:grid-cols-2">
-            {QUICK_LINKS.map(({ href, label, description, icon: Icon }) => (
-              <Link key={href} href={href} className="group flex items-center gap-3 border-b p-4 transition-colors even:sm:border-l hover:bg-[#fafbff]">
-                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"><Icon size={18} strokeWidth={1.8} /></span>
-                <div className="min-w-0 flex-1"><h3 className="text-sm font-semibold text-foreground">{label}</h3><p className="mt-0.5 truncate text-xs text-muted">{description}</p></div>
-                <ChevronRight size={16} className="text-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-brand" />
-              </Link>
-            ))}
+      <section className="max-w-2xl rounded-xl border bg-white p-5 shadow-[0_1px_2px_rgba(23,32,51,0.025)] sm:p-6">
+        <div className="flex items-start gap-4">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+            <ShieldCheck size={20} strokeWidth={1.8} />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Administration workspace</h2>
+            <p className="mt-1.5 text-sm leading-6 text-muted">This dashboard is restricted to your Super Admin session and is ready for the next approved module.</p>
           </div>
-        </section>
-        <section className="rounded-xl border bg-white p-5 shadow-[0_1px_2px_rgba(23,32,51,0.025)]">
-          <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-lg bg-warning-soft text-warning"><CircleAlert size={18} /></span><div><h2 className="text-sm font-semibold text-foreground">Needs attention</h2><p className="mt-0.5 text-xs text-muted">Items worth reviewing</p></div></div>
-          <div className="mt-5 divide-y">
-            {attention.map((item) => <div key={item.label} className="flex items-center justify-between py-3"><span className="text-xs text-muted">{item.label}</span><span className="grid min-w-7 place-items-center rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground">{item.value}</span></div>)}
-          </div>
-        </section>
-      </div>
+        </div>
+        <dl className="mt-5 grid gap-3 border-t pt-5 text-xs sm:grid-cols-3">
+          <div><dt className="text-muted">Portal</dt><dd className="mt-1 font-semibold text-foreground">Super Admin</dd></div>
+          <div><dt className="text-muted">Role</dt><dd className="mt-1 font-semibold text-foreground">{roleName}</dd></div>
+          <div><dt className="text-muted">Session</dt><dd className="mt-1 inline-flex items-center gap-1.5 font-semibold text-[#067647]"><span className="size-1.5 rounded-full bg-[#17b26a]" />Protected</dd></div>
+        </dl>
+      </section>
     </DashboardShell>
   );
 }

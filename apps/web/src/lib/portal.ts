@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
+import type { PortalType } from "@/lib/portal-types";
 
-export type PortalType = "ADMIN" | "STAFF" | "DISTRIBUTOR";
+export { portalLabel, type PortalType } from "@/lib/portal-types";
 
 export const PORTAL_HEADER = "x-bt-portal";
 
@@ -30,10 +31,4 @@ export function portalFromRequest(request: Request) {
 export async function requestPortal() {
   const requestHeaders = await headers();
   return portalFromHost(requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"));
-}
-
-export function portalLabel(portal: PortalType) {
-  if (portal === "STAFF") return "Staff Portal";
-  if (portal === "DISTRIBUTOR") return "Distributor Portal";
-  return "Administration Portal";
 }

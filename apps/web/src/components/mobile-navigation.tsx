@@ -2,15 +2,18 @@
 
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { BrandMark } from "@/components/brand-mark";
+import { SidebarBrand } from "@/components/sidebar-brand";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { SidebarUserMenu } from "@/components/sidebar-user-menu";
+import type { PortalType } from "@/lib/portal-types";
 
-export function MobileNavigation({ portal }: { portal: "ADMIN" | "STAFF" }) {
+export function MobileNavigation({ portal, userName, roleName }: { portal: PortalType; userName: string; roleName: string }) {
   const [open, setOpen] = useState(false);
-
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => { document.body.style.overflow = ""; document.removeEventListener("keydown", closeOnEscape); };
   }, [open]);
 
   return (
@@ -18,22 +21,23 @@ export function MobileNavigation({ portal }: { portal: "ADMIN" | "STAFF" }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="grid size-9 place-items-center rounded-lg border bg-white text-foreground lg:hidden"
+        className="grid size-9 shrink-0 place-items-center rounded-lg border bg-white text-foreground shadow-[0_1px_2px_rgba(23,32,51,0.04)] transition-colors hover:bg-background lg:hidden"
         aria-label="Open navigation"
       >
         <Menu size={19} />
       </button>
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <button type="button" className="absolute inset-0 bg-foreground/30" onClick={() => setOpen(false)} aria-label="Close navigation" />
-          <aside className="relative flex h-full w-[280px] flex-col border-r bg-white p-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-4">
-              <BrandMark className="!w-[128px]" />
+          <button type="button" className="absolute inset-0 bg-[#101828]/35 backdrop-blur-[1px]" onClick={() => setOpen(false)} aria-label="Close navigation" />
+          <aside role="dialog" aria-modal="true" aria-label="Portal navigation" className="relative flex h-[100dvh] w-[min(86vw,304px)] flex-col border-r bg-white px-4 py-5 shadow-[16px_0_40px_rgba(16,24,40,0.14)]">
+            <div className="flex min-h-14 items-center justify-between border-b px-2 pb-4">
+              <SidebarBrand />
               <button type="button" onClick={() => setOpen(false)} className="grid size-9 place-items-center rounded-lg text-muted hover:bg-background" aria-label="Close navigation">
                 <X size={18} />
               </button>
             </div>
-            <SidebarNav portal={portal} />
+            <SidebarNav portal={portal} onNavigate={() => setOpen(false)} />
+            <SidebarUserMenu userName={userName} roleName={roleName} />
           </aside>
         </div>
       )}

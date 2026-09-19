@@ -7,7 +7,9 @@ const API_BASE = process.env.API_INTERNAL_URL ?? "http://localhost:3001";
 export type SessionUser = {
   id: string;
   name: string;
+  loginId: string;
   email: string;
+  status: string;
   roles: Array<{ key: string; name: string }>;
   permissions: string[];
   portal: PortalType;
@@ -35,15 +37,4 @@ export async function requireSession(expectedPortal?: PortalType): Promise<Sessi
 
 export function requireAdminSession() {
   return requireSession("ADMIN");
-}
-
-export async function serverApiFetch(path: string, init?: RequestInit) {
-  const portal = await requestPortal();
-  if (!portal) throw new Error("Unknown portal.");
-  const cookieStore = await cookies();
-  return fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: { ...(init?.headers ?? {}), cookie: cookieStore.toString(), [PORTAL_HEADER]: portal },
-    cache: "no-store",
-  });
 }

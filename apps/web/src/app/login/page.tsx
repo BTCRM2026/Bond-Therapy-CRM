@@ -3,9 +3,10 @@ import { BrandMark } from "@/components/brand-mark";
 import { LoginForm } from "@/components/login-form";
 import { portalLabel, requestPortal } from "@/lib/portal";
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ passwordChanged?: string }> }) {
   const portal = (await requestPortal()) ?? "ADMIN";
   const label = portalLabel(portal);
+  const passwordChanged = (await searchParams).passwordChanged === "1";
   return (
     <main className="flex h-svh items-center justify-center overflow-hidden bg-background p-3 sm:p-5 lg:p-8">
       <section className="grid h-[calc(100svh-24px)] min-h-0 w-full max-w-[600px] overflow-hidden rounded-xl border bg-white shadow-[0_24px_60px_rgba(23,32,51,0.10),0_4px_16px_rgba(23,32,51,0.05)] sm:h-[calc(100svh-40px)] sm:max-h-[760px] lg:h-[calc(100svh-64px)] lg:max-h-[720px] lg:min-h-[620px] lg:max-w-[1120px] lg:grid-cols-[0.92fr_1.08fr] lg:gap-4 lg:p-4">
@@ -29,9 +30,10 @@ export default async function LoginPage() {
               <BrandMark className="mx-auto mb-5 w-[165px]" />
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand">{label}</p>
               <h2 className="text-[26px] font-semibold tracking-[-0.025em] text-foreground lg:text-[28px]">Welcome back</h2>
-              <span className="mx-auto mt-3 block h-1 w-12 rounded-full bg-accent" />
+              <span className="mx-auto mt-3 block h-1 w-12 rounded-full bg-brand" />
               <p className="mt-4 text-sm leading-6 text-muted">Enter your credentials to open your assigned workspace.</p>
             </div>
+            {passwordChanged && <div className="mt-5 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-center text-xs text-[#067647]">Password changed successfully. Sign in with your new password.</div>}
             <LoginForm />
             <div className="mt-6 flex items-start justify-center gap-2 border-t pt-4 text-left text-xs leading-5 text-subtle lg:justify-start"><ShieldCheck size={15} className="mt-0.5 shrink-0" />Your access is protected and activity is recorded for security.</div>
           </div>
