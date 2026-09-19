@@ -51,7 +51,7 @@ export function NotificationCenter() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="relative grid size-9 place-items-center rounded-lg border bg-white text-muted shadow-[0_2px_6px_rgba(23,32,51,0.06)] transition-colors hover:border-brand/20 hover:bg-brand-soft hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/20"
+        className="relative grid size-9 place-items-center rounded-lg border bg-white text-muted shadow-[0_2px_6px_rgba(23,35,31,0.05)] transition-colors hover:border-brand/25 hover:bg-brand-soft hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/20"
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
       >
@@ -59,7 +59,7 @@ export function NotificationCenter() {
         {unread > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[9px] font-semibold leading-4 text-white">{unread > 9 ? "9+" : unread}</span>}
       </button>
 
-      {open && <section className="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-xl border bg-white shadow-[0_18px_48px_rgba(16,24,40,0.16)]" aria-label="Notifications panel">
+      {open && <section className="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-xl border bg-white shadow-[0_18px_48px_rgba(16,32,27,0.15)]" aria-label="Notifications panel">
         <div className="flex items-center justify-between border-b px-4 py-3.5">
           <div><h2 className="text-sm font-semibold text-foreground">Notifications</h2><p className="mt-0.5 text-[11px] text-muted">Only alerts assigned to this account</p></div>
           {unread > 0 && <span className="rounded-full bg-brand-soft px-2 py-1 text-[10px] font-semibold text-brand">{unread} new</span>}

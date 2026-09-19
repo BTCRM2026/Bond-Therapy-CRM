@@ -99,7 +99,7 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
 
   return (
     <>
-      {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })} className="shadow-[0_3px_10px_rgba(23,27,114,0.18)]"><Plus size={16} /><span className="hidden sm:inline">Add staff</span><span className="sr-only sm:hidden">Add staff</span></Button>, headerSlot)}
+      {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add staff</span><span className="sr-only sm:hidden">Add staff</span></Button>, headerSlot)}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         <KpiCard icon={UsersRound} label="Managed accounts" value={directory?.users.length ?? 0} />
@@ -107,7 +107,7 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
         <KpiCard icon={ShieldCheck} label="Approved roles" value={directory?.roles.length ?? 0} />
       </div>
 
-      <section className="relative rounded-xl border bg-white shadow-[0_4px_14px_rgba(23,32,51,0.045)]">
+      <section className="relative rounded-xl border bg-white shadow-[0_3px_12px_rgba(23,35,31,0.04)]">
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
           <label className="relative block w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} />
@@ -119,11 +119,11 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
           </select>
         </div>
 
-        {(notice || error) && <div className={`mx-4 mt-4 rounded-lg border px-3 py-2.5 text-xs sm:mx-5 ${error ? "border-red-200 bg-red-50 text-danger" : "border-green-200 bg-green-50 text-[#067647]"}`} role={error ? "alert" : "status"}>{error || notice}</div>}
+        {(notice || error) && <div className={`mx-4 mt-4 rounded-lg border px-3 py-2.5 text-xs sm:mx-5 ${error ? "border-red-200 bg-red-50 text-danger" : "border-[#cde5dc] bg-[#edf7f3] text-[#27735f]"}`} role={error ? "alert" : "status"}>{error || notice}</div>}
 
         <div className="hidden overflow-visible xl:block">
           <table className="w-full min-w-[920px] text-left text-[13px]">
-            <thead className="border-b bg-[#fafbfc] text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"><tr><th className="px-5 py-3">Staff member</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Access</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Last login</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
+            <thead className="border-b bg-[#f7f9f8] text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><tr><th className="px-5 py-3">Staff member</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Access</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Last login</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
             <tbody className="divide-y">
               {filtered.map((user) => <StaffRow key={user.id} user={user} busy={busyId === user.id} onEdit={() => setEditor({ mode: "edit", user })} onPassword={() => setPasswordUser(user)} onStatus={() => toggleStatus(user)} onDelete={() => setDeleteUser(user)} />)}
             </tbody>
@@ -141,7 +141,7 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
 }
 
 function Status({ value }: { value: StaffUser["status"] }) {
-  const tone = value === "ACTIVE" ? "bg-green-50 text-[#067647]" : value === "LOCKED" ? "bg-amber-50 text-[#b54708]" : "bg-gray-100 text-muted";
+  const tone = value === "ACTIVE" ? "bg-[#e8f5ef] text-[#1f6b57]" : value === "LOCKED" ? "bg-warning-soft text-warning" : "bg-gray-100 text-muted";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone}`}>{pretty(value)}</span>;
 }
 
@@ -151,7 +151,7 @@ type StaffActionsProps = { user: StaffUser; busy: boolean; onEdit: () => void; o
 
 function StaffRow({ user, busy, onEdit, onPassword, onStatus, onDelete }: StaffActionsProps) {
   const role = user.roles[0];
-  return <tr className="transition-colors hover:bg-[#fcfcfd]"><td className="px-5 py-4"><p className="font-semibold text-foreground">{user.name}</p><p className="mt-0.5 text-xs text-muted">{user.profile?.employeeCode ? `${user.profile.employeeCode} · ` : ""}{user.loginId}</p><p className="mt-0.5 text-xs text-subtle">{user.email}</p></td><td className="px-4 py-4"><p className="font-medium text-foreground">{role?.name}</p><p className="mt-0.5 text-xs text-muted">{pretty(user.department)}</p></td><td className="px-4 py-4"><p className="font-medium text-foreground">{pretty(user.dataScope)}</p><p className="mt-0.5 text-xs text-muted">{user.manager?.name ?? (role?.key === "SALES_EXECUTIVE" ? "No manager assigned" : role?.portal === "ADMIN" ? "Admin portal" : "Staff portal")}</p></td><td className="px-4 py-4"><Status value={user.status} /></td><td className="px-4 py-4 text-xs text-muted">{lastLogin(user.lastLoginAt)}</td><td className="px-5 py-4"><div className="flex justify-end"><StaffActions user={user} busy={busy} onEdit={onEdit} onPassword={onPassword} onStatus={onStatus} onDelete={onDelete} /></div></td></tr>;
+  return <tr className="transition-colors hover:bg-[#f8faf9]"><td className="px-5 py-4"><p className="font-semibold text-foreground">{user.name}</p><p className="mt-0.5 text-xs text-muted">{user.profile?.employeeCode ? `${user.profile.employeeCode} · ` : ""}{user.loginId}</p><p className="mt-0.5 text-xs text-subtle">{user.email}</p></td><td className="px-4 py-4"><p className="font-medium text-foreground">{role?.name}</p><p className="mt-0.5 text-xs text-muted">{pretty(user.department)}</p></td><td className="px-4 py-4"><p className="font-medium text-foreground">{pretty(user.dataScope)}</p><p className="mt-0.5 text-xs text-muted">{user.manager?.name ?? (role?.key === "SALES_EXECUTIVE" ? "No manager assigned" : role?.portal === "ADMIN" ? "Admin portal" : "Staff portal")}</p></td><td className="px-4 py-4"><Status value={user.status} /></td><td className="px-4 py-4 text-xs text-muted">{lastLogin(user.lastLoginAt)}</td><td className="px-5 py-4"><div className="flex justify-end"><StaffActions user={user} busy={busy} onEdit={onEdit} onPassword={onPassword} onStatus={onStatus} onDelete={onDelete} /></div></td></tr>;
 }
 
 function StaffCard({ user, busy, onEdit, onPassword, onStatus, onDelete }: StaffActionsProps) {
@@ -168,7 +168,7 @@ function StaffActions({ user, busy, onEdit, onPassword, onStatus, onDelete }: St
     return () => document.removeEventListener("mousedown", close);
   }, []);
   const run = (action: () => void) => { setOpen(false); action(); };
-  return <div className="relative" ref={root}><button type="button" disabled={busy} onClick={() => setOpen((value) => !value)} className="grid size-9 place-items-center rounded-lg border bg-white text-muted shadow-[0_2px_6px_rgba(23,32,51,0.06)] transition-colors hover:border-brand/20 hover:bg-brand-soft hover:text-brand disabled:opacity-50" aria-label={busy ? "Saving staff account" : `Open actions for ${user.name}`} aria-expanded={open}>{busy ? <LoaderCircle className="animate-spin" size={16} /> : <MoreHorizontal size={17} />}</button>{open && <div className="absolute bottom-11 right-0 z-50 w-44 overflow-hidden rounded-lg border bg-white p-1.5 shadow-[0_12px_32px_rgba(16,24,40,0.14)]"><MenuAction icon={Pencil} label="Edit details" onClick={() => run(onEdit)} /><MenuAction icon={KeyRound} label="Update password" onClick={() => run(onPassword)} /><MenuAction icon={user.status === "ACTIVE" ? UserX : UserCheck} label={user.status === "ACTIVE" ? "Deactivate" : "Activate"} onClick={() => run(onStatus)} /><div className="my-1 border-t" /><MenuAction icon={Trash2} label="Delete account" danger onClick={() => run(onDelete)} /></div>}</div>;
+  return <div className="relative" ref={root}><button type="button" disabled={busy} onClick={() => setOpen((value) => !value)} className="grid size-9 place-items-center rounded-lg border bg-white text-muted shadow-[0_2px_6px_rgba(23,35,31,0.05)] transition-colors hover:border-brand/25 hover:bg-brand-soft hover:text-brand disabled:opacity-50" aria-label={busy ? "Saving staff account" : `Open actions for ${user.name}`} aria-expanded={open}>{busy ? <LoaderCircle className="animate-spin" size={16} /> : <MoreHorizontal size={17} />}</button>{open && <div className="absolute bottom-11 right-0 z-50 w-44 overflow-hidden rounded-lg border bg-white p-1.5 shadow-[0_12px_32px_rgba(16,32,27,0.14)]"><MenuAction icon={Pencil} label="Edit details" onClick={() => run(onEdit)} /><MenuAction icon={KeyRound} label="Update password" onClick={() => run(onPassword)} /><MenuAction icon={user.status === "ACTIVE" ? UserX : UserCheck} label={user.status === "ACTIVE" ? "Deactivate" : "Activate"} onClick={() => run(onStatus)} /><div className="my-1 border-t" /><MenuAction icon={Trash2} label="Delete account" danger onClick={() => run(onDelete)} /></div>}</div>;
 }
 
 function MenuAction({ icon: Icon, label, danger = false, onClick }: { icon: typeof Pencil; label: string; danger?: boolean; onClick: () => void }) {
@@ -276,5 +276,5 @@ function DeleteEditor({ user, onClose, onDeleted }: { user: StaffUser; onClose: 
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }
 
 function Modal({ title, subtitle, onClose, children, wide = false }: { title: string; subtitle: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
-  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#101828]/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={title}><div className={`my-auto flex max-h-[calc(100dvh-24px)] w-full flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(16,24,40,0.18)] sm:max-h-[calc(100dvh-32px)] ${wide ? "max-w-4xl" : "max-w-xl"}`}><div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><div><h2 className="text-base font-semibold text-foreground">{title}</h2><p className="mt-1 text-xs text-muted">{subtitle}</p></div><button type="button" onClick={onClose} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-background" aria-label="Close"><X size={17} /></button></div><div className="overflow-y-auto p-4 sm:p-5">{children}</div></div></div>;
+  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#10201b]/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={title}><div className={`my-auto flex max-h-[calc(100dvh-24px)] w-full flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(16,32,27,0.18)] sm:max-h-[calc(100dvh-32px)] ${wide ? "max-w-4xl" : "max-w-xl"}`}><div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><div><h2 className="text-base font-semibold text-foreground">{title}</h2><p className="mt-1 text-xs text-muted">{subtitle}</p></div><button type="button" onClick={onClose} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-background" aria-label="Close"><X size={17} /></button></div><div className="overflow-y-auto p-4 sm:p-5">{children}</div></div></div>;
 }

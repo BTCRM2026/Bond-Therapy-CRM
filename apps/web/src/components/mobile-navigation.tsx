@@ -21,15 +21,15 @@ export function MobileNavigation({ portal, userName, roleName, canManageStaff = 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="grid size-9 shrink-0 place-items-center rounded-lg border bg-white text-foreground shadow-[0_1px_2px_rgba(23,32,51,0.04)] transition-colors hover:bg-background lg:hidden"
+        className="grid size-9 shrink-0 place-items-center rounded-lg border bg-white text-foreground shadow-[0_1px_2px_rgba(23,35,31,0.04)] transition-colors hover:bg-brand-soft lg:hidden"
         aria-label="Open navigation"
       >
         <Menu size={19} />
       </button>
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <button type="button" className="absolute inset-0 bg-[#101828]/35 backdrop-blur-[1px]" onClick={() => setOpen(false)} aria-label="Close navigation" />
-          <aside role="dialog" aria-modal="true" aria-label="Portal navigation" className="relative flex h-[100dvh] w-[min(86vw,304px)] flex-col border-r bg-white px-4 py-5 shadow-[16px_0_40px_rgba(16,24,40,0.14)]">
+          <button type="button" className="absolute inset-0 bg-[#10201b]/35 backdrop-blur-[1px]" onClick={() => setOpen(false)} aria-label="Close navigation" />
+          <aside role="dialog" aria-modal="true" aria-label="Portal navigation" className="relative flex h-[100dvh] w-[min(86vw,304px)] flex-col border-r bg-white px-4 py-5 shadow-[16px_0_40px_rgba(16,32,27,0.14)]">
             <div className="flex min-h-14 items-center justify-between border-b px-2 pb-4">
               <SidebarBrand />
               <button type="button" onClick={() => setOpen(false)} className="grid size-9 place-items-center rounded-lg text-muted hover:bg-background" aria-label="Close navigation">

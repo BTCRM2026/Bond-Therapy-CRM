@@ -26,20 +26,22 @@ Avoid excessive gradients, shadows, bright/multicolor palettes, oversized cards,
 
 ## Color tokens
 
-- Application background: very light cool gray/off-white, approximately `#F5F6F8`.
-- Surface/card: `#FFFFFF`.
-- Primary text: dark navy/charcoal, approximately `#172033`.
-- Secondary text: cool muted gray, approximately `#667085`.
-- Tertiary/disabled text: approximately `#98A2B3`.
-- Border: subtle cool gray, approximately `#E4E7EC`.
-- Primary action color: existing Bond Therapy brand blue/indigo, used in a controlled manner.
+- Authenticated CRM background: soft mineral gray, `#F3F6F5`.
+- Surface/card and sidebar: pure white, `#FFFFFF`.
+- Primary text: deep charcoal-green, `#17231F`.
+- Secondary text: muted mineral gray, `#64736E`.
+- Tertiary/disabled text: `#93A19C`.
+- Border: subtle mineral gray, `#DFE6E3`.
+- Primary action color: restrained petrol green, `#0D5C52`; dark interaction state: `#08483F`; soft selected state: `#E7F2EF`.
+- Warm amber may be used sparingly for warning and supporting accents. Avoid generic indigo/purple “AI dashboard” palettes in authenticated CRM screens.
 - Status colors: muted green for success, muted amber/orange for warning, muted red for error, and muted blue/cyan for information.
 - Use semantic colors only to communicate status, action, selection, or focus.
-- The overall interface must remain predominantly white, light gray, dark navy, and a restrained brand accent.
+- The overall interface must remain predominantly white, mineral gray, deep charcoal, and restrained petrol green.
+- These authenticated CRM tokens are intentionally scoped away from the login page. Do not change the approved login page styling unless explicitly requested.
 
 ## Typography
 
-- Use Inter consistently throughout the application unless technically impossible.
+- Use Manrope consistently throughout authenticated CRM portals. Keep Inter on the approved login experience.
 - Page title: 24-28px, weight 600.
 - Section heading: 16-18px, weight 600.
 - Card heading: 14-16px, weight 600.
@@ -185,4 +187,4 @@ For every page or change, follow this order:
 
 ## Completion checklist
 
-A page is not complete until it feels like the same Bond Therapy CRM product as every other module. Confirm that it has a soft neutral background, mostly white surfaces, compact Inter typography, subtle borders, restrained brand color, consistent buttons and inputs, efficient spacing, easy scanning, simple cards, responsive behavior, and no unnecessary decoration.
+A page is not complete until it feels like the same Bond Therapy CRM product as every other module. Confirm that it has a soft neutral background, mostly white surfaces, compact Manrope typography in authenticated portals, subtle borders, restrained brand color, consistent buttons and inputs, efficient spacing, easy scanning, simple cards, responsive behavior, and no unnecessary decoration.

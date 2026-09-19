@@ -21,10 +21,10 @@ export function SidebarNav({ portal = "ADMIN", canManageStaff = false, onNavigat
     { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
   ] : STAFF_NAV_GROUPS;
   return (
-    <nav className="mt-6 space-y-6 text-sm" aria-label="Portal navigation">
+    <nav className="mt-6 space-y-7 text-sm" aria-label="Portal navigation">
       {groups.map((group) => (
         <div key={group.label}>
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle">{group.label}</p>
+          <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">{group.label}</p>
           <div className="space-y-1">
             {group.items.map((item) => {
               const { href, label, icon: Icon } = item;
@@ -36,8 +36,8 @@ export function SidebarNav({ portal = "ADMIN", canManageStaff = false, onNavigat
                   href={href}
                   onClick={onNavigate}
                   className={cn(
-                    "relative flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors",
-                    active ? "bg-brand text-white shadow-[0_4px_12px_rgba(23,27,114,0.18)]" : "text-muted hover:bg-background hover:text-foreground",
+                    "relative flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-semibold transition-colors duration-150",
+                    active ? "bg-brand text-white shadow-[0_5px_14px_rgba(13,92,82,0.16)]" : "text-muted hover:bg-brand-soft/70 hover:text-brand-dark",
                   )}
                 >
                   <Icon size={17} strokeWidth={1.8} />

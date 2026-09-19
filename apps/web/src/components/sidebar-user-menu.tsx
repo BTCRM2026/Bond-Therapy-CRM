@@ -11,11 +11,11 @@ export function SidebarUserMenu({ userName, roleName }: { userName: string; role
 
   return (
     <div className="mt-auto border-t pt-4">
-      <div className={cn("overflow-hidden rounded-xl border border-transparent transition-[border-color,box-shadow] duration-150", open && "border-border shadow-[0_6px_18px_rgba(23,32,51,0.08)]")}>
+      <div className={cn("overflow-hidden rounded-xl border border-transparent transition-[border-color,box-shadow] duration-150", open && "border-border bg-white shadow-[0_8px_20px_rgba(23,35,31,0.07)]")}>
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="flex w-full items-center gap-3 p-2 text-left outline-none transition-colors hover:bg-background focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/20"
+          className="flex w-full items-center gap-3 p-2 text-left outline-none transition-colors hover:bg-brand-soft/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/20"
           aria-expanded={open}
           aria-label={`${open ? "Close" : "Open"} account menu for ${userName}`}
         >

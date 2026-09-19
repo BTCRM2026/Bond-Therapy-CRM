@@ -15,7 +15,7 @@ export default async function AccessDeniedPage() {
       portal={session.portal}
       canManageStaff={session.permissions.includes("admin.staff.manage")}
     >
-      <section className="mx-auto mt-8 max-w-lg rounded-xl border bg-white p-6 text-center shadow-[0_8px_24px_rgba(23,32,51,0.06)] sm:p-8">
+      <section className="mx-auto mt-8 max-w-lg rounded-xl border bg-white p-6 text-center shadow-[0_8px_24px_rgba(23,35,31,0.06)] sm:p-8">
         <span className="mx-auto grid size-12 place-items-center rounded-xl bg-red-50 text-danger"><ShieldX size={22} /></span>
         <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-danger">Restricted access</p>
         <h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em] text-foreground">You cannot open this page</h2>

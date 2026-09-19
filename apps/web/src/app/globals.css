@@ -19,6 +19,7 @@
   --warning: #e9a90d;
   --warning-soft: #fff8e6;
   --danger: #b4232e;
+  --button-shadow: 0 1px 2px rgba(23, 27, 114, 0.18);
 }
 
 @theme inline {
@@ -53,3 +54,41 @@ body {
 }
 
 button, input { font: inherit; }
+
+.crm-shell {
+  --background: #f3f6f5;
+  --surface: #ffffff;
+  --foreground: #17231f;
+  --muted: #64736e;
+  --subtle: #93a19c;
+  --border: #dfe6e3;
+  --brand: #0d5c52;
+  --brand-dark: #08483f;
+  --brand-soft: #e7f2ef;
+  --accent: #a76f24;
+  --accent-soft: #fbf2e3;
+  --info: #2f7596;
+  --info-soft: #eaf3f7;
+  --magenta: #8b5d78;
+  --magenta-soft: #f6eef3;
+  --warning: #a86f19;
+  --warning-soft: #fbf2df;
+  --danger: #b13f42;
+  --success: #27735f;
+  --button-shadow: 0 1px 2px rgba(13, 92, 82, 0.22);
+  color: var(--foreground);
+  font-family: "Manrope Variable", Manrope, "Segoe UI", sans-serif;
+  font-feature-settings: "ss01" 1, "cv11" 1;
+}
+
+.crm-shell ::selection {
+  background: #cce3dc;
+  color: #10201b;
+}
+
+.crm-shell input,
+.crm-shell select,
+.crm-shell textarea,
+.crm-shell button {
+  font-family: inherit;
+}
