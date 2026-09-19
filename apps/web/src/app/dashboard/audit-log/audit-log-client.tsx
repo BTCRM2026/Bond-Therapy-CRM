@@ -22,8 +22,8 @@ export function AuditLogClient({ initialEntries, activeEntity }: { initialEntrie
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">Activity</h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="text-base font-semibold text-foreground">Recorded activity</h2><p className="mt-1 text-xs text-muted">A traceable history of changes made across the CRM.</p></div>
         <Select
           className="h-9 w-[180px] text-xs"
           value={activeEntity}

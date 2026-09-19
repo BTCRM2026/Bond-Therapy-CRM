@@ -89,8 +89,8 @@ export function DistributorsClient({ initialDistributors }: { initialDistributor
     <div className="space-y-5">
       <StatRow stats={stats} />
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">Distributors</h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="text-base font-semibold text-foreground">Distributor directory</h2><p className="mt-1 text-xs text-muted">Onboarding, ownership and account status in one place.</p></div>
         <Button onClick={() => setOpen(true)}>
           <Truck size={16} /> New distributor
         </Button>
@@ -148,7 +148,7 @@ export function DistributorsClient({ initialDistributors }: { initialDistributor
             <Input id="contactName" {...register("contactName")} />
             {errors.contactName && <p className="text-xs text-danger">{errors.contactName.message}</p>}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className="text-[13px] font-medium text-foreground" htmlFor="phone">Phone</label>
               <Input id="phone" {...register("phone")} />

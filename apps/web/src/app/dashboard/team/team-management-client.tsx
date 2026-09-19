@@ -114,8 +114,8 @@ export function TeamManagementClient({ initialUsers, roles }: { initialUsers: Us
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">Accounts</h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="text-base font-semibold text-foreground">Team accounts</h2><p className="mt-1 text-xs text-muted">Manage identities, roles and sign-in status.</p></div>
         <Button onClick={() => setOpen(true)}>
           <UserPlus size={16} /> New account
         </Button>
@@ -151,10 +151,10 @@ export function TeamManagementClient({ initialUsers, roles }: { initialUsers: Us
               <TD className="text-muted">{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : "Never"}</TD>
               <TD>
                 <div className="flex justify-end gap-2">
-                  <Button variant="secondary" className="h-8 rounded-full px-3 text-xs" onClick={() => onResetPassword(user.id)}>
+                  <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => onResetPassword(user.id)}>
                     <KeyRound size={13} /> Reset password
                   </Button>
-                  <Button variant="secondary" className="h-8 rounded-full px-3 text-xs" onClick={() => onToggleStatus(user)}>
+                  <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => onToggleStatus(user)}>
                     {user.status === "ACTIVE" ? "Deactivate" : "Activate"}
                   </Button>
                 </div>

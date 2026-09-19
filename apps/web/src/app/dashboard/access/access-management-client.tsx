@@ -29,7 +29,7 @@ export function AccessManagementClient({ initialRoles }: { initialRoles: RoleRow
 
   return (
     <div className="space-y-5">
-      <h2 className="text-lg font-semibold tracking-tight text-foreground">Portal roles</h2>
+      <div><h2 className="text-base font-semibold text-foreground">Portal roles</h2><p className="mt-1 text-xs text-muted">Control which operational roles are permitted to sign in.</p></div>
       <Table>
         <THead>
           <TR>
@@ -54,7 +54,7 @@ export function AccessManagementClient({ initialRoles }: { initialRoles: RoleRow
                 <div className="flex justify-end">
                   <Button
                     variant="secondary"
-                    className="h-8 rounded-full px-3 text-xs"
+                    className="h-8 px-3 text-xs"
                     disabled={role.key === "SUPER_ADMIN"}
                     onClick={() => onToggle(role)}
                   >

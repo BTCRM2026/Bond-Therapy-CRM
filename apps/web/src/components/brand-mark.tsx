@@ -7,6 +7,7 @@ export function BrandMark({ className = "" }: { className?: string }) {
       alt="Bond Therapy Professional"
       width={185}
       height={95}
+      priority
       className={`h-auto w-[150px] object-contain sm:w-[165px] ${className}`}
     />
   );

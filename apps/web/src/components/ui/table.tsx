@@ -3,14 +3,14 @@ import { cn } from "@/lib/utils";
 
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="overflow-x-auto rounded-xl border bg-white">
+    <div className="overflow-x-auto rounded-xl border bg-white shadow-[0_1px_2px_rgba(23,32,51,0.025)]">
       <table className={cn("w-full border-collapse text-left text-sm", className)} {...props} />
     </div>
   );
 }
 
 export function THead({ ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className="border-b bg-background/60" {...props} />;
+  return <thead className="border-b bg-[#fafbfc]" {...props} />;
 }
 
 export function TBody({ ...props }: HTMLAttributes<HTMLTableSectionElement>) {
@@ -18,13 +18,13 @@ export function TBody({ ...props }: HTMLAttributes<HTMLTableSectionElement>) {
 }
 
 export function TR({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn("transition-colors hover:bg-background/50", className)} {...props} />;
+  return <tr className={cn("transition-colors hover:bg-[#fafbff]", className)} {...props} />;
 }
 
 export function TH({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={cn("h-11 px-4 text-[11px] font-semibold uppercase tracking-wide text-subtle", className)}
+      className={cn("h-11 px-4 text-xs font-semibold text-muted", className)}
       {...props}
     />
   );

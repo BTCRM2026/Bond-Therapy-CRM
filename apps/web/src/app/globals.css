@@ -1,18 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f6f8;
+  --background: #f5f7fb;
   --surface: #ffffff;
   --foreground: #172033;
   --muted: #667085;
   --subtle: #98a2b3;
-  --border: #e1e5ec;
-  --brand: #6558c9;
-  --brand-dark: #4f45a6;
-  --brand-soft: #f0eefe;
-  --accent: #6558c9;
-  --accent-soft: #f0eefe;
-  --danger: #b43e46;
+  --border: #e4e7ef;
+  --brand: #171b72;
+  --brand-dark: #10145a;
+  --brand-soft: #eef0ff;
+  --accent: #6657d9;
+  --accent-soft: #f0eeff;
+  --info: #4f91e5;
+  --info-soft: #edf6ff;
+  --magenta: #bc4fcf;
+  --magenta-soft: #fbf0fd;
+  --warning: #e9a90d;
+  --warning-soft: #fff8e6;
+  --danger: #b4232e;
 }
 
 @theme inline {
@@ -27,6 +33,12 @@
   --color-brand-soft: var(--brand-soft);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-magenta: var(--magenta);
+  --color-magenta-soft: var(--magenta-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
   --color-danger: var(--danger);
   --font-sans: "Inter Variable", Inter, Arial, sans-serif;
 }
@@ -37,6 +49,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Inter Variable", Inter, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 button, input { font: inherit; }

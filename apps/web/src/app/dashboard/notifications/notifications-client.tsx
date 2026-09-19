@@ -34,8 +34,8 @@ export function NotificationsClient({ initialNotifications }: { initialNotificat
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">Alerts</h2>
+      <div className="flex items-center justify-between gap-3">
+        <div><h2 className="text-base font-semibold text-foreground">System alerts</h2><p className="mt-1 text-xs text-muted">Review changes and items that require attention.</p></div>
         <Badge tone="brand"><Bell size={12} /> {initialNotifications.filter((n) => !n.isRead).length} unread</Badge>
       </div>
 
@@ -46,7 +46,7 @@ export function NotificationsClient({ initialNotifications }: { initialNotificat
             <div
               key={notification.id}
               className={cn(
-                "flex items-start justify-between gap-4 rounded-xl border bg-white p-4",
+                "flex flex-col gap-4 rounded-xl border bg-white p-4 shadow-[0_1px_2px_rgba(23,32,51,0.025)] sm:flex-row sm:items-start sm:justify-between",
                 !notification.isRead && "border-brand/30 bg-brand-soft/40",
               )}
             >
@@ -64,7 +64,7 @@ export function NotificationsClient({ initialNotifications }: { initialNotificat
                 </div>
               </div>
               {!notification.isRead && (
-                <Button variant="secondary" className="h-8 shrink-0 rounded-full px-3 text-xs" onClick={() => onMarkRead(notification.id)}>
+                <Button variant="secondary" className="h-8 shrink-0 px-3 text-xs" onClick={() => onMarkRead(notification.id)}>
                   <CheckCircle2 size={13} /> Mark read
                 </Button>
               )}

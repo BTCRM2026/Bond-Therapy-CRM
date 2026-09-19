@@ -93,8 +93,8 @@ export function AgreementsClient({ initialAgreements, distributors }: { initialA
     <div className="space-y-5">
       <StatRow stats={stats} />
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">Agreements</h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="text-base font-semibold text-foreground">Agreement register</h2><p className="mt-1 text-xs text-muted">Monitor contract ownership, status and expiry dates.</p></div>
         <Button onClick={() => setOpen(true)}>
           <FileSignature size={16} /> New agreement
         </Button>
@@ -147,7 +147,7 @@ export function AgreementsClient({ initialAgreements, distributors }: { initialA
             <Input id="title" {...register("title")} />
             {errors.title && <p className="text-xs text-danger">{errors.title.message}</p>}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className="text-[13px] font-medium text-foreground" htmlFor="partyType">Party type</label>
               <Select id="partyType" {...register("partyType")}>
@@ -171,7 +171,7 @@ export function AgreementsClient({ initialAgreements, distributors }: { initialA
               ))}
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className="text-[13px] font-medium text-foreground" htmlFor="signedDate">Signed date</label>
               <Input id="signedDate" type="date" {...register("signedDate")} />

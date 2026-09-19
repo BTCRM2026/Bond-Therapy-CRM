@@ -7,7 +7,7 @@ export function Select({ className, children, ...props }: SelectHTMLAttributes<H
     <div className="relative">
       <select
         className={cn(
-          "h-11 w-full appearance-none rounded-lg border bg-white px-3 pr-9 text-sm text-foreground outline-none transition duration-150 focus:border-brand focus:ring-2 focus:ring-brand/10 disabled:bg-background disabled:text-subtle",
+          "h-10 w-full appearance-none rounded-lg border bg-white px-3 pr-9 text-sm text-foreground outline-none transition duration-150 focus:border-brand focus:ring-2 focus:ring-brand/10 disabled:bg-background disabled:text-subtle",
           className,
         )}
         {...props}
