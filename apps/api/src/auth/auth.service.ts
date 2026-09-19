@@ -1,5 +1,5 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
-import type { PortalType } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import type { DataScope, Department, PortalType, StaffProfile } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LoginDto } from './login.dto.js';
@@ -19,6 +19,10 @@ type AuthUser = {
   email: string;
   name: string;
   status: string;
+  department: Department | null;
+  dataScope: DataScope;
+  manager: { id: string; name: string } | null;
+  staffProfile: StaffProfile | null;
   roles: Array<{
     role: {
       key: string;
@@ -51,6 +55,10 @@ export class AuthService {
       email: user.email,
       name: user.name,
       status: user.status,
+      department: user.department,
+      dataScope: user.dataScope,
+      manager: user.manager,
+      profile: user.staffProfile,
       roles: roles.map(({ key, name }) => ({ key, name })),
       permissions: [...new Set(roles.flatMap((role) => role.permissions.map(({ permission }) => permission.key)))],
       portal,
@@ -62,7 +70,7 @@ export class AuthService {
     const identifier = dto.identifier.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
       where: { OR: [{ email: identifier }, { loginId: identifier }] },
-      include: { roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
+      include: { manager: { select: { id: true, name: true } }, staffProfile: true, roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
     });
 
     if (!user) {
@@ -120,7 +128,7 @@ export class AuthService {
       where: { id: this.sessionId(token) },
       include: {
         user: {
-          include: { roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
+          include: { manager: { select: { id: true, name: true } }, staffProfile: true, roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
         },
       },
     });
@@ -152,7 +160,8 @@ export class AuthService {
     return user;
   }
 
-  async changePassword(userId: string, dto: ChangePasswordDto, ipAddress?: string) {
+  async changePassword(userId: string, dto: ChangePasswordDto, portal: PortalType, ipAddress?: string) {
+    if (portal !== 'ADMIN') throw new ForbiddenException('Your password is managed by an administrator.');
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
     if (!user || !(await verifyPassword(dto.currentPassword, user.passwordHash))) {
       throw new BadRequestException('Current password is incorrect.');

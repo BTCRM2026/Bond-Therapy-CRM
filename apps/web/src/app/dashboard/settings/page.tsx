@@ -13,12 +13,8 @@ export default async function SettingsPage() {
       headerTitle="Settings"
       headerSubtitle="Profile and account security"
       portal={session.portal}
+      canManageStaff={session.permissions.includes("admin.staff.manage")}
     >
-      <div className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">Account settings</p>
-        <h1 className="mt-2 text-[26px] font-semibold tracking-[-0.025em] text-foreground">Profile</h1>
-        <p className="mt-1.5 text-sm text-muted">Manage your account details and password.</p>
-      </div>
       <ProfileSettings
         initialProfile={{
           name: session.name,
@@ -27,7 +23,12 @@ export default async function SettingsPage() {
           roleName,
           portal: session.portal,
           status: session.status,
+          department: session.department,
+          dataScope: session.dataScope,
+          managerName: session.manager?.name ?? null,
+          staffProfile: session.profile,
         }}
+        canChangePassword={session.portal === "ADMIN"}
       />
     </DashboardShell>
   );

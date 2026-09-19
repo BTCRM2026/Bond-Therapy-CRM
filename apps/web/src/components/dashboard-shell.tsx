@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { MobileNavigation } from "@/components/mobile-navigation";
+import { NotificationCenter } from "@/components/notification-center";
 import { SidebarBrand } from "@/components/sidebar-brand";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { SidebarUserMenu } from "@/components/sidebar-user-menu";
@@ -11,6 +12,7 @@ export function DashboardShell({
   headerTitle,
   headerSubtitle,
   portal = "ADMIN",
+  canManageStaff = false,
   children,
 }: {
   userName: string;
@@ -18,6 +20,7 @@ export function DashboardShell({
   headerTitle: string;
   headerSubtitle: string;
   portal?: PortalType;
+  canManageStaff?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -26,21 +29,22 @@ export function DashboardShell({
         <div className="flex min-h-14 items-center border-b px-2 pb-4">
           <SidebarBrand />
         </div>
-        <SidebarNav portal={portal} />
+        <SidebarNav portal={portal} canManageStaff={canManageStaff} />
         <SidebarUserMenu userName={userName} roleName={roleName} />
       </aside>
       <section className="min-w-0">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b bg-white/95 px-3 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-30 flex min-h-[72px] items-center justify-between gap-3 border-b bg-white/95 px-3 py-3 backdrop-blur sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <MobileNavigation portal={portal} userName={userName} roleName={roleName} />
+            <MobileNavigation portal={portal} userName={userName} roleName={roleName} canManageStaff={canManageStaff} />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">{headerTitle}</p>
+              <h1 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-foreground sm:text-base">{headerTitle}</h1>
               <p className="hidden text-xs text-muted sm:block">{headerSubtitle}</p>
             </div>
           </div>
-          <span className="hidden shrink-0 rounded-md bg-brand-soft px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand md:inline-flex">
-            {portal === "ADMIN" ? "Admin" : portal === "STAFF" ? "Staff" : "Distributor"}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <div id="page-header-actions" className="flex items-center gap-2" />
+            <NotificationCenter />
+          </div>
         </header>
         <div className="mx-auto w-full max-w-[1520px] p-4 sm:p-6 lg:p-8">{children}</div>
       </section>

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { PortalType } from '@prisma/client';
+import type { DataScope, Department, PortalType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 export type SessionUser = {
@@ -8,6 +8,9 @@ export type SessionUser = {
   email: string;
   name: string;
   status: string;
+  department: Department | null;
+  dataScope: DataScope;
+  manager: { id: string; name: string } | null;
   roles: Array<{ key: string; name: string }>;
   permissions: string[];
   portal: PortalType;
@@ -24,6 +27,7 @@ export async function loadSessionUser(prisma: PrismaService, portal: PortalType,
     include: {
       user: {
         include: {
+          manager: { select: { id: true, name: true } },
           roles: {
             where: { role: { portal, isActive: true } },
             include: { role: { include: { permissions: { include: { permission: true } } } } },
@@ -41,6 +45,9 @@ export async function loadSessionUser(prisma: PrismaService, portal: PortalType,
     email: session.user.email,
     name: session.user.name,
     status: session.user.status,
+    department: session.user.department,
+    dataScope: session.user.dataScope,
+    manager: session.user.manager,
     roles: roles.map(({ key, name }) => ({ key, name })),
     permissions: [...new Set(roles.flatMap((role) => role.permissions.map(({ permission }) => permission.key)))],
     portal,

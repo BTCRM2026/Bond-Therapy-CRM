@@ -7,7 +7,7 @@ import { SidebarNav } from "@/components/sidebar-nav";
 import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 import type { PortalType } from "@/lib/portal-types";
 
-export function MobileNavigation({ portal, userName, roleName }: { portal: PortalType; userName: string; roleName: string }) {
+export function MobileNavigation({ portal, userName, roleName, canManageStaff = false }: { portal: PortalType; userName: string; roleName: string; canManageStaff?: boolean }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -36,7 +36,7 @@ export function MobileNavigation({ portal, userName, roleName }: { portal: Porta
                 <X size={18} />
               </button>
             </div>
-            <SidebarNav portal={portal} onNavigate={() => setOpen(false)} />
+            <SidebarNav portal={portal} canManageStaff={canManageStaff} onNavigate={() => setOpen(false)} />
             <SidebarUserMenu userName={userName} roleName={roleName} />
           </aside>
         </div>

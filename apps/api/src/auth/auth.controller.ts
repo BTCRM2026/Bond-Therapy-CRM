@@ -49,7 +49,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const portal = parsePortal(portalHeader);
-    await this.auth.changePassword(user.id, dto, request.ip);
+    await this.auth.changePassword(user.id, dto, portal, request.ip);
     response.clearCookie(portalCookieName(portal), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

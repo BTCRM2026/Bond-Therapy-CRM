@@ -79,6 +79,9 @@ Avoid excessive gradients, shadows, bright/multicolor palettes, oversized cards,
 - Minimal white/light surface with a subtle bottom border.
 - Include search, notifications, profile, company context, and quick actions only where functionally required.
 - Never create an oversized header.
+- Every authenticated module in every portal must use the shared `DashboardShell` header pattern used by Staff & Access: compact module title and description on the left, contextual module actions followed by notifications on the right.
+- Put primary module actions in the shared `page-header-actions` area. Do not create a second page-title or hero block inside module content.
+- Treat this header as the permanent default for all future authenticated pages; vary only its title, description, and functionally required actions.
 
 ### Page header
 

@@ -19,22 +19,93 @@ enum PortalType {
   DISTRIBUTOR
 }
 
+enum Department {
+  PURCHASE
+  SALES
+  ACCOUNTS_BILLING
+  WAREHOUSE
+  DEMO
+}
+
+enum DataScope {
+  OWN
+  TEAM
+  DEPARTMENT
+  COMPANY
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+}
+
+enum BloodGroup {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+}
+
 model User {
-  id                  String      @id @default(cuid())
-  loginId             String      @unique
-  email               String      @unique
+  id                  String         @id @default(cuid())
+  loginId             String         @unique
+  email               String         @unique
   name                String
   passwordHash        String
-  status              UserStatus  @default(ACTIVE)
-  failedLoginAttempts Int         @default(0)
+  status              UserStatus     @default(ACTIVE)
+  failedLoginAttempts Int            @default(0)
   lockedUntil         DateTime?
   lastLoginAt         DateTime?
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  department          Department?
+  dataScope           DataScope      @default(OWN)
+  managerId           String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
   roles               UserRole[]
   sessions            Session[]
-  auditLogs           AuditLog[]  @relation("AuditActor")
-  distributors        Distributor[] @relation("DistributorSalesperson")
+  auditLogs           AuditLog[]     @relation("AuditActor")
+  notifications       Notification[] @relation("NotificationRecipient")
+  distributors        Distributor[]  @relation("DistributorSalesperson")
+  manager             User?          @relation("StaffManager", fields: [managerId], references: [id], onDelete: SetNull)
+  teamMembers         User[]         @relation("StaffManager")
+  staffProfile        StaffProfile?
+
+  @@index([department])
+  @@index([managerId])
+}
+
+model StaffProfile {
+  userId                 String         @id
+  employeeCode           String         @unique
+  mobile                 String
+  jobTitle               String
+  employmentType         EmploymentType @default(FULL_TIME)
+  joiningDate            DateTime
+  dateOfBirth            DateTime?
+  shiftStart             String?
+  shiftEnd               String?
+  bloodGroup             BloodGroup?
+  workLocation           String?
+  residentialAddress     String?
+  emergencyContactName   String?
+  emergencyContactMobile String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  user                   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([mobile])
+}
+
+model EmployeeCounter {
+  key        String   @id
+  nextNumber Int
+  updatedAt  DateTime @updatedAt
 }
 
 model Role {
@@ -85,15 +156,15 @@ model RolePermission {
 }
 
 model Session {
-  id         String   @id
+  id         String     @id
   userId     String
   portal     PortalType
   expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  lastSeenAt DateTime @default(now())
+  createdAt  DateTime   @default(now())
+  lastSeenAt DateTime   @default(now())
   ipAddress  String?
   userAgent  String?
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([portal, expiresAt])
@@ -115,7 +186,6 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
 }
-
 
 enum DistributorStatus {
   ONBOARDING
@@ -182,15 +252,19 @@ enum NotificationSeverity {
 }
 
 model Notification {
-  id        String               @id @default(cuid())
-  type      String
-  severity  NotificationSeverity @default(INFO)
-  title     String
-  message   String
-  sourceKey String               @unique
-  isRead    Boolean              @default(false)
-  createdAt DateTime             @default(now())
+  id          String               @id @default(cuid())
+  type        String
+  severity    NotificationSeverity @default(INFO)
+  title       String
+  message     String
+  sourceKey   String               @unique
+  portal      PortalType           @default(ADMIN)
+  recipientId String?
+  recipient   User?                @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  isRead      Boolean              @default(false)
+  createdAt   DateTime             @default(now())
 
   @@index([isRead])
   @@index([type])
+  @@index([recipientId, portal, isRead])
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { SessionGuard } from '../common/session.guard.js';
 import { RolesGuard } from '../common/roles.guard.js';
@@ -9,7 +9,7 @@ import { PortalType } from '@prisma/client';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import type { SessionUser } from '../common/session.util.js';
 import { UsersService } from './users.service.js';
-import { CreateUserDto, UpdateUserDto } from './dto.js';
+import { CreateUserDto, UpdateStaffPasswordDto, UpdateUserDto } from './dto.js';
 
 @Controller('users')
 @UseGuards(SessionGuard, PortalGuard, RolesGuard)
@@ -20,7 +20,7 @@ export class UsersController {
 
   @Get()
   list() {
-    return this.users.list();
+    return this.users.directory();
   }
 
   @Post()
@@ -33,8 +33,13 @@ export class UsersController {
     return this.users.update(id, dto, actor, req.ip);
   }
 
-  @Post(':id/reset-password')
-  resetPassword(@Param('id') id: string, @CurrentUser() actor: SessionUser, @Req() req: Request) {
-    return this.users.resetPassword(id, actor, req.ip);
+  @Post(':id/password')
+  updatePassword(@Param('id') id: string, @Body() dto: UpdateStaffPasswordDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
+    return this.users.updatePassword(id, dto, actor, req.ip);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @CurrentUser() actor: SessionUser, @Req() req: Request) {
+    return this.users.remove(id, actor, req.ip);
   }
 }

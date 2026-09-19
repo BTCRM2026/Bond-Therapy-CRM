@@ -1,24 +1,25 @@
 "use client";
 
-import { LayoutDashboard, Settings } from "lucide-react";
+import { LayoutDashboard, Settings, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
 import { cn } from "@/lib/utils";
-
-const ADMIN_NAV_GROUPS = [
-  { label: "Workspace", items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }] },
-  { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
-];
 
 const STAFF_NAV_GROUPS = [
   { label: "Workspace", items: [{ href: "/dashboard", label: "My workspace", icon: LayoutDashboard, exact: true }] },
   { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
 ];
 
-export function SidebarNav({ portal = "ADMIN", onNavigate }: { portal?: PortalType; onNavigate?: () => void }) {
+export function SidebarNav({ portal = "ADMIN", canManageStaff = false, onNavigate }: { portal?: PortalType; canManageStaff?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
-  const groups = portal === "ADMIN" ? ADMIN_NAV_GROUPS : STAFF_NAV_GROUPS;
+  const groups = portal === "ADMIN" ? [
+    { label: "Workspace", items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
+      ...(canManageStaff ? [{ href: "/dashboard/staff", label: "Staff & Access", icon: UsersRound, exact: false }] : []),
+    ] },
+    { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
+  ] : STAFF_NAV_GROUPS;
   return (
     <nav className="mt-6 space-y-6 text-sm" aria-label="Portal navigation">
       {groups.map((group) => (

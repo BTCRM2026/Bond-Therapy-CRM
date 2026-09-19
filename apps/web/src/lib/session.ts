@@ -10,10 +10,28 @@ export type SessionUser = {
   loginId: string;
   email: string;
   status: string;
+  department: "PURCHASE" | "SALES" | "ACCOUNTS_BILLING" | "WAREHOUSE" | "DEMO" | null;
+  dataScope: "OWN" | "TEAM" | "DEPARTMENT" | "COMPANY";
+  manager: { id: string; name: string } | null;
   roles: Array<{ key: string; name: string }>;
   permissions: string[];
   portal: PortalType;
   dashboardPath: string;
+  profile: {
+    employeeCode: string;
+    mobile: string;
+    jobTitle: string;
+    employmentType: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERN";
+    joiningDate: string;
+    dateOfBirth: string | null;
+    shiftStart: string | null;
+    shiftEnd: string | null;
+    bloodGroup: string | null;
+    workLocation: string | null;
+    residentialAddress: string | null;
+    emergencyContactName: string | null;
+    emergencyContactMobile: string | null;
+  } | null;
 };
 
 export async function requireSession(expectedPortal?: PortalType): Promise<SessionUser> {
