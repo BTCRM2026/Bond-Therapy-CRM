@@ -1,9 +1,9 @@
 import { DashboardShell } from "@/components/dashboard-shell";
-import { requireSession, serverApiFetch } from "@/lib/session";
+import { requireAdminSession, serverApiFetch } from "@/lib/session";
 import { DistributorsClient, type DistributorRow } from "./distributors-client";
 
 export default async function DistributorsPage() {
-  const session = await requireSession();
+  const session = await requireAdminSession();
   const roleName = session.roles[0]?.name ?? "Authorized user";
 
   const res = await serverApiFetch("/distributors");

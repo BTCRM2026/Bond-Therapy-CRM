@@ -13,6 +13,12 @@ enum UserStatus {
   LOCKED
 }
 
+enum PortalType {
+  ADMIN
+  STAFF
+  DISTRIBUTOR
+}
+
 model User {
   id                  String      @id @default(cuid())
   loginId             String      @unique
@@ -36,6 +42,7 @@ model Role {
   key           String           @unique
   name          String
   description   String?
+  portal        PortalType
   dashboardPath String
   priority      Int              @default(100)
   isActive      Boolean          @default(true)
@@ -43,6 +50,8 @@ model Role {
   updatedAt     DateTime         @updatedAt
   users         UserRole[]
   permissions   RolePermission[]
+
+  @@index([portal, isActive])
 }
 
 model Permission {
@@ -78,6 +87,7 @@ model RolePermission {
 model Session {
   id         String   @id
   userId     String
+  portal     PortalType
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
@@ -86,6 +96,7 @@ model Session {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([portal, expiresAt])
   @@index([expiresAt])
 }
 

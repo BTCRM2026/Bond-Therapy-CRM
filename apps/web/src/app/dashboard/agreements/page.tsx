@@ -1,10 +1,10 @@
 import { DashboardShell } from "@/components/dashboard-shell";
-import { requireSession, serverApiFetch } from "@/lib/session";
+import { requireAdminSession, serverApiFetch } from "@/lib/session";
 import { AgreementsClient, type AgreementRow } from "./agreements-client";
 import type { DistributorRow } from "../distributors/distributors-client";
 
 export default async function AgreementsPage() {
-  const session = await requireSession();
+  const session = await requireAdminSession();
   const roleName = session.roles[0]?.name ?? "Authorized user";
 
   const [agreementsRes, distributorsRes] = await Promise.all([

@@ -8,19 +8,24 @@ export function DashboardShell({
   roleName,
   headerTitle,
   headerSubtitle,
+  portal = "ADMIN",
   children,
 }: {
   userName: string;
   roleName: string;
   headerTitle: string;
   headerSubtitle: string;
+  portal?: "ADMIN" | "STAFF";
   children: ReactNode;
 }) {
   return (
     <main className="min-h-screen bg-background lg:grid lg:grid-cols-[248px_1fr]">
       <aside className="hidden border-r bg-white p-5 lg:flex lg:flex-col">
         <BrandMark />
-        <SidebarNav />
+        <div className="mt-5 inline-flex w-fit rounded-md bg-brand-soft px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-dark">
+          {portal === "STAFF" ? "Staff Portal" : "Administration"}
+        </div>
+        <SidebarNav portal={portal} />
         <div className="mt-auto rounded-lg border bg-background p-3">
           <p className="text-xs font-semibold text-foreground">{userName}</p>
           <p className="mt-1 truncate text-[11px] text-muted">{roleName}</p>

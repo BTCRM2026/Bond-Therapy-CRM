@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import type { PortalType } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LoginDto } from './login.dto.js';
@@ -11,6 +12,24 @@ const LOCK_MINUTES = 15;
 
 type RequestMeta = { ipAddress?: string; userAgent?: string };
 
+type AuthUser = {
+  id: string;
+  loginId: string;
+  email: string;
+  name: string;
+  roles: Array<{
+    role: {
+      key: string;
+      name: string;
+      dashboardPath: string;
+      priority: number;
+      portal: PortalType;
+      isActive: boolean;
+      permissions: Array<{ permission: { key: string } }>;
+    };
+  }>;
+};
+
 @Injectable()
 export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
@@ -19,29 +38,28 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  private publicUser(user: {
-    id: string;
-    loginId: string;
-    email: string;
-    name: string;
-    roles: Array<{ role: { key: string; name: string; dashboardPath: string; priority: number } }>;
-  }) {
-    const roles = user.roles.map(({ role }) => role).sort((a, b) => a.priority - b.priority);
+  private publicUser(user: AuthUser, portal: PortalType) {
+    const roles = user.roles
+      .map(({ role }) => role)
+      .filter((role) => role.portal === portal && role.isActive)
+      .sort((a, b) => a.priority - b.priority);
     return {
       id: user.id,
       loginId: user.loginId,
       email: user.email,
       name: user.name,
       roles: roles.map(({ key, name }) => ({ key, name })),
+      permissions: [...new Set(roles.flatMap((role) => role.permissions.map(({ permission }) => permission.key)))],
+      portal,
       dashboardPath: roles[0]?.dashboardPath ?? '/dashboard',
     };
   }
 
-  async login(dto: LoginDto, meta: RequestMeta) {
+  async login(dto: LoginDto, meta: RequestMeta, portal: PortalType) {
     const identifier = dto.identifier.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
       where: { OR: [{ email: identifier }, { loginId: identifier }] },
-      include: { roles: { include: { role: true } } },
+      include: { roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
     });
 
     if (!user) {
@@ -65,6 +83,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid login ID or password.');
     }
 
+    const publicUser = this.publicUser(user, portal);
+    if (!publicUser.roles.length) {
+      const assignedPortal = user.roles
+        .map(({ role }) => role)
+        .filter((role) => role.isActive)
+        .sort((a, b) => a.priority - b.priority)[0]?.portal;
+      throw new UnauthorizedException({ message: 'Redirecting you to your assigned portal.', assignedPortal });
+    }
+
     const token = randomBytes(32).toString('base64url');
     const maxAgeMs = dto.remember ? REMEMBER_DAYS * 86_400_000 : SESSION_HOURS * 3_600_000;
     await this.prisma.$transaction([
@@ -73,31 +100,37 @@ export class AuthService {
         data: {
           id: this.sessionId(token),
           userId: user.id,
+          portal,
           expiresAt: new Date(Date.now() + maxAgeMs),
           ipAddress: meta.ipAddress,
           userAgent: meta.userAgent,
         },
       }),
-      this.prisma.auditLog.create({ data: { actorId: user.id, action: 'LOGIN', entity: 'SESSION', ipAddress: meta.ipAddress } }),
+      this.prisma.auditLog.create({ data: { actorId: user.id, action: 'LOGIN', entity: 'SESSION', ipAddress: meta.ipAddress, details: { portal } } }),
     ]);
-    return { token, maxAgeMs, user: this.publicUser(user) };
+    return { token, maxAgeMs, user: publicUser };
   }
 
-  async session(token?: string) {
+  async session(portal: PortalType, token?: string) {
     if (!token) throw new UnauthorizedException();
     const session = await this.prisma.session.findUnique({
       where: { id: this.sessionId(token) },
-      include: { user: { include: { roles: { include: { role: true } } } } },
+      include: {
+        user: {
+          include: { roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
+        },
+      },
     });
-    if (!session || session.expiresAt <= new Date() || session.user.status !== 'ACTIVE') {
+    if (!session || session.portal !== portal || session.expiresAt <= new Date() || session.user.status !== 'ACTIVE') {
       if (session) await this.prisma.session.delete({ where: { id: session.id } });
       throw new UnauthorizedException();
     }
-    return this.publicUser(session.user);
+    const user = this.publicUser(session.user, portal);
+    if (!user.roles.length) throw new UnauthorizedException();
+    return user;
   }
 
   async logout(token?: string) {
     if (token) await this.prisma.session.deleteMany({ where: { id: this.sessionId(token) } });
   }
 }
-

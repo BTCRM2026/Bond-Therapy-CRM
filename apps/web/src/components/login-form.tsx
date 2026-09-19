@@ -33,8 +33,12 @@ export function LoginForm() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(values),
     });
-    const data = (await response.json().catch(() => null)) as { message?: string; user?: { dashboardPath?: string } } | null;
+    const data = (await response.json().catch(() => null)) as { message?: string; redirectUrl?: string; user?: { dashboardPath?: string } } | null;
     if (!response.ok) {
+      if (data?.redirectUrl) {
+        window.location.assign(data.redirectUrl);
+        return;
+      }
       setServerError(data?.message ?? "Unable to sign in. Please try again.");
       return;
     }

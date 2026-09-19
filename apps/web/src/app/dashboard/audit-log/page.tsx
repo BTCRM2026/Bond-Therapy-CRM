@@ -1,5 +1,5 @@
 import { DashboardShell } from "@/components/dashboard-shell";
-import { requireSession, serverApiFetch } from "@/lib/session";
+import { requireAdminSession, serverApiFetch } from "@/lib/session";
 import { AuditLogClient, type AuditLogRow } from "./audit-log-client";
 
 export default async function AuditLogPage({
@@ -7,7 +7,7 @@ export default async function AuditLogPage({
 }: {
   searchParams: Promise<{ entity?: string }>;
 }) {
-  const session = await requireSession();
+  const session = await requireAdminSession();
   const roleName = session.roles[0]?.name ?? "Authorized user";
   const { entity } = await searchParams;
 

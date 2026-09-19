@@ -1,44 +1,46 @@
-import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './login.dto.js';
-
-const COOKIE_NAME = 'bt_session';
+import { parsePortal, PORTAL_HEADER, portalCookieName } from '../common/portal.js';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('login')
-  async login(@Body() dto: LoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    const result = await this.auth.login(dto, { ipAddress: request.ip, userAgent: request.get('user-agent') });
-    response.cookie(COOKIE_NAME, result.token, {
+  async login(@Body() dto: LoginDto, @Headers(PORTAL_HEADER) portalHeader: string | undefined, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const portal = parsePortal(portalHeader);
+    const result = await this.auth.login(dto, { ipAddress: request.ip, userAgent: request.get('user-agent') }, portal);
+    response.cookie(portalCookieName(portal), result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: result.maxAgeMs,
-      ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+      priority: 'high',
     });
     return { user: result.user };
   }
 
   @Get('session')
-  session(@Req() request: Request) {
-    return this.auth.session(request.cookies?.[COOKIE_NAME] as string | undefined);
+  session(@Headers(PORTAL_HEADER) portalHeader: string | undefined, @Req() request: Request) {
+    const portal = parsePortal(portalHeader);
+    return this.auth.session(portal, request.cookies?.[portalCookieName(portal)] as string | undefined);
   }
 
   @Post('logout')
-  async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    await this.auth.logout(request.cookies?.[COOKIE_NAME] as string | undefined);
-    response.clearCookie(COOKIE_NAME, {
+  async logout(@Headers(PORTAL_HEADER) portalHeader: string | undefined, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const portal = parsePortal(portalHeader);
+    const cookieName = portalCookieName(portal);
+    await this.auth.logout(request.cookies?.[cookieName] as string | undefined);
+    response.clearCookie(cookieName, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+      priority: 'high',
     });
     return { ok: true };
   }
 }
-

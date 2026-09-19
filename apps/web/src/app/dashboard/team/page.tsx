@@ -1,9 +1,9 @@
 import { DashboardShell } from "@/components/dashboard-shell";
-import { requireSession, serverApiFetch } from "@/lib/session";
+import { requireAdminSession, serverApiFetch } from "@/lib/session";
 import { TeamManagementClient, type RoleOption, type UserRow } from "./team-management-client";
 
 export default async function TeamManagementPage() {
-  const session = await requireSession();
+  const session = await requireAdminSession();
   const roleName = session.roles[0]?.name ?? "Authorized user";
 
   const [usersRes, rolesRes] = await Promise.all([

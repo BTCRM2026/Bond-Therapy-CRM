@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
+const ADMIN_NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/team", label: "Team management", icon: Users },
   { href: "/dashboard/access", label: "Access management", icon: ShieldCheck },
@@ -15,11 +15,16 @@ const NAV_ITEMS = [
   { href: "/dashboard/audit-log", label: "Audit log", icon: Activity },
 ];
 
-export function SidebarNav() {
+const STAFF_NAV_ITEMS = [
+  { href: "/dashboard", label: "My workspace", icon: LayoutDashboard, exact: true },
+];
+
+export function SidebarNav({ portal = "ADMIN" }: { portal?: "ADMIN" | "STAFF" }) {
   const pathname = usePathname();
+  const items = portal === "STAFF" ? STAFF_NAV_ITEMS : ADMIN_NAV_ITEMS;
   return (
     <nav className="mt-8 space-y-1 text-sm">
-      {NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => {
+      {items.map(({ href, label, icon: Icon, exact }) => {
         const active = exact ? pathname === href : pathname.startsWith(href);
         return (
           <Link

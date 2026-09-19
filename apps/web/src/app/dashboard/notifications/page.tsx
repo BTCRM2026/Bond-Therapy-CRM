@@ -1,9 +1,9 @@
 import { DashboardShell } from "@/components/dashboard-shell";
-import { requireSession, serverApiFetch } from "@/lib/session";
+import { requireAdminSession, serverApiFetch } from "@/lib/session";
 import { NotificationsClient, type NotificationRow } from "./notifications-client";
 
 export default async function NotificationsPage() {
-  const session = await requireSession();
+  const session = await requireAdminSession();
   const roleName = session.roles[0]?.name ?? "Authorized user";
 
   const res = await serverApiFetch("/notifications");
