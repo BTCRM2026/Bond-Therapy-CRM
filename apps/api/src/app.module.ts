@@ -8,6 +8,7 @@ import { DistributorsModule } from './distributors/distributors.module.js';
 import { AgreementsModule } from './agreements/agreements.module.js';
 import { AuditLogModule } from './audit-log/audit-log.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { ClientsModule } from './clients/clients.module.js';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { NotificationsModule } from './notifications/notifications.module.js';
     AgreementsModule,
     AuditLogModule,
     NotificationsModule,
+    ClientsModule,
   ],
   controllers: [AppController],
 })

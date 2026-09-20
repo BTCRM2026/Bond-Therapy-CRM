@@ -42,6 +42,8 @@ $ npm run start:dev
 
 # production mode
 $ npm run start:prod
+
+Production startup runs migrations and the API only. Run `npm run db:seed` once when provisioning a new environment; it will not overwrite existing profile names or emails.
 ```
 
 ## Run tests

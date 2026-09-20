@@ -54,7 +54,7 @@ const staffRoles = [
   ['SALES_EXECUTIVE', 'Sales Executive', 'staff.sales.access', 11],
   ['ACCOUNTS_BILLING', 'Accounts & Billing', 'staff.accounts.access', 20],
   ['WAREHOUSE', 'Warehouse', 'staff.warehouse.access', 30],
-  ['DEMO_TEAM', 'Demo Team', 'staff.demo.access', 40],
+  ['DEMO_TEAM', 'Trainer', 'staff.demo.access', 40],
 ];
 
 for (const [key, name, permissionKey, priority] of staffRoles) {
@@ -82,7 +82,7 @@ const password = process.env.ADMIN_PASSWORD;
 if (loginId && email && password) {
   const user = await prisma.user.upsert({
     where: { email },
-    update: { loginId, name: 'Bond Therapy Administrator', status: 'ACTIVE', dataScope: 'COMPANY' },
+    update: { status: 'ACTIVE', dataScope: 'COMPANY' },
     create: { loginId, email, name: 'Bond Therapy Administrator', passwordHash: hashPassword(password), dataScope: 'COMPANY' },
   });
   await prisma.userRole.upsert({
@@ -105,7 +105,7 @@ if (staffLoginId && staffEmail && staffPassword) {
   if (staffRole.portal !== 'STAFF') throw new Error(`${staffRoleKey} is not a Staff portal role.`);
   const user = await prisma.user.upsert({
     where: { email: staffEmail },
-    update: { loginId: staffLoginId, name: 'Local Staff User', status: 'ACTIVE', department: 'SALES', dataScope: staffRoleKey === 'SALES_MANAGER' ? 'TEAM' : 'OWN' },
+    update: { status: 'ACTIVE', department: 'SALES', dataScope: staffRoleKey === 'SALES_MANAGER' ? 'TEAM' : 'OWN' },
     create: { loginId: staffLoginId, email: staffEmail, name: 'Local Staff User', passwordHash: hashPassword(staffPassword), department: 'SALES', dataScope: staffRoleKey === 'SALES_MANAGER' ? 'TEAM' : 'OWN' },
   });
   await prisma.userRole.upsert({

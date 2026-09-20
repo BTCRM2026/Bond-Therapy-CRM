@@ -1,13 +1,13 @@
 "use client";
 
-import { LayoutDashboard, Settings, UsersRound } from "lucide-react";
+import { Building2, LayoutDashboard, Settings, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
 import { cn } from "@/lib/utils";
 
 const STAFF_NAV_GROUPS = [
-  { label: "Workspace", items: [{ href: "/dashboard", label: "My workspace", icon: LayoutDashboard, exact: true }] },
+  { label: "Workspace", items: [{ href: "/dashboard", label: "My workspace", icon: LayoutDashboard, exact: true }, { href: "/dashboard/clients", label: "Clients", icon: Building2, exact: false }] },
   { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
 ];
 
