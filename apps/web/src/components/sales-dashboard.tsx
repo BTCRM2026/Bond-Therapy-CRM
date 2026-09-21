@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3, Target, TrendingUp, Trophy, UserPlus } from "lucide-react";
+import { CalendarClock, Clock3, IndianRupee, LogIn, MapPin, Target, TrendingUp, Trophy, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -60,11 +60,15 @@ export function SalesDashboardWidgets() {
       </div>)}</div>
     </section>}
 
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       <QuickLink href="/dashboard/leads" icon={UserPlus} label="Add lead" />
       <QuickLink href="/dashboard/follow-ups" icon={Clock3} label="Follow-ups" />
       <QuickLink href="/dashboard/orders" icon={TrendingUp} label="Orders" />
       <QuickLink href="/dashboard/products" icon={Target} label="Catalogue" />
+      <QuickLink href="/dashboard/demos" icon={CalendarClock} label="Book demo" />
+      <QuickLink href="/dashboard/territory" icon={MapPin} label="Territory" />
+      <QuickLink href="/dashboard/attendance" icon={LogIn} label="Attendance" />
+      <QuickLink href="/dashboard/incentives" icon={IndianRupee} label="Incentives" />
     </div>
   </div>;
 }

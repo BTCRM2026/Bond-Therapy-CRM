@@ -1,6 +1,6 @@
-import { IsEmail, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ClientActivityStatus, ClientActivityType, ClientCategory, ClientPotential, ClientStatus, CustomerSegment } from '@prisma/client';
+import { ClientActivityStatus, ClientActivityType, ClientCategory, ClientPotential, ClientStatus, CustomerSegment, DemoOutcome } from '@prisma/client';
 
 export class ListClientsDto {
   @IsOptional() @IsString() @MaxLength(120) search?: string;
@@ -50,6 +50,12 @@ export class ClientDto {
   @IsOptional() continueOnDuplicate?: boolean;
 }
 
+export class RequestedProductDto {
+  @IsString() productId!: string;
+  @IsString() @MaxLength(160) name!: string;
+  @IsInt() @Min(1) quantity!: number;
+}
+
 export class ClientActivityDto {
   @IsEnum(ClientActivityType) type!: ClientActivityType;
   @IsOptional() @IsEnum(ClientActivityStatus) status?: ClientActivityStatus;
@@ -57,13 +63,18 @@ export class ClientActivityDto {
   @IsOptional() @IsString() @MaxLength(120) personMet?: string;
   @IsOptional() @IsString() @MaxLength(1000) note?: string;
   @IsOptional() @IsString() scheduledAt?: string;
+  @IsOptional() @IsString() assignedToId?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(1000) attendeeCount?: number;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => RequestedProductDto) requestedProducts?: RequestedProductDto[];
 }
 
 export class ListActivitiesDto {
   @IsOptional() @IsIn(['open', 'overdue', 'all']) scope?: 'open' | 'overdue' | 'all';
+  @IsOptional() @IsEnum(ClientActivityType) type?: ClientActivityType;
 }
 
 export class UpdateActivityStatusDto {
   @IsEnum(ClientActivityStatus) status!: ClientActivityStatus;
   @IsOptional() @IsString() @MaxLength(1000) note?: string;
+  @IsOptional() @IsEnum(DemoOutcome) outcome?: DemoOutcome;
 }

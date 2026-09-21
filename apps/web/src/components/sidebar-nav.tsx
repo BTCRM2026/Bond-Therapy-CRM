@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Building2, LayoutDashboard, ListChecks, Package, Settings, ShoppingCart, Truck, UserPlus, UsersRound } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, Clock3, IndianRupee, LayoutDashboard, ListChecks, MapPin, Package, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
@@ -20,9 +20,16 @@ function staffGroups(roleKey?: string) {
     ] : []),
     ...(isWarehouse ? [{ href: "/dashboard/dispatch", label: "Dispatch", icon: Truck, exact: false }] : []),
     { href: "/dashboard/clients", label: "Clients", icon: Building2, exact: false },
-    ...(isSales ? [{ href: "/dashboard/orders", label: "Orders", icon: ShoppingCart, exact: false }] : []),
+    ...(isSales ? [
+      { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart, exact: false },
+      { href: "/dashboard/products", label: "Products", icon: Package, exact: false },
+      { href: "/dashboard/demos", label: "Demo Booking", icon: CalendarClock, exact: false },
+      { href: "/dashboard/territory", label: "Territory", icon: MapPin, exact: false },
+      { href: "/dashboard/performance", label: "Performance", icon: TrendingUp, exact: false },
+      { href: "/dashboard/incentives", label: "Incentives", icon: IndianRupee, exact: false },
+      { href: "/dashboard/attendance", label: "Attendance", icon: Clock3, exact: false },
+    ] : []),
     ...(isWarehouse ? [{ href: "/dashboard/inventory", label: "Inventory", icon: AlertTriangle, exact: false }] : []),
-    ...(isSales ? [{ href: "/dashboard/products", label: "Products", icon: Package, exact: false }] : []),
   ];
   return [
     { label: "Workspace", items: workspaceItems },

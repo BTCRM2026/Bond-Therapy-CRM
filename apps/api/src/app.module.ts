@@ -14,6 +14,8 @@ import { ProductsModule } from './products/products.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { SalesModule } from './sales/sales.module.js';
 import { WarehouseModule } from './warehouse/warehouse.module.js';
+import { IncentivesModule } from './incentives/incentives.module.js';
+import { AttendanceModule } from './attendance/attendance.module.js';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { WarehouseModule } from './warehouse/warehouse.module.js';
     OrdersModule,
     SalesModule,
     WarehouseModule,
+    IncentivesModule,
+    AttendanceModule,
   ],
   controllers: [AppController],
 })

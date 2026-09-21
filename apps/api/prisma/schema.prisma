@@ -79,11 +79,15 @@ model User {
   clientsAssigned     Client[]         @relation("ClientSalesperson")
   clientsTrained      Client[]         @relation("ClientTrainer")
   clientActivities    ClientActivity[] @relation("ClientActivityCreator")
+  clientActivitiesAssigned ClientActivity[] @relation("ClientActivityAssignee")
   leadsAssigned       Lead[]           @relation("LeadAssignee")
   leadsCreated        Lead[]           @relation("LeadCreator")
   ordersBooked        Order[]          @relation("OrderSalesperson")
   salesTargets        SalesTarget[]    @relation("SalesTargetOwner")
   stockMovementsRecorded StockMovement[] @relation("StockMovementRecorder")
+  attendanceRecords   AttendanceRecord[] @relation("AttendanceOwner")
+  incentiveStatements IncentiveStatement[] @relation("IncentiveOwner")
+  incentivesApproved  IncentiveStatement[] @relation("IncentiveApprover")
 
   @@index([department])
   @@index([managerId])
@@ -262,6 +266,14 @@ enum ClientActivityStatus {
   CANCELLED
 }
 
+enum DemoOutcome {
+  INTERESTED
+  TRIAL_REQUIRED
+  QUOTATION_REQUESTED
+  NOT_INTERESTED
+  FOLLOW_UP_REQUIRED
+}
+
 model Client {
   id                       String           @id @default(cuid())
   salonName                String
@@ -319,23 +331,29 @@ model Client {
 }
 
 model ClientActivity {
-  id          String               @id @default(cuid())
-  clientId    String
-  type        ClientActivityType
-  status      ClientActivityStatus @default(OPEN)
-  purpose     String?
-  personMet   String?
-  note        String?
-  scheduledAt DateTime?
-  completedAt DateTime?
-  createdById String
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-  client      Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  createdBy   User                 @relation("ClientActivityCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  id                String               @id @default(cuid())
+  clientId          String
+  type              ClientActivityType
+  status            ClientActivityStatus @default(OPEN)
+  purpose           String?
+  personMet         String?
+  note              String?
+  scheduledAt       DateTime?
+  completedAt       DateTime?
+  createdById       String
+  assignedToId      String?
+  attendeeCount     Int?
+  requestedProducts Json?
+  outcome           DemoOutcome?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  client            Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy         User                 @relation("ClientActivityCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  assignedTo        User?                @relation("ClientActivityAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([clientId, createdAt])
   @@index([clientId, status, scheduledAt])
+  @@index([assignedToId, type])
   @@index([createdById])
 }
 
@@ -499,6 +517,47 @@ model SalesTarget {
 
   @@unique([userId, periodYear, periodMonth])
   @@index([periodYear, periodMonth])
+}
+
+enum IncentiveStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
+model IncentiveStatement {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation("IncentiveOwner", fields: [userId], references: [id], onDelete: Cascade)
+  periodMonth     Int
+  periodYear      Int
+  ratePercent     Decimal          @db.Decimal(5, 2)
+  eligibleRevenue Decimal          @db.Decimal(12, 2)
+  incentiveAmount Decimal          @db.Decimal(12, 2)
+  status          IncentiveStatus  @default(PENDING)
+  approvedById    String?
+  approvedBy      User?            @relation("IncentiveApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([userId, periodYear, periodMonth])
+  @@index([periodYear, periodMonth])
+  @@index([status])
+}
+
+model AttendanceRecord {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation("AttendanceOwner", fields: [userId], references: [id], onDelete: Cascade)
+  date        DateTime  @db.Date
+  punchInAt   DateTime?
+  punchOutAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }
 
 enum AgreementPartyType {

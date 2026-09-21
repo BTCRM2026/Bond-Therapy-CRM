@@ -25,6 +25,12 @@ export class ClientsController {
   @Patch('activities/:id')
   updateActivityStatus(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: UpdateActivityStatusDto) { return this.clients.updateActivityStatus(actor, id, dto); }
 
+  @Get('territory')
+  territoryCoverage(@CurrentUser() actor: SessionUser) { return this.clients.territoryCoverage(actor); }
+
+  @Get('trainers')
+  listTrainers(@CurrentUser() actor: SessionUser) { return this.clients.listTrainers(actor); }
+
   @Get(':id')
   detail(@CurrentUser() actor: SessionUser, @Param('id') id: string) { return this.clients.detail(actor, id); }
 

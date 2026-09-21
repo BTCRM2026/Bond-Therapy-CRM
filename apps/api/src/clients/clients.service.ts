@@ -147,7 +147,18 @@ export class ClientsService {
 
   async addActivity(actor: SessionUser, clientId: string, dto: ClientActivityDto, ipAddress?: string) {
     const client = await this.getVisible(actor, clientId);
-    const activity = await this.prisma.clientActivity.create({ data: { clientId: client.id, type: dto.type, status: dto.status ?? 'OPEN', purpose: dto.purpose?.trim() || null, personMet: dto.personMet?.trim() || null, note: dto.note?.trim() || null, scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null, completedAt: dto.status === 'COMPLETED' ? new Date() : null, createdById: actor.id }, include: { createdBy: { select: { id: true, name: true } } } });
+    if (dto.assignedToId) {
+      const assignee = await this.prisma.user.findFirst({ where: { id: dto.assignedToId, status: 'ACTIVE' }, select: { id: true } });
+      if (!assignee) throw new ForbiddenException('Select an active team member to assign.');
+    }
+    const activity = await this.prisma.clientActivity.create({
+      data: {
+        clientId: client.id, type: dto.type, status: dto.status ?? 'OPEN', purpose: dto.purpose?.trim() || null, personMet: dto.personMet?.trim() || null, note: dto.note?.trim() || null,
+        scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null, completedAt: dto.status === 'COMPLETED' ? new Date() : null, createdById: actor.id,
+        assignedToId: dto.assignedToId || null, attendeeCount: dto.attendeeCount ?? null, requestedProducts: dto.requestedProducts ? (dto.requestedProducts as unknown as Prisma.InputJsonValue) : undefined,
+      },
+      include: { createdBy: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } } },
+    });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'CLIENT_ACTIVITY_CREATE', entity: 'CLIENT_ACTIVITY', entityId: activity.id, details: { clientId, type: activity.type }, ipAddress });
     return activity;
   }
@@ -159,10 +170,11 @@ export class ClientsService {
     if (query.scope === 'overdue') filters.push({ status: 'OPEN', scheduledAt: { lt: now } });
     else if (query.scope === 'all') { /* no extra status filter */ }
     else filters.push({ status: 'OPEN' });
+    if (query.type) filters.push({ type: query.type });
     const where = { AND: filters } satisfies Prisma.ClientActivityWhereInput;
     return this.prisma.clientActivity.findMany({
       where,
-      include: { client: { select: { id: true, salonName: true, city: true, primaryContact: true } }, createdBy: { select: { id: true, name: true } } },
+      include: { client: { select: { id: true, salonName: true, city: true, primaryContact: true } }, createdBy: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } } },
       orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }],
       take: 100,
     });
@@ -174,8 +186,33 @@ export class ClientsService {
     if (!activity) throw new NotFoundException('Activity not found or you do not have access to it.');
     return this.prisma.clientActivity.update({
       where: { id },
-      data: { status: dto.status, note: dto.note?.trim() || activity.note, completedAt: dto.status === 'COMPLETED' ? new Date() : activity.completedAt },
+      data: { status: dto.status, note: dto.note?.trim() || activity.note, completedAt: dto.status === 'COMPLETED' ? new Date() : activity.completedAt, outcome: dto.outcome ?? activity.outcome },
       include: { client: { select: { id: true, salonName: true } } },
     });
+  }
+
+  async listTrainers(actor: SessionUser) {
+    this.ensureAccess(actor);
+    return this.prisma.user.findMany({
+      where: { status: 'ACTIVE', roles: { some: { role: { key: 'DEMO_TEAM', isActive: true } } } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async territoryCoverage(actor: SessionUser) {
+    this.ensureAccess(actor);
+    const clients = await this.prisma.client.findMany({
+      where: this.visibility(actor),
+      select: {
+        id: true, salonName: true, city: true, area: true, territory: true, routeBeat: true, potential: true, status: true,
+        activities: { where: { type: 'VISIT' }, orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
+      },
+      orderBy: { salonName: 'asc' },
+    });
+    return clients.map((client) => ({
+      id: client.id, salonName: client.salonName, city: client.city, area: client.area, territory: client.territory, routeBeat: client.routeBeat,
+      potential: client.potential, status: client.status, lastVisitAt: client.activities[0]?.createdAt ?? null,
+    }));
   }
 }

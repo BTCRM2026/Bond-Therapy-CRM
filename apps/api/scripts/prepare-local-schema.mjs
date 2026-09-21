@@ -11,7 +11,7 @@ const localDatabasePath = join(prismaDirectory, 'bond-therapy-local.db');
 const productionSchema = await readFile(productionSchemaPath, 'utf8');
 const localSchema = productionSchema
   .replace('provider = "postgresql"', 'provider = "sqlite"')
-  .replaceAll(' @db.Decimal(12, 2)', '');
+  .replaceAll(/ @db\.\w+(\([^)]*\))?/g, '');
 
 await writeFile(localSchemaPath, localSchema, 'utf8');
 const localDatabase = await open(localDatabasePath, 'a');
