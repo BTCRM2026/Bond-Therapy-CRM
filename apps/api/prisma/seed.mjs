@@ -116,4 +116,18 @@ if (staffLoginId && staffEmail && staffPassword) {
   console.log(`Bootstrap staff user ready: ${staffLoginId} (${staffRoleKey})`);
 }
 
+const sampleProducts = [
+  { sku: 'BT-SHM-001', name: 'Keratin Repair Shampoo 1L', category: 'SHAMPOO', unit: 'bottle', unitPrice: 650, stockOnHand: 120 },
+  { sku: 'BT-CND-001', name: 'Keratin Repair Conditioner 1L', category: 'CONDITIONER', unit: 'bottle', unitPrice: 690, stockOnHand: 95 },
+  { sku: 'BT-TRT-001', name: 'Bond Rebuild Treatment 500ml', category: 'TREATMENT', unit: 'bottle', unitPrice: 1450, stockOnHand: 40 },
+  { sku: 'BT-CLR-001', name: 'Professional Color Cream 100g', category: 'COLOR', unit: 'tube', unitPrice: 380, stockOnHand: 6 },
+  { sku: 'BT-STY-001', name: 'Heat Protect Styling Spray 250ml', category: 'STYLING', unit: 'bottle', unitPrice: 520, stockOnHand: 70 },
+  { sku: 'BT-TL-001', name: 'Ceramic Flat Iron Pro', category: 'TOOLS', unit: 'pcs', unitPrice: 4200, stockOnHand: 0 },
+];
+
+for (const product of sampleProducts) {
+  await prisma.product.upsert({ where: { sku: product.sku }, update: {}, create: product });
+}
+console.log(`Sample products ready: ${sampleProducts.length}`);
+
 await prisma.$disconnect();

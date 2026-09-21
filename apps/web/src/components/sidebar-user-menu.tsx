@@ -11,7 +11,7 @@ export function SidebarUserMenu({ userName, roleName }: { userName: string; role
 
   return (
     <div className="mt-auto border-t pt-4">
-      <div className={cn("overflow-hidden rounded-xl border border-transparent transition-[border-color,box-shadow] duration-150", open && "border-border bg-white shadow-[0_8px_20px_rgba(23,35,31,0.07)]")}>
+      <div className={cn("overflow-hidden rounded-xl border border-transparent transition-[border-color,box-shadow] duration-150", open && "border-border bg-white shadow-[0_8px_20px_rgba(15,23,42,0.07)]")}>
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}

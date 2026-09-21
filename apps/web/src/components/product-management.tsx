@@ -1,0 +1,179 @@
+"use client";
+
+import { AlertTriangle, LoaderCircle, Package, Pencil, Plus, Search, ShieldCheck, UserCheck, UserX, X } from "lucide-react";
+import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { KpiCard } from "@/components/ui/kpi-card";
+
+type Product = { id: string; sku: string; name: string; category: string; unit: string; unitPrice: string; imageUrl: string | null; stockOnHand: number; isActive: boolean };
+export type ProductListResponse = { items: Product[]; page: number; pageSize: number; total: number; hasMore: boolean };
+
+const CATEGORIES = [["SHAMPOO", "Shampoo"], ["CONDITIONER", "Conditioner"], ["TREATMENT", "Treatment"], ["COLOR", "Color"], ["STYLING", "Styling"], ["TOOLS", "Tools"], ["OTHER", "Other"]];
+const pretty = (value: string) => value[0] + value.slice(1).toLowerCase();
+const money = (value: string | number) => `₹${Number(value).toLocaleString("en-IN")}`;
+const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? (Array.isArray((data as { message: unknown }).message) ? (data as { message: string[] }).message.join(" ") : String((data as { message: unknown }).message)) : fallback;
+
+export function ProductManagement({ initial }: { initial: ProductListResponse | null }) {
+  const [data, setData] = useState(initial);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("ALL");
+  const [editor, setEditor] = useState<{ mode: "create" | "edit"; product?: Product } | null>(null);
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  const [busyId, setBusyId] = useState("");
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState(initial ? "" : "Products could not be loaded. Check the API connection and try again.");
+
+  useEffect(() => { const frame = requestAnimationFrame(() => setHeaderSlot(document.getElementById("page-header-actions"))); return () => cancelAnimationFrame(frame); }, []);
+
+  const reload = async () => {
+    const params = new URLSearchParams({ page: "1", pageSize: "200" });
+    if (search.trim()) params.set("search", search.trim());
+    if (category !== "ALL") params.set("category", category);
+    const response = await fetch(`/api/products?${params}`, { cache: "no-store" });
+    const json = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(messageFrom(json, "Unable to refresh products."));
+    setData(json as ProductListResponse);
+  };
+
+  useEffect(() => { const timer = setTimeout(() => { void reload().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load products.")); }, 250); return () => clearTimeout(timer); }, [search, category]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleActive = async (product: Product) => {
+    setBusyId(product.id); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/products/${product.id}/active`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ isActive: !product.isActive }) });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(messageFrom(data, "Unable to update this product."));
+      await reload();
+      setNotice(`${product.name} is now ${product.isActive ? "inactive" : "active"}.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to update this product."); }
+    finally { setBusyId(""); }
+  };
+
+  const active = data?.items.filter((product) => product.isActive).length ?? 0;
+  const lowStock = data?.items.filter((product) => product.isActive && product.stockOnHand <= 10).length ?? 0;
+
+  return (
+    <>
+      {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add product</span><span className="sr-only sm:hidden">Add product</span></Button>, headerSlot)}
+
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <KpiCard icon={Package} label="Total products" value={data?.total ?? 0} />
+        <KpiCard icon={ShieldCheck} label="Active" value={active} />
+        <KpiCard icon={AlertTriangle} label="Low or out of stock" value={lowStock} />
+      </div>
+
+      <section className="relative rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
+          <label className="relative block w-full sm:max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search name or SKU" aria-label="Search products" />
+          </label>
+          <select value={category} onChange={(event) => setCategory(event.target.value)} className="h-11 rounded-lg border bg-white px-3 text-[13px] text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10" aria-label="Filter by category">
+            <option value="ALL">All categories</option>
+            {CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+        </div>
+
+        {(notice || error) && <div className={`mx-4 mt-4 rounded-lg border px-3 py-2.5 text-xs sm:mx-5 ${error ? "border-red-200 bg-red-50 text-danger" : "border-success/25 bg-success-soft text-success"}`} role={error ? "alert" : "status"}>{error || notice}</div>}
+
+        <div className="hidden overflow-visible xl:block">
+          <table className="w-full min-w-[820px] text-left text-[13px]">
+            <thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><tr><th className="px-5 py-3">Product</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Price</th><th className="px-4 py-3">Stock</th><th className="px-4 py-3">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
+            <tbody className="divide-y">
+              {data?.items.map((product) => <ProductRow key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} />)}
+            </tbody>
+          </table>
+        </div>
+        <div className="divide-y xl:hidden">{data?.items.map((product) => <ProductCard key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} />)}</div>
+        {!data?.items.length && <div className="px-5 py-12 text-center"><Package className="mx-auto text-subtle" size={24} /><p className="mt-3 text-sm font-semibold text-foreground">No products found</p><p className="mt-1 text-xs text-muted">Adjust the search or add a product.</p></div>}
+      </section>
+
+      {editor && <ProductEditor mode={editor.mode} product={editor.product} onClose={() => setEditor(null)} onSaved={async (message) => { setEditor(null); await reload(); setError(""); setNotice(message); }} />}
+    </>
+  );
+}
+
+function StatusBadge({ isActive }: { isActive: boolean }) {
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${isActive ? "bg-success-soft text-success" : "bg-gray-100 text-muted"}`}>{isActive ? "Active" : "Inactive"}</span>;
+}
+function StockCell({ stockOnHand }: { stockOnHand: number }) {
+  if (stockOnHand <= 0) return <span className="font-medium text-danger">Out of stock</span>;
+  if (stockOnHand <= 10) return <span className="font-medium text-warning">{stockOnHand} left</span>;
+  return <span className="font-medium text-foreground">{stockOnHand}</span>;
+}
+
+type RowProps = { product: Product; busy: boolean; onEdit: () => void; onToggleActive: () => void };
+
+function ProductRow({ product, busy, onEdit, onToggleActive }: RowProps) {
+  return <tr className="transition-colors hover:bg-brand-soft/40">
+    <td className="px-5 py-4"><p className="font-semibold text-foreground">{product.name}</p><p className="mt-0.5 text-xs text-muted">{product.sku}</p></td>
+    <td className="px-4 py-4 text-muted">{pretty(product.category)}</td>
+    <td className="px-4 py-4 text-muted">{money(product.unitPrice)} / {product.unit}</td>
+    <td className="px-4 py-4"><StockCell stockOnHand={product.stockOnHand} /></td>
+    <td className="px-4 py-4"><StatusBadge isActive={product.isActive} /></td>
+    <td className="px-5 py-4"><div className="flex justify-end gap-2"><IconAction icon={Pencil} label="Edit product" onClick={onEdit} /><IconAction icon={product.isActive ? UserX : UserCheck} label={product.isActive ? "Deactivate" : "Activate"} onClick={onToggleActive} busy={busy} /></div></td>
+  </tr>;
+}
+
+function ProductCard({ product, busy, onEdit, onToggleActive }: RowProps) {
+  return <article className="p-4">
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{product.sku} · {pretty(product.category)}</p></div><StatusBadge isActive={product.isActive} /></div>
+    <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs">
+      <div><dt className="text-muted">Price</dt><dd className="mt-1 font-medium text-foreground">{money(product.unitPrice)} / {product.unit}</dd></div>
+      <div><dt className="text-muted">Stock</dt><dd className="mt-1"><StockCell stockOnHand={product.stockOnHand} /></dd></div>
+    </dl>
+    <div className="mt-3 flex gap-2">
+      <Button variant="secondary" className="h-11 flex-1" onClick={onEdit}><Pencil size={14} />Edit</Button>
+      <Button variant="secondary" className="h-11 flex-1" disabled={busy} onClick={onToggleActive}>{busy ? <LoaderCircle className="animate-spin" size={14} /> : product.isActive ? <UserX size={14} /> : <UserCheck size={14} />}{product.isActive ? "Deactivate" : "Activate"}</Button>
+    </div>
+  </article>;
+}
+
+function IconAction({ icon: Icon, label, onClick, busy = false }: { icon: typeof Pencil; label: string; onClick: () => void; busy?: boolean }) {
+  return <button type="button" disabled={busy} onClick={onClick} className="grid size-9 place-items-center rounded-lg border bg-white text-muted transition-colors hover:border-brand/25 hover:bg-brand-soft hover:text-brand disabled:opacity-50" aria-label={label}>{busy ? <LoaderCircle className="animate-spin" size={15} /> : <Icon size={15} />}</button>;
+}
+
+type FormState = { sku: string; name: string; category: string; unit: string; unitPrice: string; imageUrl: string; stockOnHand: string };
+function toFormState(product?: Product): FormState {
+  return { sku: product?.sku ?? "", name: product?.name ?? "", category: product?.category ?? "SHAMPOO", unit: product?.unit ?? "bottle", unitPrice: product?.unitPrice ?? "", imageUrl: product?.imageUrl ?? "", stockOnHand: "" };
+}
+
+function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "edit"; product?: Product; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
+  const [form, setForm] = useState<FormState>(toFormState(product));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const set = (key: keyof FormState) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((value) => ({ ...value, [key]: event.target.value }));
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setSaving(true); setError("");
+    try {
+      const payload = { sku: form.sku, name: form.name, category: form.category, unit: form.unit || undefined, unitPrice: Number(form.unitPrice), imageUrl: form.imageUrl || undefined, ...(mode === "create" ? { stockOnHand: form.stockOnHand ? Number(form.stockOnHand) : 0 } : {}) };
+      const response = await fetch(mode === "create" ? "/api/products" : `/api/products/${product?.id}`, { method: mode === "create" ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(messageFrom(data, `Unable to ${mode === "create" ? "add" : "update"} this product.`));
+      await onSaved(mode === "create" ? `${form.name} was added to the catalogue.` : `${form.name} was updated.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save this product."); setSaving(false); }
+  };
+
+  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#0f172a]/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={mode === "create" ? "Add product" : "Edit product"}>
+    <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-lg flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-32px)]">
+      <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><div><h2 className="text-base font-semibold text-foreground">{mode === "create" ? "Add product" : "Edit product"}</h2><p className="mt-1 text-xs text-muted">Visible to Sales and Warehouse once saved</p></div><button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-background sm:size-8" aria-label="Close"><X size={17} /></button></div>
+      <form onSubmit={submit} className="overflow-y-auto p-4 sm:p-5">
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2"><Field label="SKU *"><Input value={form.sku} onChange={set("sku")} required minLength={2} maxLength={40} autoFocus /></Field><Field label="Category *"><select value={form.category} onChange={set("category")} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field></div>
+          <Field label="Product name *"><Input value={form.name} onChange={set("name")} required minLength={2} maxLength={160} /></Field>
+          <div className="grid gap-4 sm:grid-cols-2"><Field label="Unit"><Input value={form.unit} onChange={set("unit")} placeholder="bottle, tube, pcs" maxLength={20} /></Field><Field label="Unit price (₹) *"><Input value={form.unitPrice} onChange={set("unitPrice")} required type="number" min="0" step="0.01" inputMode="decimal" /></Field></div>
+          {mode === "create" && <Field label="Opening stock"><Input value={form.stockOnHand} onChange={set("stockOnHand")} type="number" min="0" inputMode="numeric" placeholder="0" /></Field>}
+          <Field label="Image URL"><Input value={form.imageUrl} onChange={set("imageUrl")} type="url" placeholder="https://..." /></Field>
+          {mode === "edit" && <p className="rounded-lg border border-brand/15 bg-brand-soft/50 px-3 py-2.5 text-xs leading-5 text-muted">Stock changes go through the Warehouse Inventory screen, not this form, so every movement stays on the audit trail.</p>}
+          {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}
+        </div>
+        <div className="sticky bottom-0 mt-5 flex flex-col-reverse gap-2 border-t bg-white pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Saving…" : mode === "create" ? "Add product" : "Save changes"}</Button></div>
+      </form>
+    </div>
+  </div>;
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }

@@ -19,6 +19,8 @@
   --warning: #e9a90d;
   --warning-soft: #fff8e6;
   --danger: #b4232e;
+  --success: #16a34a;
+  --success-soft: #f0fdf4;
   --button-shadow: 0 1px 2px rgba(23, 27, 114, 0.18);
 }
 
@@ -41,6 +43,8 @@
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
   --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
   --font-sans: "Inter Variable", Inter, Arial, sans-serif;
 }
 
@@ -56,34 +60,34 @@ body {
 button, input { font: inherit; }
 
 .crm-shell {
-  --background: #f3f6f5;
+  --background: #f8fafc;
   --surface: #ffffff;
-  --foreground: #17231f;
-  --muted: #64736e;
-  --subtle: #93a19c;
-  --border: #dfe6e3;
-  --brand: #0d5c52;
-  --brand-dark: #08483f;
-  --brand-soft: #e7f2ef;
-  --accent: #a76f24;
-  --accent-soft: #fbf2e3;
-  --info: #2f7596;
-  --info-soft: #eaf3f7;
-  --magenta: #8b5d78;
-  --magenta-soft: #f6eef3;
-  --warning: #a86f19;
-  --warning-soft: #fbf2df;
-  --danger: #b13f42;
-  --success: #27735f;
-  --button-shadow: 0 1px 2px rgba(13, 92, 82, 0.22);
+  --foreground: #111827;
+  --muted: #6b7280;
+  --subtle: #9ca3af;
+  --border: #e5e7eb;
+  --brand: #2563eb;
+  --brand-dark: #1d4ed8;
+  --brand-soft: #eff6ff;
+  --accent: #2563eb;
+  --accent-soft: #eff6ff;
+  --info: #3b82f6;
+  --info-soft: #eff6ff;
+  --magenta: #9333ea;
+  --magenta-soft: #faf5ff;
+  --warning: #f59e0b;
+  --warning-soft: #fffbeb;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --success-soft: #f0fdf4;
+  --button-shadow: 0 1px 2px rgba(37, 99, 235, 0.18);
   color: var(--foreground);
-  font-family: "Manrope Variable", Manrope, "Segoe UI", sans-serif;
-  font-feature-settings: "ss01" 1, "cv11" 1;
+  font-family: "Inter Variable", Inter, "Segoe UI", sans-serif;
 }
 
 .crm-shell ::selection {
-  background: #cce3dc;
-  color: #10201b;
+  background: #dbeafe;
+  color: #111827;
 }
 
 .crm-shell input,

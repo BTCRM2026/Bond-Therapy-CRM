@@ -10,6 +10,7 @@ export default async function SettingsPage() {
     <DashboardShell
       userName={session.name}
       roleName={roleName}
+      roleKey={session.roles[0]?.key}
       headerTitle="Settings"
       headerSubtitle="Profile and account security"
       portal={session.portal}

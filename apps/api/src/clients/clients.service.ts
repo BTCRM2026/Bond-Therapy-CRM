@@ -3,7 +3,7 @@ import { ClientActivityStatus, ClientActivityType, ClientCategory, Prisma } from
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { ClientActivityDto, ClientDto, ListClientsDto } from './dto.js';
+import type { ClientActivityDto, ClientDto, ListActivitiesDto, ListClientsDto, UpdateActivityStatusDto } from './dto.js';
 
 const managedRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE', 'ACCOUNTS_BILLING', 'WAREHOUSE', 'DEMO_TEAM']);
 const clientInclude = {
@@ -73,10 +73,20 @@ export class ClientsService {
     const activities = await this.prisma.clientActivity.findMany({ where: { clientId: client.id }, orderBy: { createdAt: 'desc' }, take: 10, include: { createdBy: { select: { id: true, name: true } } } });
     const nextVisit = await this.prisma.clientActivity.findFirst({ where: { clientId: client.id, type: ClientActivityType.VISIT, status: ClientActivityStatus.OPEN, scheduledAt: { not: null, gte: new Date() } }, orderBy: { scheduledAt: 'asc' } });
     const openActions = await this.prisma.clientActivity.findMany({ where: { clientId: client.id, status: ClientActivityStatus.OPEN }, orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }], take: 8 });
+    const orderAggregate = await this.prisma.order.aggregate({ where: { clientId: client.id, status: { not: 'CANCELLED' } }, _sum: { totalAmount: true }, _avg: { totalAmount: true }, _count: true });
+    const lastOrder = await this.prisma.order.findFirst({ where: { clientId: client.id, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, select: { orderNumber: true, createdAt: true, totalAmount: true } });
+    const recentOrders = await this.prisma.order.findMany({ where: { clientId: client.id, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, take: 5, include: { items: { include: { product: { select: { name: true } } } } } });
     return {
       client, activities, openActions, nextVisit,
-      salesSnapshot: { lifetimeSales: null, currentYearSales: null, averageOrderValue: null, lastOrder: null, outstanding: null, overdue: null },
-      productSnapshot: { purchased: [], lastProduct: null, mostPurchased: null, demos: [], samples: [] },
+      salesSnapshot: {
+        lifetimeSales: orderAggregate._count > 0 ? Number(orderAggregate._sum.totalAmount ?? 0) : null,
+        currentYearSales: null,
+        averageOrderValue: orderAggregate._count > 0 ? Number(orderAggregate._avg.totalAmount ?? 0) : null,
+        lastOrder: lastOrder ? `${lastOrder.orderNumber} · ₹${Number(lastOrder.totalAmount).toLocaleString('en-IN')}` : null,
+        outstanding: null,
+        overdue: null,
+      },
+      productSnapshot: { purchased: recentOrders, lastProduct: recentOrders[0]?.items[0]?.product.name ?? null, mostPurchased: null, demos: [], samples: [] },
     };
   }
 
@@ -140,5 +150,32 @@ export class ClientsService {
     const activity = await this.prisma.clientActivity.create({ data: { clientId: client.id, type: dto.type, status: dto.status ?? 'OPEN', purpose: dto.purpose?.trim() || null, personMet: dto.personMet?.trim() || null, note: dto.note?.trim() || null, scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null, completedAt: dto.status === 'COMPLETED' ? new Date() : null, createdById: actor.id }, include: { createdBy: { select: { id: true, name: true } } } });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'CLIENT_ACTIVITY_CREATE', entity: 'CLIENT_ACTIVITY', entityId: activity.id, details: { clientId, type: activity.type }, ipAddress });
     return activity;
+  }
+
+  async listActivities(actor: SessionUser, query: ListActivitiesDto) {
+    this.ensureAccess(actor);
+    const now = new Date();
+    const filters: Prisma.ClientActivityWhereInput[] = [{ client: this.visibility(actor) }];
+    if (query.scope === 'overdue') filters.push({ status: 'OPEN', scheduledAt: { lt: now } });
+    else if (query.scope === 'all') { /* no extra status filter */ }
+    else filters.push({ status: 'OPEN' });
+    const where = { AND: filters } satisfies Prisma.ClientActivityWhereInput;
+    return this.prisma.clientActivity.findMany({
+      where,
+      include: { client: { select: { id: true, salonName: true, city: true, primaryContact: true } }, createdBy: { select: { id: true, name: true } } },
+      orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }],
+      take: 100,
+    });
+  }
+
+  async updateActivityStatus(actor: SessionUser, id: string, dto: UpdateActivityStatusDto) {
+    this.ensureAccess(actor);
+    const activity = await this.prisma.clientActivity.findFirst({ where: { AND: [{ id }, { client: this.visibility(actor) }] } });
+    if (!activity) throw new NotFoundException('Activity not found or you do not have access to it.');
+    return this.prisma.clientActivity.update({
+      where: { id },
+      data: { status: dto.status, note: dto.note?.trim() || activity.note, completedAt: dto.status === 'COMPLETED' ? new Date() : activity.completedAt },
+      include: { client: { select: { id: true, salonName: true } } },
+    });
   }
 }

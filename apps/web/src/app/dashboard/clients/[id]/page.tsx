@@ -19,5 +19,5 @@ export default async function Salon360Page({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const detail = await loadClient(id);
   if (!detail) notFound();
-  return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} headerTitle="Salon 360" headerSubtitle="Complete relationship view" portal="STAFF"><Salon360 initial={detail} /></DashboardShell>;
+  return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} roleKey={session.roles[0]?.key} headerTitle="Salon 360" headerSubtitle="Complete relationship view" portal="STAFF"><Salon360 initial={detail} /></DashboardShell>;
 }

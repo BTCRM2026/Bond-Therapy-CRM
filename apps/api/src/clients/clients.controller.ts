@@ -7,7 +7,7 @@ import { RolesGuard } from '../common/roles.guard.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PortalType } from '@prisma/client';
-import { ClientActivityDto, ClientDto, ListClientsDto } from './dto.js';
+import { ClientActivityDto, ClientDto, ListActivitiesDto, ListClientsDto, UpdateActivityStatusDto } from './dto.js';
 import { ClientsService } from './clients.service.js';
 
 @Controller('clients')
@@ -18,6 +18,12 @@ export class ClientsController {
 
   @Get()
   list(@CurrentUser() actor: SessionUser, @Query() query: ListClientsDto) { return this.clients.list(actor, query); }
+
+  @Get('activities')
+  listActivities(@CurrentUser() actor: SessionUser, @Query() query: ListActivitiesDto) { return this.clients.listActivities(actor, query); }
+
+  @Patch('activities/:id')
+  updateActivityStatus(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: UpdateActivityStatusDto) { return this.clients.updateActivityStatus(actor, id, dto); }
 
   @Get(':id')
   detail(@CurrentUser() actor: SessionUser, @Param('id') id: string) { return this.clients.detail(actor, id); }

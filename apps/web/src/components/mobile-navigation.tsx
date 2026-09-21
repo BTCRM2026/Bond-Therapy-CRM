@@ -1,46 +1,45 @@
 "use client";
 
-import { Menu, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { SidebarBrand } from "@/components/sidebar-brand";
-import { SidebarNav } from "@/components/sidebar-nav";
-import { SidebarUserMenu } from "@/components/sidebar-user-menu";
-import type { PortalType } from "@/lib/portal-types";
+import { useEffect, useRef, useState } from "react";
+import { LogoutButton } from "@/components/logout-button";
 
-export function MobileNavigation({ portal, userName, roleName, canManageStaff = false }: { portal: PortalType; userName: string; roleName: string; canManageStaff?: boolean }) {
+export function MobileNavigation({ userName, roleName }: { userName: string; roleName: string }) {
   const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const initials = userName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => { document.body.style.overflow = ""; document.removeEventListener("keydown", closeOnEscape); };
-  }, [open]);
+    const close = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent && event.key === "Escape") setOpen(false);
+      if (event instanceof MouseEvent && root.current && !root.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); };
+  }, []);
 
   return (
-    <>
+    <div className="relative lg:hidden" ref={root}>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="grid size-9 shrink-0 place-items-center rounded-lg border bg-white text-foreground shadow-[0_1px_2px_rgba(23,35,31,0.04)] transition-colors hover:bg-brand-soft lg:hidden"
-        aria-label="Open navigation"
+        onClick={() => setOpen((value) => !value)}
+        className="grid size-11 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand transition-colors hover:bg-brand/15"
+        aria-label={`${open ? "Close" : "Open"} account menu`}
+        aria-expanded={open}
       >
-        <Menu size={19} />
+        {initials}
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button type="button" className="absolute inset-0 bg-[#10201b]/35 backdrop-blur-[1px]" onClick={() => setOpen(false)} aria-label="Close navigation" />
-          <aside role="dialog" aria-modal="true" aria-label="Portal navigation" className="relative flex h-[100dvh] w-[min(86vw,304px)] flex-col border-r bg-white px-4 py-5 shadow-[16px_0_40px_rgba(16,32,27,0.14)]">
-            <div className="flex min-h-14 items-center justify-between border-b px-2 pb-4">
-              <SidebarBrand />
-              <button type="button" onClick={() => setOpen(false)} className="grid size-9 place-items-center rounded-lg text-muted hover:bg-background" aria-label="Close navigation">
-                <X size={18} />
-              </button>
-            </div>
-            <SidebarNav portal={portal} canManageStaff={canManageStaff} onNavigate={() => setOpen(false)} />
-            <SidebarUserMenu userName={userName} roleName={roleName} />
-          </aside>
+        <div className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-xl border bg-white shadow-[0_18px_48px_rgba(15,23,42,0.15)]">
+          <div className="border-b px-4 py-3">
+            <p className="truncate text-sm font-semibold text-foreground">{userName}</p>
+            <p className="mt-0.5 truncate text-xs text-muted">{roleName}</p>
+          </div>
+          <div className="p-1.5">
+            <LogoutButton />
+          </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

@@ -9,6 +9,11 @@ import { AgreementsModule } from './agreements/agreements.module.js';
 import { AuditLogModule } from './audit-log/audit-log.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { ClientsModule } from './clients/clients.module.js';
+import { LeadsModule } from './leads/leads.module.js';
+import { ProductsModule } from './products/products.module.js';
+import { OrdersModule } from './orders/orders.module.js';
+import { SalesModule } from './sales/sales.module.js';
+import { WarehouseModule } from './warehouse/warehouse.module.js';
 
 @Module({
   imports: [
@@ -21,6 +26,11 @@ import { ClientsModule } from './clients/clients.module.js';
     AuditLogModule,
     NotificationsModule,
     ClientsModule,
+    LeadsModule,
+    ProductsModule,
+    OrdersModule,
+    SalesModule,
+    WarehouseModule,
   ],
   controllers: [AppController],
 })

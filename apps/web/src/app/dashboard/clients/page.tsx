@@ -16,5 +16,5 @@ async function loadClients() {
 export default async function ClientsPage() {
   const session = await requireSession("STAFF");
   const initial = await loadClients();
-  return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} headerTitle="Clients" headerSubtitle="Your assigned salon relationships" portal="STAFF"><ClientsModule initial={initial} /></DashboardShell>;
+  return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} roleKey={session.roles[0]?.key} headerTitle="Clients" headerSubtitle="Your assigned salon relationships" portal="STAFF"><ClientsModule initial={initial} /></DashboardShell>;
 }

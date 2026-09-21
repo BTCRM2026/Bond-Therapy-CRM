@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ClientActivityStatus, ClientActivityType, ClientCategory, ClientPotential, ClientStatus, CustomerSegment } from '@prisma/client';
 
@@ -57,4 +57,13 @@ export class ClientActivityDto {
   @IsOptional() @IsString() @MaxLength(120) personMet?: string;
   @IsOptional() @IsString() @MaxLength(1000) note?: string;
   @IsOptional() @IsString() scheduledAt?: string;
+}
+
+export class ListActivitiesDto {
+  @IsOptional() @IsIn(['open', 'overdue', 'all']) scope?: 'open' | 'overdue' | 'all';
+}
+
+export class UpdateActivityStatusDto {
+  @IsEnum(ClientActivityStatus) status!: ClientActivityStatus;
+  @IsOptional() @IsString() @MaxLength(1000) note?: string;
 }

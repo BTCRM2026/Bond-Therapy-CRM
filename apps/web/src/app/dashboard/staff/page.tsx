@@ -27,6 +27,7 @@ export default async function StaffPage() {
     <DashboardShell
       userName={session.name}
       roleName="Super Admin"
+      roleKey={session.roles[0]?.key}
       headerTitle="Staff & Access"
       headerSubtitle="Manage portal accounts and permissions"
       portal="ADMIN"

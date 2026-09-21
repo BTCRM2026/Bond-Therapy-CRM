@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { MobileNavigation } from "@/components/mobile-navigation";
+import { MobileSidebarDrawer } from "@/components/mobile-sidebar-drawer";
 import { NotificationCenter } from "@/components/notification-center";
 import { SidebarBrand } from "@/components/sidebar-brand";
 import { SidebarNav } from "@/components/sidebar-nav";
@@ -9,6 +11,7 @@ import type { PortalType } from "@/lib/portal-types";
 export function DashboardShell({
   userName,
   roleName,
+  roleKey,
   headerTitle,
   headerSubtitle,
   portal = "ADMIN",
@@ -17,6 +20,7 @@ export function DashboardShell({
 }: {
   userName: string;
   roleName: string;
+  roleKey?: string;
   headerTitle: string;
   headerSubtitle: string;
   portal?: PortalType;
@@ -29,13 +33,13 @@ export function DashboardShell({
         <div className="flex min-h-14 items-center border-b px-2 pb-5">
           <SidebarBrand />
         </div>
-        <SidebarNav portal={portal} canManageStaff={canManageStaff} />
+        <SidebarNav portal={portal} roleKey={roleKey} canManageStaff={canManageStaff} />
         <SidebarUserMenu userName={userName} roleName={roleName} />
       </aside>
       <section className="min-w-0">
-        <header className="sticky top-0 z-30 flex min-h-[68px] items-center justify-between gap-3 border-b bg-white/95 px-3 py-3 backdrop-blur-md sm:px-6 lg:px-7">
+        <header className="sticky top-0 z-30 flex min-h-[68px] items-center justify-between gap-3 border-b bg-white px-4 py-3 sm:px-6 lg:px-7">
           <div className="flex min-w-0 items-center gap-3">
-            <MobileNavigation portal={portal} userName={userName} roleName={roleName} canManageStaff={canManageStaff} />
+            <MobileSidebarDrawer portal={portal} roleKey={roleKey} canManageStaff={canManageStaff} />
             <div className="min-w-0">
               <h1 className="truncate text-[15px] font-semibold tracking-[-0.018em] text-foreground sm:text-base">{headerTitle}</h1>
               <p className="hidden text-[11px] text-muted sm:block">{headerSubtitle}</p>
@@ -44,9 +48,11 @@ export function DashboardShell({
           <div className="flex shrink-0 items-center gap-2">
             <div id="page-header-actions" className="flex items-center gap-2" />
             <NotificationCenter />
+            <MobileNavigation userName={userName} roleName={roleName} />
           </div>
         </header>
-        <div className="mx-auto w-full max-w-[1520px] p-4 sm:p-6 lg:p-7">{children}</div>
+        <div className="mx-auto w-full max-w-[1520px] p-4 pb-24 sm:p-6 sm:pb-24 lg:p-7 lg:pb-7">{children}</div>
+        <BottomTabBar portal={portal} roleKey={roleKey} canManageStaff={canManageStaff} />
       </section>
     </main>
   );
