@@ -1,13 +1,13 @@
 "use client";
 
-import { AlertTriangle, IndianRupee, LoaderCircle, MoreHorizontal, Package, PackageCheck, PackageX, Pencil, Plus, Search, Trash2, UserCheck, UserX, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, IndianRupee, LoaderCircle, MoreHorizontal, Package, PackageCheck, PackageX, Pencil, Plus, Search, Trash2, UserCheck, UserX, X } from "lucide-react";
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KpiCard } from "@/components/ui/kpi-card";
 
-type Product = { id: string; name: string; category: string; variant: string | null; unit: string; unitPrice: string; stockOnHand: number; isActive: boolean };
+type Product = { id: string; name: string; category: string; unitPrice: string; stockOnHand: number; isActive: boolean };
 export type ProductListResponse = { items: Product[]; page: number; pageSize: number; total: number; hasMore: boolean };
 type ProductStats = { totalProducts: number; inStock: number; lowStock: number; outOfStock: number; inventoryValue: number };
 
@@ -21,6 +21,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
   const [stats, setStats] = useState<ProductStats | null>(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("ALL");
+  const [page, setPage] = useState(initial?.page ?? 1);
   const [editor, setEditor] = useState<{ mode: "create" | "edit"; product?: Product } | null>(null);
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   const [busyId, setBusyId] = useState("");
@@ -30,7 +31,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
   useEffect(() => { const frame = requestAnimationFrame(() => setHeaderSlot(document.getElementById("page-header-actions"))); return () => cancelAnimationFrame(frame); }, []);
 
   const reload = async () => {
-    const params = new URLSearchParams({ page: "1", pageSize: "200" });
+    const params = new URLSearchParams({ page: String(page), pageSize: "24" });
     if (search.trim()) params.set("search", search.trim());
     if (category !== "ALL") params.set("category", category);
     const response = await fetch(`/api/products?${params}`, { cache: "no-store" });
@@ -48,7 +49,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
 
   useEffect(() => { const timer = setTimeout(() => { void reloadStats().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load product statistics.")); }, 0); return () => clearTimeout(timer); }, []);
 
-  useEffect(() => { const timer = setTimeout(() => { void reload().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load products.")); }, 250); return () => clearTimeout(timer); }, [search, category]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const timer = setTimeout(() => { void reload().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load products.")); }, 250); return () => clearTimeout(timer); }, [search, category, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleActive = async (product: Product) => {
     setBusyId(product.id); setError(""); setNotice("");
@@ -91,9 +92,9 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
           <label className="relative block w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} />
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search products" aria-label="Search products" />
+            <Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="pl-9" placeholder="Search products" aria-label="Search products" />
           </label>
-          <select value={category} onChange={(event) => setCategory(event.target.value)} className="h-11 rounded-lg border bg-white px-3 text-[13px] text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10" aria-label="Filter by category">
+          <select value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }} className="h-11 rounded-lg border bg-white px-3 text-[13px] text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10" aria-label="Filter by category">
             <option value="ALL">All categories</option>
             {CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
@@ -103,14 +104,15 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
 
         <div className="hidden overflow-visible xl:block">
           <table className="w-full min-w-[820px] text-left text-[13px]">
-            <thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><tr><th className="px-5 py-3">Product</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Price</th><th className="px-4 py-3">Stock</th><th className="px-4 py-3">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
+            <thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><tr><th className="px-5 py-3">Product</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">MRP</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
             <tbody className="divide-y">
               {data?.items.map((product) => <ProductRow key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}
             </tbody>
           </table>
         </div>
-        <div className="divide-y xl:hidden">{data?.items.map((product) => <ProductCard key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}</div>
+        <div className="grid grid-cols-2 gap-3 p-3 xl:hidden">{data?.items.map((product) => <ProductCard key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}</div>
         {!data?.items.length && <div className="px-5 py-12 text-center"><Package className="mx-auto text-subtle" size={24} /><p className="mt-3 text-sm font-semibold text-foreground">No products found</p><p className="mt-1 text-xs text-muted">Adjust the search or add a product.</p></div>}
+        {data && data.total > 0 && <Pagination page={data.page} pageSize={data.pageSize} total={data.total} hasMore={data.hasMore} onPageChange={setPage} />}
       </section>
 
       {editor && <ProductEditor mode={editor.mode} product={editor.product} onClose={() => setEditor(null)} onSaved={async (message) => { setEditor(null); await Promise.all([reload(), reloadStats()]); setError(""); setNotice(message); }} />}
@@ -131,9 +133,9 @@ type RowProps = { product: Product; busy: boolean; onEdit: () => void; onToggleA
 
 function ProductRow({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
   return <tr className="transition-colors hover:bg-brand-soft/40">
-    <td className="px-5 py-4"><p className="font-semibold text-foreground">{product.name}</p>{product.variant && <p className="mt-0.5 text-xs text-muted">{product.variant}</p>}</td>
+    <td className="px-5 py-4"><p className="font-semibold text-foreground">{product.name}</p></td>
     <td className="px-4 py-4 text-muted">{pretty(product.category)}</td>
-    <td className="px-4 py-4 text-muted">{money(product.unitPrice)} / {product.unit}</td>
+    <td className="px-4 py-4 text-muted">{money(product.unitPrice)}</td>
     <td className="px-4 py-4"><StockCell stockOnHand={product.stockOnHand} /></td>
     <td className="px-4 py-4"><StatusBadge isActive={product.isActive} /></td>
     <td className="px-5 py-4"><div className="flex justify-end gap-2"><IconAction icon={Pencil} label="Edit product" onClick={onEdit} /><IconAction icon={product.isActive ? UserX : UserCheck} label={product.isActive ? "Deactivate" : "Activate"} onClick={onToggleActive} busy={busy} /><IconAction icon={Trash2} label="Delete product" onClick={onDelete} busy={busy} danger /></div></td>
@@ -141,11 +143,11 @@ function ProductRow({ product, busy, onEdit, onToggleActive, onDelete }: RowProp
 }
 
 function ProductCard({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
-  return <article className="p-4">
-    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{product.variant ? `${product.variant} · ` : ""}{pretty(product.category)}</p></div><div className="flex shrink-0 items-center gap-2"><StatusBadge isActive={product.isActive} /><ProductActions product={product} busy={busy} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} /></div></div>
+  return <article className="rounded-xl border bg-white p-4 shadow-[0_3px_12px_rgba(45,36,28,0.04)]">
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{pretty(product.category)}</p></div><div className="flex shrink-0 items-center gap-2"><StatusBadge isActive={product.isActive} /><ProductActions product={product} busy={busy} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} /></div></div>
     <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs">
-      <div><dt className="text-muted">Price</dt><dd className="mt-1 font-medium text-foreground">{money(product.unitPrice)} / {product.unit}</dd></div>
-      <div><dt className="text-muted">Stock</dt><dd className="mt-1"><StockCell stockOnHand={product.stockOnHand} /></dd></div>
+      <div><dt className="text-muted">MRP</dt><dd className="mt-1 font-medium text-foreground">{money(product.unitPrice)}</dd></div>
+      <div><dt className="text-muted">Quantity</dt><dd className="mt-1"><StockCell stockOnHand={product.stockOnHand} /></dd></div>
     </dl>
   </article>;
 }
@@ -173,9 +175,9 @@ function IconAction({ icon: Icon, label, onClick, busy = false, danger = false }
   return <button type="button" disabled={busy} onClick={onClick} className={`grid size-9 place-items-center rounded-lg border bg-white transition-colors disabled:opacity-50 ${danger ? "text-danger hover:border-red-200 hover:bg-red-50" : "text-muted hover:border-brand/25 hover:bg-brand-soft hover:text-brand"}`} aria-label={label}>{busy ? <LoaderCircle className="animate-spin" size={15} /> : <Icon size={15} />}</button>;
 }
 
-type FormState = { name: string; category: string; variant: string; unit: string; unitPrice: string; stockOnHand: string };
+type FormState = { name: string; category: string; unitPrice: string; stockOnHand: string };
 function toFormState(product?: Product): FormState {
-  return { name: product?.name ?? "", category: product?.category ?? "SHAMPOO", variant: product?.variant ?? "", unit: product?.unit ?? "bottle", unitPrice: product?.unitPrice ?? "", stockOnHand: "" };
+  return { name: product?.name ?? "", category: product?.category ?? "SHAMPOO", unitPrice: product?.unitPrice ?? "", stockOnHand: product ? String(product.stockOnHand) : "" };
 }
 
 function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "edit"; product?: Product; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
@@ -187,7 +189,7 @@ function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError("");
     try {
-      const payload = { name: form.name, category: form.category, variant: form.variant || undefined, unit: form.unit || undefined, unitPrice: Number(form.unitPrice), ...(mode === "create" ? { stockOnHand: form.stockOnHand ? Number(form.stockOnHand) : 0 } : {}) };
+      const payload = { name: form.name, category: form.category, unitPrice: Number(form.unitPrice), ...(mode === "create" ? { stockOnHand: form.stockOnHand ? Number(form.stockOnHand) : 0 } : {}) };
       const response = await fetch(mode === "create" ? "/api/products" : `/api/products/${product?.id}`, { method: mode === "create" ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(messageFrom(data, `Unable to ${mode === "create" ? "add" : "update"} this product.`));
@@ -201,9 +203,7 @@ function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "
       <form onSubmit={submit} className="overflow-y-auto p-4 sm:p-5">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2"><Field label="Product name *"><Input value={form.name} onChange={set("name")} required minLength={2} maxLength={160} autoFocus /></Field><Field label="Category *"><select value={form.category} onChange={set("category")} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field></div>
-          <Field label="Variant / pack size"><Input value={form.variant} onChange={set("variant")} placeholder="Optional" maxLength={80} /></Field>
-          <div className="grid gap-4 sm:grid-cols-2"><Field label="Unit"><Input value={form.unit} onChange={set("unit")} placeholder="bottle, tube, piece" maxLength={20} /></Field><Field label="MRP (₹) *"><Input value={form.unitPrice} onChange={set("unitPrice")} required type="number" min="0" step="0.01" inputMode="decimal" /></Field></div>
-          {mode === "create" && <Field label="Opening stock"><Input value={form.stockOnHand} onChange={set("stockOnHand")} type="number" min="0" inputMode="numeric" placeholder="0" /></Field>}
+          <div className="grid gap-4 sm:grid-cols-2"><Field label="Quantity *"><Input value={form.stockOnHand} onChange={set("stockOnHand")} required={mode === "create"} type="number" min="0" inputMode="numeric" placeholder="0" readOnly={mode === "edit"} /></Field><Field label="MRP (₹) *"><Input value={form.unitPrice} onChange={set("unitPrice")} required type="number" min="0" step="0.01" inputMode="decimal" /></Field></div>
           {mode === "edit" && <p className="rounded-lg border border-brand/15 bg-brand-soft/50 px-3 py-2.5 text-xs leading-5 text-muted">Stock changes go through the Warehouse Inventory screen, not this form, so every movement stays on the audit trail.</p>}
           {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}
         </div>
@@ -211,6 +211,12 @@ function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "
       </form>
     </div>
   </div>;
+}
+
+function Pagination({ page, pageSize, total, hasMore, onPageChange }: { page: number; pageSize: number; total: number; hasMore: boolean; onPageChange: (page: number) => void }) {
+  const first = (page - 1) * pageSize + 1;
+  const last = Math.min(page * pageSize, total);
+  return <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-xs text-muted sm:px-5"><span>Showing {first}–{last} of {total}</span><div className="flex gap-2"><Button variant="secondary" className="h-9 px-3" disabled={page <= 1} onClick={() => onPageChange(page - 1)}><ChevronLeft size={14} />Previous</Button><Button variant="secondary" className="h-9 px-3" disabled={!hasMore} onClick={() => onPageChange(page + 1)}>Next<ChevronRight size={14} /></Button></div></div>;
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }
