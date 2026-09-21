@@ -14,7 +14,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           className="relative hidden overflow-hidden rounded-lg bg-cover bg-center p-8 lg:flex lg:flex-col lg:justify-between"
           style={{ backgroundImage: "url('/brand/login-product.jpeg')" }}
         >
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,20,72,.18)_0%,rgba(18,23,92,.40)_48%,rgba(12,16,76,.88)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(128,90,43,.18)_0%,rgba(96,66,31,.42)_48%,rgba(45,36,28,.88)_100%)]" />
           <BrandMark className="relative w-[165px] self-end brightness-0 invert lg:w-[170px] lg:self-start" />
           <div className="relative max-w-[430px] pb-1 text-white">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/75">One connected business workspace</p>

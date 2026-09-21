@@ -1,27 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f7fb;
+  --background: #faf8f3;
   --surface: #ffffff;
-  --foreground: #172033;
-  --muted: #667085;
-  --subtle: #98a2b3;
-  --border: #e4e7ef;
-  --brand: #171b72;
-  --brand-dark: #10145a;
-  --brand-soft: #eef0ff;
-  --accent: #6657d9;
-  --accent-soft: #f0eeff;
-  --info: #4f91e5;
-  --info-soft: #edf6ff;
-  --magenta: #bc4fcf;
-  --magenta-soft: #fbf0fd;
-  --warning: #e9a90d;
-  --warning-soft: #fff8e6;
-  --danger: #b4232e;
-  --success: #16a34a;
-  --success-soft: #f0fdf4;
-  --button-shadow: 0 1px 2px rgba(23, 27, 114, 0.18);
+  --foreground: #2d241c;
+  --muted: #756b60;
+  --subtle: #a79b8d;
+  --border: #e7ded1;
+  --brand: #805a2b;
+  --brand-dark: #60421f;
+  --brand-soft: #f3e8d2;
+  --accent: #805a2b;
+  --accent-soft: #f3e8d2;
+  --info: #587c78;
+  --info-soft: #eaf2f0;
+  --magenta: #966178;
+  --magenta-soft: #f5ebef;
+  --warning: #b27a27;
+  --warning-soft: #fbf1dc;
+  --danger: #a65345;
+  --success: #5f7653;
+  --success-soft: #edf4eb;
+  --button-shadow: 0 1px 2px rgba(96, 66, 31, 0.18);
 }
 
 @theme inline {
@@ -60,34 +60,34 @@ body {
 button, input { font: inherit; }
 
 .crm-shell {
-  --background: #f8fafc;
+  --background: #faf8f3;
   --surface: #ffffff;
-  --foreground: #111827;
-  --muted: #6b7280;
-  --subtle: #9ca3af;
-  --border: #e5e7eb;
-  --brand: #2563eb;
-  --brand-dark: #1d4ed8;
-  --brand-soft: #eff6ff;
-  --accent: #2563eb;
-  --accent-soft: #eff6ff;
-  --info: #3b82f6;
-  --info-soft: #eff6ff;
-  --magenta: #9333ea;
-  --magenta-soft: #faf5ff;
-  --warning: #f59e0b;
-  --warning-soft: #fffbeb;
-  --danger: #ef4444;
-  --success: #22c55e;
-  --success-soft: #f0fdf4;
-  --button-shadow: 0 1px 2px rgba(37, 99, 235, 0.18);
+  --foreground: #2d241c;
+  --muted: #756b60;
+  --subtle: #a79b8d;
+  --border: #e7ded1;
+  --brand: #805a2b;
+  --brand-dark: #60421f;
+  --brand-soft: #f3e8d2;
+  --accent: #805a2b;
+  --accent-soft: #f3e8d2;
+  --info: #587c78;
+  --info-soft: #eaf2f0;
+  --magenta: #966178;
+  --magenta-soft: #f5ebef;
+  --warning: #b27a27;
+  --warning-soft: #fbf1dc;
+  --danger: #a65345;
+  --success: #5f7653;
+  --success-soft: #edf4eb;
+  --button-shadow: 0 1px 2px rgba(96, 66, 31, 0.18);
   color: var(--foreground);
   font-family: "Inter Variable", Inter, "Segoe UI", sans-serif;
 }
 
 .crm-shell ::selection {
-  background: #dbeafe;
-  color: #111827;
+  background: #f3e8d2;
+  color: #2d241c;
 }
 
 .crm-shell input,
