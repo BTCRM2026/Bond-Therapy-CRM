@@ -19,6 +19,9 @@ export class ProductsController {
   @Get()
   list(@CurrentUser() actor: SessionUser, @Query() query: ListProductsDto) { return this.products.list(actor, query); }
 
+  @Get('stats')
+  stats(@CurrentUser() actor: SessionUser) { return this.products.stats(actor); }
+
   @Get('movements')
   listMovements(@CurrentUser() actor: SessionUser, @Query('productId') productId?: string) { return this.products.listMovements(actor, productId); }
 

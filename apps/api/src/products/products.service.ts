@@ -53,6 +53,20 @@ export class ProductsService {
     return { items, page, pageSize, total, hasMore: page * pageSize < total };
   }
 
+  async stats(actor: SessionUser) {
+    this.ensureAdminAccess(actor);
+    const where = { isActive: true } satisfies Prisma.ProductWhereInput;
+    const [totalProducts, inStock, lowStock, outOfStock, products] = await this.prisma.$transaction([
+      this.prisma.product.count({ where }),
+      this.prisma.product.count({ where: { ...where, stockOnHand: { gt: 10 } } }),
+      this.prisma.product.count({ where: { ...where, stockOnHand: { gt: 0, lte: 10 } } }),
+      this.prisma.product.count({ where: { ...where, stockOnHand: { lte: 0 } } }),
+      this.prisma.product.findMany({ where, select: { unitPrice: true, stockOnHand: true } }),
+    ]);
+    const inventoryValue = products.reduce((total, product) => total + Number(product.unitPrice) * product.stockOnHand, 0);
+    return { totalProducts, inStock, lowStock, outOfStock, inventoryValue };
+  }
+
   async create(actor: SessionUser, dto: ProductDto, ipAddress?: string) {
     this.ensureAdminAccess(actor);
     const product = await this.prisma.product.create({

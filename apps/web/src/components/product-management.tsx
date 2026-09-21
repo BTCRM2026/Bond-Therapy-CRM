@@ -1,7 +1,7 @@
 "use client";
 
-import { AlertTriangle, LoaderCircle, Package, Pencil, Plus, Search, ShieldCheck, Trash2, UserCheck, UserX, X } from "lucide-react";
-import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { AlertTriangle, IndianRupee, LoaderCircle, MoreHorizontal, Package, PackageCheck, PackageX, Pencil, Plus, Search, Trash2, UserCheck, UserX, X } from "lucide-react";
+import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { KpiCard } from "@/components/ui/kpi-card";
 
 type Product = { id: string; name: string; category: string; variant: string | null; unit: string; unitPrice: string; stockOnHand: number; isActive: boolean };
 export type ProductListResponse = { items: Product[]; page: number; pageSize: number; total: number; hasMore: boolean };
+type ProductStats = { totalProducts: number; inStock: number; lowStock: number; outOfStock: number; inventoryValue: number };
 
 const CATEGORIES = [["SHAMPOO", "Shampoo"], ["CONDITIONER", "Conditioner"], ["MASK", "Mask"], ["TREATMENT", "Treatment"], ["KIT", "Kit"], ["COLOR", "Color"], ["DEVELOPER", "Developer"], ["STYLING", "Styling"], ["OIL_SERUM", "Oil / Serum"], ["LIQUID", "Liquid"], ["TOOLS", "Tools"], ["OTHER", "Other"]];
 const pretty = (value: string) => value[0] + value.slice(1).toLowerCase();
@@ -17,6 +18,7 @@ const messageFrom = (data: unknown, fallback: string) => data && typeof data ===
 
 export function ProductManagement({ initial }: { initial: ProductListResponse | null }) {
   const [data, setData] = useState(initial);
+  const [stats, setStats] = useState<ProductStats | null>(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("ALL");
   const [editor, setEditor] = useState<{ mode: "create" | "edit"; product?: Product } | null>(null);
@@ -37,6 +39,15 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
     setData(json as ProductListResponse);
   };
 
+  const reloadStats = async () => {
+    const response = await fetch("/api/products/stats", { cache: "no-store" });
+    const json = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(messageFrom(json, "Unable to load product statistics."));
+    setStats(json as ProductStats);
+  };
+
+  useEffect(() => { const timer = setTimeout(() => { void reloadStats().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load product statistics.")); }, 0); return () => clearTimeout(timer); }, []);
+
   useEffect(() => { const timer = setTimeout(() => { void reload().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load products.")); }, 250); return () => clearTimeout(timer); }, [search, category]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleActive = async (product: Product) => {
@@ -45,7 +56,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
       const response = await fetch(`/api/products/${product.id}/active`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ isActive: !product.isActive }) });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(messageFrom(data, "Unable to update this product."));
-      await reload();
+      await Promise.all([reload(), reloadStats()]);
       setNotice(`${product.name} is now ${product.isActive ? "inactive" : "active"}.`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to update this product."); }
     finally { setBusyId(""); }
@@ -58,23 +69,22 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
       const response = await fetch(`/api/products/${product.id}`, { method: "DELETE" });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(messageFrom(json, "Unable to delete this product."));
-      await reload();
+      await Promise.all([reload(), reloadStats()]);
       setNotice(`${product.name} was deleted.`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to delete this product."); }
     finally { setBusyId(""); }
   };
 
-  const active = data?.items.filter((product) => product.isActive).length ?? 0;
-  const lowStock = data?.items.filter((product) => product.isActive && product.stockOnHand <= 10).length ?? 0;
-
   return (
     <>
       {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add product</span><span className="sr-only sm:hidden">Add product</span></Button>, headerSlot)}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <KpiCard icon={Package} label="Total products" value={data?.total ?? 0} />
-        <KpiCard icon={ShieldCheck} label="Active" value={active} />
-        <KpiCard icon={AlertTriangle} label="Low or out of stock" value={lowStock} />
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <KpiCard icon={Package} label="Total products" value={stats?.totalProducts ?? "—"} detail="Active catalogue" />
+        <KpiCard icon={PackageCheck} label="In stock" value={stats?.inStock ?? "—"} detail="Above reorder level" tone="success" />
+        <KpiCard icon={AlertTriangle} label="Low stock" value={stats?.lowStock ?? "—"} detail="Reorder soon" tone="warning" />
+        <KpiCard icon={PackageX} label="Out of stock" value={stats?.outOfStock ?? "—"} detail="Needs restocking" tone="danger" />
+        <KpiCard icon={IndianRupee} label="Inventory value" value={stats ? money(stats.inventoryValue) : "—"} detail="MRP × stock" tone="brand" />
       </div>
 
       <section className="relative rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
@@ -103,7 +113,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
         {!data?.items.length && <div className="px-5 py-12 text-center"><Package className="mx-auto text-subtle" size={24} /><p className="mt-3 text-sm font-semibold text-foreground">No products found</p><p className="mt-1 text-xs text-muted">Adjust the search or add a product.</p></div>}
       </section>
 
-      {editor && <ProductEditor mode={editor.mode} product={editor.product} onClose={() => setEditor(null)} onSaved={async (message) => { setEditor(null); await reload(); setError(""); setNotice(message); }} />}
+      {editor && <ProductEditor mode={editor.mode} product={editor.product} onClose={() => setEditor(null)} onSaved={async (message) => { setEditor(null); await Promise.all([reload(), reloadStats()]); setError(""); setNotice(message); }} />}
     </>
   );
 }
@@ -132,17 +142,31 @@ function ProductRow({ product, busy, onEdit, onToggleActive, onDelete }: RowProp
 
 function ProductCard({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
   return <article className="p-4">
-    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{product.variant ? `${product.variant} · ` : ""}{pretty(product.category)}</p></div><StatusBadge isActive={product.isActive} /></div>
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{product.variant ? `${product.variant} · ` : ""}{pretty(product.category)}</p></div><div className="flex shrink-0 items-center gap-2"><StatusBadge isActive={product.isActive} /><ProductActions product={product} busy={busy} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} /></div></div>
     <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs">
       <div><dt className="text-muted">Price</dt><dd className="mt-1 font-medium text-foreground">{money(product.unitPrice)} / {product.unit}</dd></div>
       <div><dt className="text-muted">Stock</dt><dd className="mt-1"><StockCell stockOnHand={product.stockOnHand} /></dd></div>
     </dl>
-    <div className="mt-3 flex gap-2">
-      <Button variant="secondary" className="h-11 flex-1" onClick={onEdit}><Pencil size={14} />Edit</Button>
-      <Button variant="secondary" className="h-11 flex-1" disabled={busy} onClick={onToggleActive}>{busy ? <LoaderCircle className="animate-spin" size={14} /> : product.isActive ? <UserX size={14} /> : <UserCheck size={14} />}{product.isActive ? "Deactivate" : "Activate"}</Button>
-      <Button variant="secondary" className="h-11 px-3 text-danger" disabled={busy} onClick={onDelete} aria-label="Delete product"><Trash2 size={14} /></Button>
-    </div>
   </article>;
+}
+
+function ProductActions({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const close = (event: MouseEvent) => { if (root.current && !root.current.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+  const run = (action: () => void) => { setOpen(false); action(); };
+  return <div className="relative" ref={root}>
+    <button type="button" disabled={busy} onClick={() => setOpen((value) => !value)} className="grid size-9 place-items-center rounded-lg border bg-white text-muted transition-colors hover:border-brand/25 hover:bg-brand-soft hover:text-brand disabled:opacity-50" aria-label={`Open actions for ${product.name}`} aria-expanded={open}>{busy ? <LoaderCircle className="animate-spin" size={16} /> : <MoreHorizontal size={17} />}</button>
+    {open && <div className="absolute right-0 top-10 z-50 w-44 overflow-hidden rounded-lg border bg-white p-1.5 shadow-[0_12px_32px_rgba(45,36,28,0.14)]"><MenuAction icon={Pencil} label="Edit product" onClick={() => run(onEdit)} /><MenuAction icon={product.isActive ? UserX : UserCheck} label={product.isActive ? "Deactivate" : "Activate"} onClick={() => run(onToggleActive)} /><div className="my-1 border-t" /><MenuAction icon={Trash2} label="Delete product" danger onClick={() => run(onDelete)} /></div>}
+  </div>;
+}
+
+function MenuAction({ icon: Icon, label, danger = false, onClick }: { icon: typeof Pencil; label: string; danger?: boolean; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={`flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-xs font-medium transition-colors ${danger ? "text-danger hover:bg-red-50" : "text-muted hover:bg-background hover:text-foreground"}`}><Icon size={15} />{label}</button>;
 }
 
 function IconAction({ icon: Icon, label, onClick, busy = false, danger = false }: { icon: typeof Pencil; label: string; onClick: () => void; busy?: boolean; danger?: boolean }) {
