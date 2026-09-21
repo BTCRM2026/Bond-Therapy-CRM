@@ -388,9 +388,14 @@ model Lead {
 enum ProductCategory {
   SHAMPOO
   CONDITIONER
+  MASK
   TREATMENT
+  KIT
   COLOR
+  DEVELOPER
   STYLING
+  OIL_SERUM
+  LIQUID
   TOOLS
   OTHER
 }
@@ -400,9 +405,9 @@ model Product {
   sku         String          @unique
   name        String
   category    ProductCategory @default(OTHER)
+  variant     String?
   unit        String          @default("pcs")
   unitPrice   Decimal         @db.Decimal(12, 2)
-  imageUrl    String?
   stockOnHand Int             @default(0)
   isActive    Boolean         @default(true)
   createdAt   DateTime        @default(now())

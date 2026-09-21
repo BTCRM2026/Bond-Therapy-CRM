@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -10,6 +11,9 @@ const movementInclude = {
   product: { select: { id: true, name: true, sku: true } },
   recordedBy: { select: { id: true, name: true } },
 } satisfies Prisma.StockMovementInclude;
+
+const titleCase = (value: string) => value.trim().toLowerCase().replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
+const internalSku = () => `BT-${randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`;
 
 @Injectable()
 export class ProductsService {
@@ -39,7 +43,7 @@ export class ProductsService {
     const pageSize = Math.min(200, Math.max(1, Number(query.pageSize) || 100));
     const search = query.search?.trim();
     const filters: Prisma.ProductWhereInput[] = this.isAdmin(actor) ? [] : [{ isActive: true }];
-    if (search) filters.push({ OR: [{ name: { contains: search } }, { sku: { contains: search } }] });
+    if (search) filters.push({ OR: [{ name: { contains: search } }, { variant: { contains: search } }] });
     if (query.category) filters.push({ category: query.category });
     const where = { AND: filters } satisfies Prisma.ProductWhereInput;
     const [items, total] = await this.prisma.$transaction([
@@ -51,12 +55,10 @@ export class ProductsService {
 
   async create(actor: SessionUser, dto: ProductDto, ipAddress?: string) {
     this.ensureAdminAccess(actor);
-    const existing = await this.prisma.product.findUnique({ where: { sku: dto.sku.trim() } });
-    if (existing) throw new ConflictException('A product with this SKU already exists.');
     const product = await this.prisma.product.create({
-      data: { sku: dto.sku.trim(), name: dto.name.trim(), category: dto.category, unit: dto.unit?.trim() || 'pcs', unitPrice: dto.unitPrice, imageUrl: dto.imageUrl?.trim() || null, stockOnHand: dto.stockOnHand ?? 0 },
+      data: { sku: internalSku(), name: titleCase(dto.name), category: dto.category, variant: dto.variant?.trim() || null, unit: dto.unit?.trim() || 'pcs', unitPrice: dto.unitPrice, stockOnHand: dto.stockOnHand ?? 0 },
     });
-    await recordAudit(this.prisma, { actorId: actor.id, action: 'PRODUCT_CREATE', entity: 'PRODUCT', entityId: product.id, details: { sku: product.sku, name: product.name }, ipAddress });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'PRODUCT_CREATE', entity: 'PRODUCT', entityId: product.id, details: { name: product.name, category: product.category }, ipAddress });
     return product;
   }
 
@@ -64,16 +66,22 @@ export class ProductsService {
     this.ensureAdminAccess(actor);
     const existing = await this.prisma.product.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Product not found.');
-    if (dto.sku.trim() !== existing.sku) {
-      const skuTaken = await this.prisma.product.findUnique({ where: { sku: dto.sku.trim() } });
-      if (skuTaken) throw new ConflictException('A product with this SKU already exists.');
-    }
     const product = await this.prisma.product.update({
       where: { id },
-      data: { sku: dto.sku.trim(), name: dto.name.trim(), category: dto.category, unit: dto.unit?.trim() || 'pcs', unitPrice: dto.unitPrice, imageUrl: dto.imageUrl?.trim() || null },
+      data: { name: titleCase(dto.name), category: dto.category, variant: dto.variant?.trim() || null, unit: dto.unit?.trim() || 'pcs', unitPrice: dto.unitPrice },
     });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'PRODUCT_UPDATE', entity: 'PRODUCT', entityId: id, details: { changes: dto }, ipAddress });
     return product;
+  }
+
+  async remove(actor: SessionUser, id: string, ipAddress?: string) {
+    this.ensureAdminAccess(actor);
+    const existing = await this.prisma.product.findUnique({ where: { id }, include: { _count: { select: { orderItems: true } } } });
+    if (!existing) throw new NotFoundException('Product not found.');
+    if (existing._count.orderItems > 0) throw new ConflictException('This product is used in an order and cannot be deleted. Deactivate it instead.');
+    await this.prisma.product.delete({ where: { id } });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'PRODUCT_DELETE', entity: 'PRODUCT', entityId: id, details: { name: existing.name }, ipAddress });
+    return { deleted: true };
   }
 
   async setActive(actor: SessionUser, id: string, dto: SetProductActiveDto, ipAddress?: string) {

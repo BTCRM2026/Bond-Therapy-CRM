@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type OrderItemRow = { id: string; quantity: number; unitPrice: string; lineTotal: string; product: { id: string; name: string; sku: string; unit: string } };
+type OrderItemRow = { id: string; quantity: number; unitPrice: string; lineTotal: string; product: { id: string; name: string; unit: string } };
 export type Order = { id: string; orderNumber: string; status: string; subtotal: string; discountAmount: string; totalAmount: string; notes: string | null; createdAt: string; client: { id: string; salonName: string; city: string; primaryContact: string }; salesperson: { id: string; name: string }; items: OrderItemRow[] };
 export type OrderListResponse = { items: Order[]; page: number; pageSize: number; total: number; hasMore: boolean };
 
@@ -70,7 +70,7 @@ export function OrdersModule({ initial }: { initial: OrderListResponse | null })
 }
 
 type ClientOption = { id: string; salonName: string; city: string; primaryContact: string };
-type ProductOption = { id: string; sku: string; name: string; unit: string; unitPrice: string; stockOnHand: number };
+type ProductOption = { id: string; name: string; unit: string; unitPrice: string; stockOnHand: number };
 type CartLine = { product: ProductOption; quantity: number };
 
 export function OrderBookingModal({ clientId, clientName, onClose, onBooked }: { clientId?: string; clientName?: string; onClose: () => void; onBooked: (order: Order) => Promise<void> | void }) {
@@ -151,7 +151,7 @@ export function OrderBookingModal({ clientId, clientName, onClose, onBooked }: {
 
         <div>
           <p className="mb-2 text-xs font-semibold text-foreground">Products</p>
-          <label className="relative block"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={17} /><Input className="pl-9" value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Search product or SKU" /></label>
+          <label className="relative block"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={17} /><Input className="pl-9" value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Search products" /></label>
           <div className="mt-2 max-h-48 space-y-1.5 overflow-y-auto rounded-lg border bg-background p-2">
             {products.length ? products.map((product) => <button key={product.id} type="button" disabled={product.stockOnHand <= 0} onClick={() => addToCart(product)} className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
               <span className="min-w-0"><span className="block truncate text-sm font-medium text-foreground">{product.name}</span><span className="text-xs text-muted">{money(product.unitPrice)} / {product.unit} · {product.stockOnHand > 0 ? `${product.stockOnHand} in stock` : "Out of stock"}</span></span>

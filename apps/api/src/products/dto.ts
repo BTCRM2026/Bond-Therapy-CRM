@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { ProductCategory, StockMovementType } from '@prisma/client';
 
 export class ListProductsDto {
@@ -10,12 +10,11 @@ export class ListProductsDto {
 }
 
 export class ProductDto {
-  @IsString() @MinLength(2) @MaxLength(40) sku!: string;
   @IsString() @MinLength(2) @MaxLength(160) name!: string;
   @IsEnum(ProductCategory) category!: ProductCategory;
+  @IsOptional() @IsString() @MaxLength(80) variant?: string;
   @IsOptional() @IsString() @MaxLength(20) unit?: string;
   @Type(() => Number) @IsNumber() @Min(0) unitPrice!: number;
-  @IsOptional() @IsUrl({ require_protocol: true }) @MaxLength(500) imageUrl?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) stockOnHand?: number;
 }
 

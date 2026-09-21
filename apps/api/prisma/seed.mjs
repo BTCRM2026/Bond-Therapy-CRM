@@ -2,6 +2,9 @@ import { PrismaClient } from '@prisma/client';
 import { randomBytes, scryptSync } from 'node:crypto';
 
 const prisma = new PrismaClient();
+const productsOnly = process.env.PRODUCTS_ONLY === 'true';
+
+if (!productsOnly) {
 
 function hashPassword(password) {
   const salt = randomBytes(16);
@@ -116,18 +119,52 @@ if (staffLoginId && staffEmail && staffPassword) {
   console.log(`Bootstrap staff user ready: ${staffLoginId} (${staffRoleKey})`);
 }
 
-const sampleProducts = [
-  { sku: 'BT-SHM-001', name: 'Keratin Repair Shampoo 1L', category: 'SHAMPOO', unit: 'bottle', unitPrice: 650, stockOnHand: 120 },
-  { sku: 'BT-CND-001', name: 'Keratin Repair Conditioner 1L', category: 'CONDITIONER', unit: 'bottle', unitPrice: 690, stockOnHand: 95 },
-  { sku: 'BT-TRT-001', name: 'Bond Rebuild Treatment 500ml', category: 'TREATMENT', unit: 'bottle', unitPrice: 1450, stockOnHand: 40 },
-  { sku: 'BT-CLR-001', name: 'Professional Color Cream 100g', category: 'COLOR', unit: 'tube', unitPrice: 380, stockOnHand: 6 },
-  { sku: 'BT-STY-001', name: 'Heat Protect Styling Spray 250ml', category: 'STYLING', unit: 'bottle', unitPrice: 520, stockOnHand: 70 },
-  { sku: 'BT-TL-001', name: 'Ceramic Flat Iron Pro', category: 'TOOLS', unit: 'pcs', unitPrice: 4200, stockOnHand: 0 },
+}
+
+const titleCase = (value) => value.trim().toLowerCase().replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
+const categoryFor = (name) => {
+  const value = name.toLowerCase();
+  if (value.includes('conditionar') || value.includes('conditioner')) return 'CONDITIONER';
+  if (value.includes('shampoo')) return 'SHAMPOO';
+  if (value.includes('mask')) return 'MASK';
+  if (value.includes('colour')) return 'COLOR';
+  if (value.includes('developer')) return 'DEVELOPER';
+  if (value.includes('kit')) return 'KIT';
+  if (value.includes('oil') || value.includes('syrum') || value.includes('serum')) return 'OIL_SERUM';
+  if (value.includes('liquid')) return 'LIQUID';
+  if (value.includes('spray')) return 'STYLING';
+  if (value.includes('treatment') || value.includes('therapy') || value.includes('surgery') || value.includes('microtox') || value.includes('brazilian')) return 'TREATMENT';
+  return 'OTHER';
+};
+const unitFor = (category) => category === 'KIT' ? 'kit' : ['SHAMPOO', 'CONDITIONER', 'MASK', 'OIL_SERUM', 'LIQUID', 'STYLING'].includes(category) ? 'bottle' : ['COLOR', 'DEVELOPER'].includes(category) ? 'tube' : 'piece';
+const catalogue = [
+  ['KERAFILL PRE SHAMPOO', 2500], ['HAIR KERAFILL TREATMENT', 16000], ['KERATIN POST MASK', 2500], ['KERA RECOVERY SHAMPOO', 1200], ['KERA RECOVERY CONDITIONAR', 1200],
+  ['STRAIGHT THERAPY A', 1700], ['STRAIGHT THERAPY B', 300], ['HYDRA ACTIVE SHAMPOO', 950], ['HYDRA ACTIVE CONDITIONAR', 950], ['HYDRA ACTIVE SHAMPOO', 2500],
+  ['HYDRA ACTIVE CONDITIONAR', 2500], ['REVITALIZING HAIR MASK', 1199], ['INJECTION REPAIR SHAMPOO', 900], ['INJECTION REPAIR MASK', 1050], ['INJECTION SMOOTHING SHAMPOO', 900],
+  ['INJECTION SMOOTHING MASK', 1050], ['INJECTION NUTRI OIL SHAMPOO', 900], ['INJECTION NUTRI OIL MASK', 1050], ['ONE STEP TREATMENT', 27000], ['SURGERY B1 BOND SHAPER', 15000],
+  ['SURGERY B2 BOND SMOOTHER', 15000], ['SURGERY B3 BOND PH', 15000], ['SURGERY B4 BOND LAMINIZER', 15000], ['SURGERY B PRO ACIDIC SHAMPOO', 1500], ['SURGERY B PRO ACIDIC MASK', 1500],
+  ['NEW BRAZILIAN S3', 15000], ['S PRO PROTEIN SHAMPOO', 2000], ['S PRO PROTEIN MASK', 1400], ['MULTI ACTION LIVING SPARY', 800], ['D PRO SHAMPOO', 1650],
+  ['D MIRACLE SCALP LIQUID', 700], ['D TREATMENT & HAIR MUD MASK', 1050], ['D MIRACLE ANTI PELLICULAIRE', 700], ['D PRO SHAMPOO', 700], ['ARGAN OIL', 1100],
+  ['S PRO PROTIN SHAMPOO', 800], ['S PRO PROTIN MASK', 800], ['S PRO SYRUM', 800], ['INJECTION REPAIR SHAMPOO', 2500], ['INJECTION NUTRI OIL SHAMPOO', 2500],
+  ['INJECTION NUTRI OIL MASK', 1700], ['INJECTION SMOOTHING SHAMPOO', 2500], ['INJECTION SMOOTHING MASK', 1700], ['INJECTION REPAIR MASK', 1700], ['GEN PRO HAIR COLOUR 2/0', 549],
+  ['GEN PRO HAIR COLOUR 3/0', 549], ['GEN PRO HAIR COLOUR 4/0', 549], ['GEN PRO HAIR COLOUR 5/0', 549], ['GEN PRO DEVELOPER', 650], ['MICROTOX', 2000],
+  ['MICROTOX SHAMPOO', 999], ['MICROTOX MASK', 999], ['BOND GOLDEN CAVIAE KIT', 9999], ['BOND PLEX KIT 100 ML', 9999], ['BOND REVIVAL LUXE 100ML X 3 NOS', 9999],
+  ['BOND REVIVAL LUXE 100ML', 3999],
 ];
 
-for (const product of sampleProducts) {
-  await prisma.product.upsert({ where: { sku: product.sku }, update: {}, create: product });
+for (const sku of ['BT-SHM-001', 'BT-CND-001', 'BT-TRT-001', 'BT-CLR-001', 'BT-STY-001', 'BT-TL-001']) {
+  await prisma.product.updateMany({ where: { sku }, data: { isActive: false } });
 }
-console.log(`Sample products ready: ${sampleProducts.length}`);
+for (const [index, [rawName, unitPrice]] of catalogue.entries()) {
+  const name = titleCase(rawName);
+  const category = categoryFor(rawName);
+  const sku = `BT-CATALOG-${String(index + 1).padStart(3, '0')}`;
+  await prisma.product.upsert({
+    where: { sku },
+    update: { name, category, unit: unitFor(category), unitPrice, isActive: true },
+    create: { sku, name, category, unit: unitFor(category), unitPrice, stockOnHand: 0 },
+  });
+}
+console.log(`Product catalogue ready: ${catalogue.length}`);
 
 await prisma.$disconnect();

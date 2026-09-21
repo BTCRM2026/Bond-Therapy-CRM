@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { PortalType } from '@prisma/client';
 import { PortalGuard } from '../common/portal.guard.js';
@@ -30,6 +30,9 @@ export class ProductsController {
 
   @Patch(':id/active')
   setActive(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: SetProductActiveDto, @Req() req: Request) { return this.products.setActive(actor, id, dto, req.ip); }
+
+  @Delete(':id')
+  remove(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Req() req: Request) { return this.products.remove(actor, id, req.ip); }
 
   @Post(':id/movements')
   recordMovement(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: StockMovementDto, @Req() req: Request) { return this.products.recordMovement(actor, id, dto, req.ip); }

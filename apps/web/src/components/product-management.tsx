@@ -1,16 +1,16 @@
 "use client";
 
-import { AlertTriangle, LoaderCircle, Package, Pencil, Plus, Search, ShieldCheck, UserCheck, UserX, X } from "lucide-react";
+import { AlertTriangle, LoaderCircle, Package, Pencil, Plus, Search, ShieldCheck, Trash2, UserCheck, UserX, X } from "lucide-react";
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KpiCard } from "@/components/ui/kpi-card";
 
-type Product = { id: string; sku: string; name: string; category: string; unit: string; unitPrice: string; imageUrl: string | null; stockOnHand: number; isActive: boolean };
+type Product = { id: string; name: string; category: string; variant: string | null; unit: string; unitPrice: string; stockOnHand: number; isActive: boolean };
 export type ProductListResponse = { items: Product[]; page: number; pageSize: number; total: number; hasMore: boolean };
 
-const CATEGORIES = [["SHAMPOO", "Shampoo"], ["CONDITIONER", "Conditioner"], ["TREATMENT", "Treatment"], ["COLOR", "Color"], ["STYLING", "Styling"], ["TOOLS", "Tools"], ["OTHER", "Other"]];
+const CATEGORIES = [["SHAMPOO", "Shampoo"], ["CONDITIONER", "Conditioner"], ["MASK", "Mask"], ["TREATMENT", "Treatment"], ["KIT", "Kit"], ["COLOR", "Color"], ["DEVELOPER", "Developer"], ["STYLING", "Styling"], ["OIL_SERUM", "Oil / Serum"], ["LIQUID", "Liquid"], ["TOOLS", "Tools"], ["OTHER", "Other"]];
 const pretty = (value: string) => value[0] + value.slice(1).toLowerCase();
 const money = (value: string | number) => `₹${Number(value).toLocaleString("en-IN")}`;
 const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? (Array.isArray((data as { message: unknown }).message) ? (data as { message: string[] }).message.join(" ") : String((data as { message: unknown }).message)) : fallback;
@@ -51,6 +51,19 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
     finally { setBusyId(""); }
   };
 
+  const remove = async (product: Product) => {
+    if (!window.confirm(`Delete ${product.name}? This cannot be undone.`)) return;
+    setBusyId(product.id); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/products/${product.id}`, { method: "DELETE" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(messageFrom(json, "Unable to delete this product."));
+      await reload();
+      setNotice(`${product.name} was deleted.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to delete this product."); }
+    finally { setBusyId(""); }
+  };
+
   const active = data?.items.filter((product) => product.isActive).length ?? 0;
   const lowStock = data?.items.filter((product) => product.isActive && product.stockOnHand <= 10).length ?? 0;
 
@@ -68,7 +81,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
           <label className="relative block w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} />
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search name or SKU" aria-label="Search products" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search products" aria-label="Search products" />
           </label>
           <select value={category} onChange={(event) => setCategory(event.target.value)} className="h-11 rounded-lg border bg-white px-3 text-[13px] text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10" aria-label="Filter by category">
             <option value="ALL">All categories</option>
@@ -82,11 +95,11 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
           <table className="w-full min-w-[820px] text-left text-[13px]">
             <thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><tr><th className="px-5 py-3">Product</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Price</th><th className="px-4 py-3">Stock</th><th className="px-4 py-3">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
             <tbody className="divide-y">
-              {data?.items.map((product) => <ProductRow key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} />)}
+              {data?.items.map((product) => <ProductRow key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}
             </tbody>
           </table>
         </div>
-        <div className="divide-y xl:hidden">{data?.items.map((product) => <ProductCard key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} />)}</div>
+        <div className="divide-y xl:hidden">{data?.items.map((product) => <ProductCard key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}</div>
         {!data?.items.length && <div className="px-5 py-12 text-center"><Package className="mx-auto text-subtle" size={24} /><p className="mt-3 text-sm font-semibold text-foreground">No products found</p><p className="mt-1 text-xs text-muted">Adjust the search or add a product.</p></div>}
       </section>
 
@@ -104,22 +117,22 @@ function StockCell({ stockOnHand }: { stockOnHand: number }) {
   return <span className="font-medium text-foreground">{stockOnHand}</span>;
 }
 
-type RowProps = { product: Product; busy: boolean; onEdit: () => void; onToggleActive: () => void };
+type RowProps = { product: Product; busy: boolean; onEdit: () => void; onToggleActive: () => void; onDelete: () => void };
 
-function ProductRow({ product, busy, onEdit, onToggleActive }: RowProps) {
+function ProductRow({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
   return <tr className="transition-colors hover:bg-brand-soft/40">
-    <td className="px-5 py-4"><p className="font-semibold text-foreground">{product.name}</p><p className="mt-0.5 text-xs text-muted">{product.sku}</p></td>
+    <td className="px-5 py-4"><p className="font-semibold text-foreground">{product.name}</p>{product.variant && <p className="mt-0.5 text-xs text-muted">{product.variant}</p>}</td>
     <td className="px-4 py-4 text-muted">{pretty(product.category)}</td>
     <td className="px-4 py-4 text-muted">{money(product.unitPrice)} / {product.unit}</td>
     <td className="px-4 py-4"><StockCell stockOnHand={product.stockOnHand} /></td>
     <td className="px-4 py-4"><StatusBadge isActive={product.isActive} /></td>
-    <td className="px-5 py-4"><div className="flex justify-end gap-2"><IconAction icon={Pencil} label="Edit product" onClick={onEdit} /><IconAction icon={product.isActive ? UserX : UserCheck} label={product.isActive ? "Deactivate" : "Activate"} onClick={onToggleActive} busy={busy} /></div></td>
+    <td className="px-5 py-4"><div className="flex justify-end gap-2"><IconAction icon={Pencil} label="Edit product" onClick={onEdit} /><IconAction icon={product.isActive ? UserX : UserCheck} label={product.isActive ? "Deactivate" : "Activate"} onClick={onToggleActive} busy={busy} /><IconAction icon={Trash2} label="Delete product" onClick={onDelete} busy={busy} danger /></div></td>
   </tr>;
 }
 
-function ProductCard({ product, busy, onEdit, onToggleActive }: RowProps) {
+function ProductCard({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
   return <article className="p-4">
-    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{product.sku} · {pretty(product.category)}</p></div><StatusBadge isActive={product.isActive} /></div>
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{product.variant ? `${product.variant} · ` : ""}{pretty(product.category)}</p></div><StatusBadge isActive={product.isActive} /></div>
     <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs">
       <div><dt className="text-muted">Price</dt><dd className="mt-1 font-medium text-foreground">{money(product.unitPrice)} / {product.unit}</dd></div>
       <div><dt className="text-muted">Stock</dt><dd className="mt-1"><StockCell stockOnHand={product.stockOnHand} /></dd></div>
@@ -127,17 +140,18 @@ function ProductCard({ product, busy, onEdit, onToggleActive }: RowProps) {
     <div className="mt-3 flex gap-2">
       <Button variant="secondary" className="h-11 flex-1" onClick={onEdit}><Pencil size={14} />Edit</Button>
       <Button variant="secondary" className="h-11 flex-1" disabled={busy} onClick={onToggleActive}>{busy ? <LoaderCircle className="animate-spin" size={14} /> : product.isActive ? <UserX size={14} /> : <UserCheck size={14} />}{product.isActive ? "Deactivate" : "Activate"}</Button>
+      <Button variant="secondary" className="h-11 px-3 text-danger" disabled={busy} onClick={onDelete} aria-label="Delete product"><Trash2 size={14} /></Button>
     </div>
   </article>;
 }
 
-function IconAction({ icon: Icon, label, onClick, busy = false }: { icon: typeof Pencil; label: string; onClick: () => void; busy?: boolean }) {
-  return <button type="button" disabled={busy} onClick={onClick} className="grid size-9 place-items-center rounded-lg border bg-white text-muted transition-colors hover:border-brand/25 hover:bg-brand-soft hover:text-brand disabled:opacity-50" aria-label={label}>{busy ? <LoaderCircle className="animate-spin" size={15} /> : <Icon size={15} />}</button>;
+function IconAction({ icon: Icon, label, onClick, busy = false, danger = false }: { icon: typeof Pencil; label: string; onClick: () => void; busy?: boolean; danger?: boolean }) {
+  return <button type="button" disabled={busy} onClick={onClick} className={`grid size-9 place-items-center rounded-lg border bg-white transition-colors disabled:opacity-50 ${danger ? "text-danger hover:border-red-200 hover:bg-red-50" : "text-muted hover:border-brand/25 hover:bg-brand-soft hover:text-brand"}`} aria-label={label}>{busy ? <LoaderCircle className="animate-spin" size={15} /> : <Icon size={15} />}</button>;
 }
 
-type FormState = { sku: string; name: string; category: string; unit: string; unitPrice: string; imageUrl: string; stockOnHand: string };
+type FormState = { name: string; category: string; variant: string; unit: string; unitPrice: string; stockOnHand: string };
 function toFormState(product?: Product): FormState {
-  return { sku: product?.sku ?? "", name: product?.name ?? "", category: product?.category ?? "SHAMPOO", unit: product?.unit ?? "bottle", unitPrice: product?.unitPrice ?? "", imageUrl: product?.imageUrl ?? "", stockOnHand: "" };
+  return { name: product?.name ?? "", category: product?.category ?? "SHAMPOO", variant: product?.variant ?? "", unit: product?.unit ?? "bottle", unitPrice: product?.unitPrice ?? "", stockOnHand: "" };
 }
 
 function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "edit"; product?: Product; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
@@ -149,7 +163,7 @@ function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError("");
     try {
-      const payload = { sku: form.sku, name: form.name, category: form.category, unit: form.unit || undefined, unitPrice: Number(form.unitPrice), imageUrl: form.imageUrl || undefined, ...(mode === "create" ? { stockOnHand: form.stockOnHand ? Number(form.stockOnHand) : 0 } : {}) };
+      const payload = { name: form.name, category: form.category, variant: form.variant || undefined, unit: form.unit || undefined, unitPrice: Number(form.unitPrice), ...(mode === "create" ? { stockOnHand: form.stockOnHand ? Number(form.stockOnHand) : 0 } : {}) };
       const response = await fetch(mode === "create" ? "/api/products" : `/api/products/${product?.id}`, { method: mode === "create" ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(messageFrom(data, `Unable to ${mode === "create" ? "add" : "update"} this product.`));
@@ -162,11 +176,10 @@ function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "
       <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><div><h2 className="text-base font-semibold text-foreground">{mode === "create" ? "Add product" : "Edit product"}</h2><p className="mt-1 text-xs text-muted">Visible to Sales and Warehouse once saved</p></div><button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-background sm:size-8" aria-label="Close"><X size={17} /></button></div>
       <form onSubmit={submit} className="overflow-y-auto p-4 sm:p-5">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2"><Field label="SKU *"><Input value={form.sku} onChange={set("sku")} required minLength={2} maxLength={40} autoFocus /></Field><Field label="Category *"><select value={form.category} onChange={set("category")} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field></div>
-          <Field label="Product name *"><Input value={form.name} onChange={set("name")} required minLength={2} maxLength={160} /></Field>
-          <div className="grid gap-4 sm:grid-cols-2"><Field label="Unit"><Input value={form.unit} onChange={set("unit")} placeholder="bottle, tube, pcs" maxLength={20} /></Field><Field label="Unit price (₹) *"><Input value={form.unitPrice} onChange={set("unitPrice")} required type="number" min="0" step="0.01" inputMode="decimal" /></Field></div>
+          <div className="grid gap-4 sm:grid-cols-2"><Field label="Product name *"><Input value={form.name} onChange={set("name")} required minLength={2} maxLength={160} autoFocus /></Field><Field label="Category *"><select value={form.category} onChange={set("category")} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field></div>
+          <Field label="Variant / pack size"><Input value={form.variant} onChange={set("variant")} placeholder="Optional" maxLength={80} /></Field>
+          <div className="grid gap-4 sm:grid-cols-2"><Field label="Unit"><Input value={form.unit} onChange={set("unit")} placeholder="bottle, tube, piece" maxLength={20} /></Field><Field label="MRP (₹) *"><Input value={form.unitPrice} onChange={set("unitPrice")} required type="number" min="0" step="0.01" inputMode="decimal" /></Field></div>
           {mode === "create" && <Field label="Opening stock"><Input value={form.stockOnHand} onChange={set("stockOnHand")} type="number" min="0" inputMode="numeric" placeholder="0" /></Field>}
-          <Field label="Image URL"><Input value={form.imageUrl} onChange={set("imageUrl")} type="url" placeholder="https://..." /></Field>
           {mode === "edit" && <p className="rounded-lg border border-brand/15 bg-brand-soft/50 px-3 py-2.5 text-xs leading-5 text-muted">Stock changes go through the Warehouse Inventory screen, not this form, so every movement stays on the audit trail.</p>}
           {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}
         </div>

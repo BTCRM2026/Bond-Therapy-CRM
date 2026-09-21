@@ -9,7 +9,7 @@ type DashboardData = {
   lowStockCount: number;
   receivedToday: number;
   dispatchedToday: number;
-  lowStockItems: Array<{ id: string; name: string; sku: string; stockOnHand: number; unit: string }>;
+  lowStockItems: Array<{ id: string; name: string; stockOnHand: number; unit: string }>;
 };
 
 export function WarehouseDashboardWidgets() {
@@ -57,7 +57,7 @@ export function WarehouseDashboardWidgets() {
     {data.lowStockItems.length > 0 && <section className="rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
       <div className="flex items-center gap-3 border-b px-5 py-4"><span className="grid size-9 place-items-center rounded-lg bg-warning-soft text-warning"><AlertTriangle size={17} /></span><div><h3 className="text-sm font-semibold text-foreground">Needs attention</h3><p className="mt-0.5 text-xs text-muted">Lowest stock first</p></div></div>
       <div className="divide-y">{data.lowStockItems.map((item) => <div key={item.id} className="flex items-center justify-between px-5 py-3">
-        <div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{item.name}</p><p className="text-xs text-muted">{item.sku}</p></div>
+        <div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{item.name}</p><p className="text-xs text-muted">{item.unit}</p></div>
         <span className={`shrink-0 text-sm font-semibold ${item.stockOnHand <= 0 ? "text-danger" : "text-warning"}`}>{item.stockOnHand} {item.unit}</span>
       </div>)}</div>
     </section>}

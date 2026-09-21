@@ -16,6 +16,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "node prisma/seed.mjs",
+    "db:seed:products": "node prisma/seed-products.mjs",
     "db:local:setup": "node scripts/prepare-local-schema.mjs && prisma generate --schema prisma/schema.local.prisma && prisma db push --schema prisma/schema.local.prisma && node --env-file=.env prisma/seed.mjs",
     "db:production:generate": "prisma generate --schema prisma/schema.prisma",
     "lint": "oxlint --type-aware src/ test/",

@@ -12,3 +12,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return new NextResponse(await upstream.text(), { status: upstream.status, headers: { "content-type": "application/json" } });
   } catch { return NextResponse.json({ message: "Product service is temporarily unavailable." }, { status: 503 }); }
 }
+
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    const portal = portalFromRequest(request);
+    if (portal !== "ADMIN") return NextResponse.json({ message: "Only administrators can delete products." }, { status: 403 });
+    const { id } = await context.params;
+    const upstream = await fetch(`${API}/products/${encodeURIComponent(id)}`, { method: "DELETE", headers: { cookie: request.headers.get("cookie") ?? "", [PORTAL_HEADER]: portal }, cache: "no-store" });
+    return new NextResponse(await upstream.text(), { status: upstream.status, headers: { "content-type": "application/json" } });
+  } catch { return NextResponse.json({ message: "Product service is temporarily unavailable." }, { status: 503 }); }
+}

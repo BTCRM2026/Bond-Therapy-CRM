@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type Product = { id: string; sku: string; name: string; category: string; unit: string; unitPrice: string; stockOnHand: number };
+type Product = { id: string; name: string; category: string; unit: string; unitPrice: string; stockOnHand: number };
 type ProductListResponse = { items: Product[]; page: number; pageSize: number; total: number; hasMore: boolean };
 
 const CATEGORIES = [
@@ -46,7 +46,7 @@ export function InventoryModule({ initial }: { initial: ProductListResponse | nu
   useEffect(() => { const timer = setTimeout(() => { void reload(); }, 250); return () => clearTimeout(timer); }, [search, category]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return <div className="space-y-4">
-    <label className="relative block"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={17} /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search product or SKU" aria-label="Search inventory" /></label>
+    <label className="relative block"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={17} /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products" aria-label="Search inventory" /></label>
     <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
       {CATEGORIES.map(([value, label]) => <button key={value} type="button" onClick={() => setCategory(value)} className={`h-9 shrink-0 rounded-full border px-3.5 text-xs font-semibold transition-colors ${category === value ? "border-brand bg-brand text-white" : "text-muted hover:bg-brand-soft/60"}`}>{label}</button>)}
     </div>
@@ -56,7 +56,7 @@ export function InventoryModule({ initial }: { initial: ProductListResponse | nu
         : data?.items.length ? <div className="divide-y">{data.items.map((product) => <div key={product.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">{product.name}</p>
-            <p className="mt-0.5 text-xs text-muted">{pretty(product.category)} · {product.sku} · {product.unit}</p>
+            <p className="mt-0.5 text-xs text-muted">{pretty(product.category)} · {product.unit}</p>
           </div>
           <div className="flex items-center gap-3">
             <StockBadge stockOnHand={product.stockOnHand} />
