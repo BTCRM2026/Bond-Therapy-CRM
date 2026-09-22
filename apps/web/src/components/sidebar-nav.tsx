@@ -53,11 +53,11 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
     { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
   ] : staffGroups(roleKey);
   return (
-    <nav className="mt-5 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1 text-sm [scrollbar-width:thin]" aria-label="Portal navigation">
+    <nav className="mt-7 min-h-0 flex-1 space-y-7 overflow-y-auto pr-1 text-sm [scrollbar-color:var(--subtle)_transparent] [scrollbar-width:thin]" aria-label="Portal navigation">
       {groups.map((group) => (
         <div key={group.label}>
-          <p className="mb-2 px-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle">{group.label}</p>
-          <div className="space-y-1">
+          <p className="mb-2.5 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-subtle">{group.label}</p>
+          <div className="space-y-1.5">
             {group.items.map((item) => {
               const { href, label, icon: Icon } = item;
               const exact = "exact" in item && item.exact;
@@ -68,13 +68,15 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
                   href={href}
                   onClick={onNavigate}
                   className={cn(
-                    "flex h-10 items-center gap-2.5 rounded-lg border px-2.5 text-[13px] font-medium transition-colors duration-150",
+                    "flex h-12 items-center gap-2.5 rounded-[10px] border px-3 text-sm font-medium transition-colors duration-150",
                     active
                       ? "border-brand/20 bg-brand-soft font-semibold text-brand-dark"
                       : "border-transparent text-muted hover:bg-brand-soft/60 hover:text-brand-dark",
                   )}
                 >
-                  <Icon size={17} strokeWidth={1.8} />
+                  <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg transition-colors", active ? "bg-brand text-white shadow-[0_1px_2px_rgba(112,72,28,0.22)]" : "text-muted")}>
+                    <Icon size={18} strokeWidth={1.8} />
+                  </span>
                   {label}
                 </Link>
               );

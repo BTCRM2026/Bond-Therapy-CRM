@@ -28,9 +28,9 @@ export function DashboardShell({
   children: ReactNode;
 }) {
   return (
-    <main className="crm-shell min-h-screen bg-background lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
-      <aside className="sticky top-0 hidden h-screen min-h-0 border-r bg-white px-4 py-6 lg:flex lg:flex-col">
-        <div className="flex min-h-12 items-center border-b px-2 pb-5">
+    <main className="crm-shell min-h-screen bg-background lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
+      <aside className="sticky top-0 hidden h-screen min-h-0 border-r bg-white px-5 pb-4 pt-6 lg:flex lg:flex-col">
+        <div className="flex min-h-24 items-center justify-center border-b pb-6">
           <SidebarBrand />
         </div>
         <SidebarNav portal={portal} roleKey={roleKey} canManageStaff={canManageStaff} />

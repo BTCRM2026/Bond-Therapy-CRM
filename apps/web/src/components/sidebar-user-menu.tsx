@@ -11,7 +11,7 @@ export function SidebarUserMenu({ userName, roleName }: { userName: string; role
 
   return (
     <div className="mt-4 border-t pt-4">
-      <div className={cn("overflow-hidden rounded-xl border border-transparent transition-[border-color,box-shadow] duration-150", open && "border-border bg-white shadow-[0_8px_20px_rgba(15,23,42,0.07)]")}>
+      <div className={cn("overflow-hidden rounded-2xl border border-brand/20 bg-white transition-shadow duration-150", open && "shadow-[0_8px_20px_rgba(55,43,29,0.08)]")}>
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
@@ -19,12 +19,12 @@ export function SidebarUserMenu({ userName, roleName }: { userName: string; role
           aria-expanded={open}
           aria-label={`${open ? "Close" : "Open"} account menu for ${userName}`}
         >
-          <span className={cn("grid size-10 shrink-0 place-items-center rounded-lg text-xs font-semibold transition-colors", open ? "bg-brand text-white" : "bg-brand-soft text-brand")}>{initials}</span>
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand text-xs font-semibold text-white">{initials}</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs font-semibold text-foreground">{userName}</span>
             <span className="mt-0.5 block truncate text-[11px] text-muted">{roleName}</span>
           </span>
-          {open ? <ChevronDown className="shrink-0 text-muted" size={16} /> : <ChevronUp className="shrink-0 text-muted" size={16} />}
+          {open ? <ChevronUp className="shrink-0 text-muted" size={16} /> : <ChevronDown className="shrink-0 text-muted" size={16} />}
         </button>
         {open && (
           <div className="border-t p-1.5">
