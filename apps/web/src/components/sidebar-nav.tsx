@@ -68,10 +68,10 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
                   href={href}
                   onClick={onNavigate}
                   className={cn(
-                    "flex h-12 items-center gap-2.5 rounded-[10px] border px-3 text-sm font-medium transition-colors duration-150",
+                    "flex h-12 items-center gap-2.5 rounded-[10px] px-3 text-sm font-medium transition-colors duration-150",
                     active
-                      ? "border-brand/20 bg-brand-soft font-semibold text-brand-dark"
-                      : "border-transparent text-muted hover:bg-brand-soft/60 hover:text-brand-dark",
+                      ? "bg-brand-soft font-semibold text-brand-dark ring-1 ring-inset ring-brand/15"
+                      : "text-muted hover:bg-brand-soft/55 hover:text-brand-dark",
                   )}
                 >
                   <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg transition-colors", active ? "bg-brand text-white shadow-[0_1px_2px_rgba(112,72,28,0.22)]" : "text-muted")}>
