@@ -109,7 +109,7 @@ function RateForm({ row, period, onClose, onSaved }: { row: TeamRow; period: { m
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to set this rate."); setSaving(false); }
   };
   return <div className="fixed inset-0 z-50 grid place-items-end bg-[#0f172a]/40 p-0 backdrop-blur-[1px] sm:place-items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Set incentive rate">
-    <div className="w-full rounded-t-xl border bg-white p-5 shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-w-sm sm:rounded-xl">
+    <div className="w-full rounded-xl border bg-white p-5 shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-w-sm">
       <div className="flex items-center gap-2"><IndianRupee size={16} className="text-brand" /><h2 className="text-base font-semibold text-foreground">Set incentive rate</h2></div>
       <p className="mt-1 text-xs text-muted">{row.name} · revenue this period {money(row.eligibleRevenue)}</p>
       <label className="mt-4 block space-y-1.5"><span className="text-xs font-medium text-foreground">Commission rate (%)</span><Input type="number" min="0" max="100" step="0.5" value={rate} onChange={(event) => setRate(event.target.value)} autoFocus /></label>

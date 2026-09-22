@@ -28,16 +28,16 @@ export function DashboardShell({
   children: ReactNode;
 }) {
   return (
-    <main className="crm-shell min-h-screen bg-background lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
-      <aside className="sticky top-0 hidden h-screen border-r bg-white px-4 py-5 lg:flex lg:flex-col">
-        <div className="flex min-h-14 items-center border-b px-2 pb-5">
+    <main className="crm-shell min-h-screen bg-background lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
+      <aside className="sticky top-0 hidden h-screen min-h-0 border-r bg-white px-4 py-6 lg:flex lg:flex-col">
+        <div className="flex min-h-12 items-center border-b px-2 pb-5">
           <SidebarBrand />
         </div>
         <SidebarNav portal={portal} roleKey={roleKey} canManageStaff={canManageStaff} />
         <SidebarUserMenu userName={userName} roleName={roleName} />
       </aside>
       <section className="min-w-0">
-        <header className="sticky top-0 z-30 flex min-h-[68px] items-center justify-between gap-3 border-b bg-white px-4 py-3 sm:px-6 lg:px-7">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b bg-white/95 px-4 shadow-[0_1px_0_rgba(98,68,38,0.04)] backdrop-blur sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <MobileSidebarDrawer portal={portal} roleKey={roleKey} canManageStaff={canManageStaff} />
             <div className="min-w-0">
@@ -51,7 +51,7 @@ export function DashboardShell({
             <MobileNavigation userName={userName} roleName={roleName} />
           </div>
         </header>
-        <div className="mx-auto w-full max-w-[1520px] p-4 pb-24 sm:p-6 sm:pb-24 lg:p-7 lg:pb-7">{children}</div>
+        <div className="w-full p-4 pb-24 sm:p-6 sm:pb-24 lg:p-8 lg:pb-8">{children}</div>
         <BottomTabBar portal={portal} roleKey={roleKey} canManageStaff={canManageStaff} />
       </section>
     </main>

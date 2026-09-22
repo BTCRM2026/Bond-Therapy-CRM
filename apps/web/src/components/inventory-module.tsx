@@ -90,7 +90,7 @@ function StockMovementForm({ product, type, onClose, onSaved }: { product: Produ
   };
 
   return <div className="fixed inset-0 z-50 grid place-items-end bg-[#0f172a]/40 p-0 backdrop-blur-[1px] sm:place-items-center sm:p-4" role="dialog" aria-modal="true" aria-label={type === "RECEIVED" ? "Receive stock" : "Report damaged stock"}>
-    <div className="w-full rounded-t-xl border bg-white p-5 shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-w-sm sm:rounded-xl">
+    <div className="w-full rounded-xl border bg-white p-5 shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-w-sm">
       <h2 className="text-base font-semibold text-foreground">{type === "RECEIVED" ? "Receive stock" : "Report damaged stock"}</h2>
       <p className="mt-1 text-xs text-muted">{product.name} · currently {product.stockOnHand} {product.unit}</p>
       <div className="mt-4 space-y-3">

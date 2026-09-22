@@ -1,8 +1,9 @@
 "use client";
 
-import { CalendarClock, Clock3, IndianRupee, LogIn, MapPin, Target, TrendingUp, Trophy, UserPlus } from "lucide-react";
+import { CalendarClock, Clock3, IndianRupee, ListChecks, LogIn, MapPin, ShoppingBag, Target, TrendingUp, Trophy, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { KpiCard } from "@/components/ui/kpi-card";
 
 type DashboardData = {
   period: { month: number; year: number };
@@ -32,24 +33,23 @@ export function SalesDashboardWidgets() {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="h-28 animate-pulse rounded-xl bg-background" /><div className="h-28 animate-pulse rounded-xl bg-background" /><div className="h-28 animate-pulse rounded-xl bg-background" /><div className="h-28 animate-pulse rounded-xl bg-background" /></div>;
+  if (loading) return <div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><div className="h-[108px] animate-pulse rounded-xl bg-white" /><div className="h-[108px] animate-pulse rounded-xl bg-white" /><div className="h-[108px] animate-pulse rounded-xl bg-white" /><div className="h-[108px] animate-pulse rounded-xl bg-white" /></div>;
   if (!data) return null;
 
   const progress = data.target ? Math.min(100, Math.round((data.achieved / data.target) * 100)) : null;
 
-  return <div className="space-y-4">
-    <section className="rounded-xl border bg-white p-5 shadow-[0_3px_12px_rgba(15,23,42,0.04)] sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">{MONTHS[data.period.month - 1]} {data.period.year} so far</p><p className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-foreground">{money(data.achieved)}</p></div>
-        {data.target != null && <div className="text-right"><p className="text-xs text-muted">Target</p><p className="text-sm font-semibold text-foreground">{money(data.target)}</p></div>}
-      </div>
-      {progress != null && <div className="mt-4"><div className="h-2 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-brand transition-all" style={{ width: `${progress}%` }} /></div><p className="mt-1.5 text-xs text-muted">{progress}% of target</p></div>}
-      <div className="mt-5 grid grid-cols-3 gap-3 border-t pt-4 text-center">
-        <div><p className="text-lg font-semibold text-foreground">{data.orderCount}</p><p className="text-[11px] text-muted">Orders booked</p></div>
-        <Link href="/dashboard/leads" className="block"><p className="text-lg font-semibold text-foreground">{data.openLeads}</p><p className="text-[11px] text-muted">Open leads</p></Link>
-        <Link href="/dashboard/follow-ups" className="block"><p className={`text-lg font-semibold ${data.overdueFollowUps > 0 ? "text-danger" : "text-foreground"}`}>{data.overdueFollowUps}</p><p className="text-[11px] text-muted">Overdue follow-ups</p></Link>
-      </div>
+  return <div className="space-y-5">
+    <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Sales overview">
+      <KpiCard icon={IndianRupee} label="Revenue achieved" value={money(data.achieved)} detail={`${MONTHS[data.period.month - 1]} ${data.period.year}`} tone="success" />
+      <Link href="/dashboard/orders" className="group"><KpiCard icon={ShoppingBag} label="Orders booked" value={data.orderCount} detail="Confirmed this month" className="h-full group-hover:-translate-y-0.5 group-hover:border-brand/30" /></Link>
+      <Link href="/dashboard/leads" className="group"><KpiCard icon={UserPlus} label="Open leads" value={data.openLeads} detail="Awaiting conversion" tone="warning" className="h-full group-hover:-translate-y-0.5 group-hover:border-brand/30" /></Link>
+      <Link href="/dashboard/follow-ups" className="group"><KpiCard icon={ListChecks} label="Overdue follow-ups" value={data.overdueFollowUps} detail={data.overdueFollowUps ? "Needs attention" : "Nothing overdue"} tone={data.overdueFollowUps ? "danger" : "neutral"} className="h-full group-hover:-translate-y-0.5 group-hover:border-brand/30" /></Link>
     </section>
+
+    {progress != null && <section className="crm-surface p-5">
+      <div className="flex items-center justify-between gap-4"><div><h2 className="text-sm font-semibold text-foreground">Monthly target</h2><p className="mt-1 text-xs text-muted">{money(data.achieved)} of {money(data.target ?? 0)}</p></div><span className="text-lg font-semibold text-brand-dark">{progress}%</span></div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-brand transition-all" style={{ width: `${progress}%` }} /></div>
+    </section>}
 
     {data.leaderboard && <section className="rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
       <div className="flex items-center gap-3 border-b px-5 py-4"><span className="grid size-9 place-items-center rounded-lg bg-brand-soft text-brand"><Trophy size={17} /></span><div><h3 className="text-sm font-semibold text-foreground">Team this month</h3><p className="mt-0.5 text-xs text-muted">Ranked by revenue booked</p></div></div>
@@ -60,7 +60,7 @@ export function SalesDashboardWidgets() {
       </div>)}</div>
     </section>}
 
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <section><div className="mb-3"><h2 className="text-sm font-semibold text-foreground">Quick actions</h2><p className="mt-0.5 text-xs text-muted">Common sales workflows</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <QuickLink href="/dashboard/leads" icon={UserPlus} label="Add lead" />
       <QuickLink href="/dashboard/follow-ups" icon={Clock3} label="Follow-ups" />
       <QuickLink href="/dashboard/orders" icon={TrendingUp} label="Orders" />
@@ -69,10 +69,10 @@ export function SalesDashboardWidgets() {
       <QuickLink href="/dashboard/territory" icon={MapPin} label="Territory" />
       <QuickLink href="/dashboard/attendance" icon={LogIn} label="Attendance" />
       <QuickLink href="/dashboard/incentives" icon={IndianRupee} label="Incentives" />
-    </div>
+    </div></section>
   </div>;
 }
 
 function QuickLink({ href, icon: Icon, label }: { href: string; icon: typeof Target; label: string }) {
-  return <Link href={href} className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl border bg-white text-xs font-semibold text-foreground shadow-[0_2px_8px_rgba(15,23,42,0.03)] hover:border-brand/25 hover:bg-brand-soft/40"><Icon size={18} className="text-brand" />{label}</Link>;
+  return <Link href={href} className="crm-surface flex h-[72px] items-center gap-3 px-4 text-xs font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-brand/30"><span className="grid size-9 place-items-center rounded-lg bg-brand-soft text-brand"><Icon size={17} /></span>{label}</Link>;
 }

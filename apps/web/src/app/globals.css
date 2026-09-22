@@ -60,17 +60,17 @@ body {
 button, input { font: inherit; }
 
 .crm-shell {
-  --background: #faf8f3;
+  --background: #f7f4ef;
   --surface: #ffffff;
-  --foreground: #2d241c;
-  --muted: #756b60;
-  --subtle: #a79b8d;
-  --border: #e7ded1;
-  --brand: #805a2b;
-  --brand-dark: #60421f;
-  --brand-soft: #f3e8d2;
-  --accent: #805a2b;
-  --accent-soft: #f3e8d2;
+  --foreground: #26231f;
+  --muted: #716a61;
+  --subtle: #9d958a;
+  --border: #e3ddd4;
+  --brand: #8a5a22;
+  --brand-dark: #70481c;
+  --brand-soft: #f5ead8;
+  --accent: #a66d28;
+  --accent-soft: #f8eedf;
   --info: #587c78;
   --info-soft: #eaf2f0;
   --magenta: #966178;
@@ -80,14 +80,14 @@ button, input { font: inherit; }
   --danger: #a65345;
   --success: #5f7653;
   --success-soft: #edf4eb;
-  --button-shadow: 0 1px 2px rgba(96, 66, 31, 0.18);
+  --button-shadow: 0 1px 2px rgba(112, 72, 28, 0.2);
   color: var(--foreground);
-  font-family: "Inter Variable", Inter, "Segoe UI", sans-serif;
+  font-family: "Manrope Variable", Manrope, "Segoe UI", sans-serif;
 }
 
 .crm-shell ::selection {
-  background: #f3e8d2;
-  color: #2d241c;
+  background: #f5ead8;
+  color: #26231f;
 }
 
 .crm-shell input,
@@ -95,4 +95,32 @@ button, input { font: inherit; }
 .crm-shell textarea,
 .crm-shell button {
   font-family: inherit;
+}
+
+/* Keep modal footers inside the same rounded surface as the header. */
+.crm-shell [role="dialog"] > .rounded-xl {
+  overflow: hidden;
+}
+
+.crm-shell .crm-surface {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(55, 43, 29, 0.05), 0 3px 8px rgba(55, 43, 29, 0.035);
+}
+
+.crm-shell :where(section, article)[class*="rounded-xl"][class*="bg-white"] {
+  box-shadow: 0 1px 2px rgba(55, 43, 29, 0.05), 0 3px 8px rgba(55, 43, 29, 0.035);
+}
+
+.crm-shell :where(input, select, textarea):focus-visible {
+  outline: none;
+}
+
+.crm-shell table thead {
+  background: #faf7f2;
+}
+
+.crm-shell table tbody tr {
+  transition: background-color 150ms ease;
 }

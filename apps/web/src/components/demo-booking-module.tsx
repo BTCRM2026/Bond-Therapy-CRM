@@ -155,7 +155,7 @@ function BookDemoForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   };
 
   return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#0f172a]/40 p-0 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label="Book demo">
-    <div className="flex min-h-full w-full flex-col bg-white sm:my-4 sm:min-h-0 sm:max-h-[calc(100dvh-32px)] sm:max-w-lg sm:rounded-xl sm:border sm:shadow-[0_20px_48px_rgba(15,23,42,0.18)]">
+    <div className="flex min-h-full w-full flex-col overflow-hidden bg-white sm:my-4 sm:min-h-0 sm:max-h-[calc(100dvh-32px)] sm:max-w-lg sm:rounded-xl sm:border sm:shadow-[0_20px_48px_rgba(15,23,42,0.18)]">
       <div className="flex items-center justify-between border-b px-4 py-4 sm:px-5"><div><h2 className="text-base font-semibold text-foreground">Book demo</h2><p className="mt-1 text-xs text-muted">Reserve a Demo Team slot for a salon</p></div><button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-lg text-muted hover:bg-background sm:size-8" aria-label="Close"><X size={18} /></button></div>
       <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
         <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
@@ -202,7 +202,7 @@ function OutcomeForm({ demo, onClose, onSaved }: { demo: Demo; onClose: () => vo
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to log this outcome."); setSaving(false); }
   };
   return <div className="fixed inset-0 z-50 grid place-items-end bg-[#0f172a]/40 p-0 backdrop-blur-[1px] sm:place-items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Log demo outcome">
-    <div className="w-full rounded-t-xl border bg-white p-5 shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-w-sm sm:rounded-xl">
+    <div className="w-full rounded-xl border bg-white p-5 shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-w-sm">
       <div className="flex items-center gap-2"><Users size={16} className="text-brand" /><h2 className="text-base font-semibold text-foreground">Log outcome</h2></div>
       <p className="mt-1 text-xs text-muted">{demo.client.salonName}</p>
       <div className="mt-4 space-y-3">

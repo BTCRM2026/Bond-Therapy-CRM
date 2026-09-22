@@ -10,7 +10,7 @@ export function SidebarUserMenu({ userName, roleName }: { userName: string; role
   const initials = userName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="mt-auto border-t pt-4">
+    <div className="mt-4 border-t pt-4">
       <div className={cn("overflow-hidden rounded-xl border border-transparent transition-[border-color,box-shadow] duration-150", open && "border-border bg-white shadow-[0_8px_20px_rgba(15,23,42,0.07)]")}>
         <button
           type="button"

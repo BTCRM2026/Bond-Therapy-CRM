@@ -62,7 +62,9 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
   const [error, setError] = useState(initialDirectory ? "" : "Staff data could not be loaded. Check the API connection and try again.");
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setHeaderSlot(document.getElementById("page-header-actions")));
+    const syncHeaderSlot = () => setHeaderSlot(document.getElementById("page-header-actions"));
+    syncHeaderSlot();
+    const frame = requestAnimationFrame(syncHeaderSlot);
     return () => cancelAnimationFrame(frame);
   }, []);
 

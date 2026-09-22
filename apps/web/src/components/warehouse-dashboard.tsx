@@ -3,6 +3,7 @@
 import { AlertTriangle, PackageCheck, PackagePlus, Truck } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { KpiCard } from "@/components/ui/kpi-card";
 
 type DashboardData = {
   pendingDispatch: number;
@@ -30,28 +31,12 @@ export function WarehouseDashboardWidgets() {
   if (loading) return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /></div>;
   if (!data) return null;
 
-  return <div className="space-y-4">
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <Link href="/dashboard/dispatch" className="rounded-xl border bg-white p-4 shadow-[0_3px_12px_rgba(15,23,42,0.04)] hover:border-brand/25">
-        <span className="grid size-10 place-items-center rounded-lg bg-brand-soft text-brand"><Truck size={18} /></span>
-        <p className="mt-3 text-2xl font-semibold text-foreground">{data.pendingDispatch}</p>
-        <p className="text-xs text-muted">Ready to dispatch</p>
-      </Link>
-      <div className="rounded-xl border bg-white p-4 shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
-        <span className="grid size-10 place-items-center rounded-lg bg-success-soft text-success"><PackageCheck size={18} /></span>
-        <p className="mt-3 text-2xl font-semibold text-foreground">{data.dispatchedToday}</p>
-        <p className="text-xs text-muted">Moved today</p>
-      </div>
-      <div className="rounded-xl border bg-white p-4 shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
-        <span className="grid size-10 place-items-center rounded-lg bg-brand-soft text-brand"><PackagePlus size={18} /></span>
-        <p className="mt-3 text-2xl font-semibold text-foreground">{data.receivedToday}</p>
-        <p className="text-xs text-muted">Units received today</p>
-      </div>
-      <Link href="/dashboard/inventory" className="rounded-xl border bg-white p-4 shadow-[0_3px_12px_rgba(15,23,42,0.04)] hover:border-brand/25">
-        <span className="grid size-10 place-items-center rounded-lg bg-warning-soft text-warning"><AlertTriangle size={18} /></span>
-        <p className={`mt-3 text-2xl font-semibold ${data.lowStockCount > 0 ? "text-danger" : "text-foreground"}`}>{data.lowStockCount}</p>
-        <p className="text-xs text-muted">Low or out of stock</p>
-      </Link>
+  return <div className="space-y-5">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <Link href="/dashboard/dispatch" className="group"><KpiCard icon={Truck} label="Pending dispatch" value={data.pendingDispatch} detail="Ready to dispatch" className="h-full group-hover:-translate-y-0.5 group-hover:border-brand/30" /></Link>
+      <KpiCard icon={PackageCheck} label="Dispatched today" value={data.dispatchedToday} detail="Orders moved" tone="success" />
+      <KpiCard icon={PackagePlus} label="Received today" value={data.receivedToday} detail="Units received" />
+      <Link href="/dashboard/inventory" className="group"><KpiCard icon={AlertTriangle} label="Stock alerts" value={data.lowStockCount} detail="Low or out of stock" tone={data.lowStockCount ? "warning" : "neutral"} className="h-full group-hover:-translate-y-0.5 group-hover:border-brand/30" /></Link>
     </div>
 
     {data.lowStockItems.length > 0 && <section className="rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">

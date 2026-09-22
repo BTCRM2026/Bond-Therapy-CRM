@@ -25,13 +25,6 @@ export default async function DashboardPage() {
         portal="STAFF"
         canManageStaff={false}
       >
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div><h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">Welcome back, {session.name}</h2><p className="mt-1.5 text-sm text-muted">{isSales ? "Today's numbers and what needs your attention." : isWarehouse ? "What needs to ship and what needs restocking." : "Your secure account overview and assigned access."}</p></div>
-          <span className="inline-flex w-fit items-center gap-2 rounded-lg border border-brand/15 bg-white px-3 py-2 text-xs font-semibold text-brand shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-            <span className="size-2 rounded-full bg-success" />{roleName}
-          </span>
-        </div>
-
         {isSales ? <SalesDashboardWidgets /> : isWarehouse ? <WarehouseDashboardWidgets /> : (
           <div className="grid max-w-4xl gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.8fr)]">
             <section className="rounded-xl border bg-white p-5 shadow-[0_3px_12px_rgba(15,23,42,0.04)] sm:p-6">
@@ -47,7 +40,7 @@ export default async function DashboardPage() {
               </dl>
             </section>
 
-            <section className="rounded-xl bg-brand p-5 text-white shadow-[0_10px_24px_rgba(37,99,235,0.14)]">
+            <section className="rounded-xl bg-brand p-5 text-white shadow-[0_10px_24px_rgba(112,72,28,0.14)]">
               <LockKeyhole size={20} className="text-white/80" />
               <h2 className="mt-4 text-sm font-semibold">Secure Staff Portal</h2>
               <p className="mt-1.5 text-xs leading-5 text-white/70">This session works only on the Staff Portal. Use Settings to review and update your profile.</p>
@@ -67,7 +60,6 @@ export default async function DashboardPage() {
       headerSubtitle={`${roleName} administration overview`}
       canManageStaff={session.permissions.includes("admin.staff.manage")}
     >
-      <div className="mb-6"><h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">Welcome back, {session.name}</h2><p className="mt-1.5 text-sm text-muted">Your focused administration workspace.</p></div>
       <section className="max-w-2xl rounded-xl border bg-white p-5 shadow-[0_3px_12px_rgba(15,23,42,0.04)] sm:p-6">
         <div className="flex items-start gap-4">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
