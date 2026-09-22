@@ -25,7 +25,7 @@ export class SalesService {
 
     const [target, ownOrders, openLeads, overdueFollowUps] = await Promise.all([
       this.prisma.salesTarget.findUnique({ where: { userId_periodYear_periodMonth: { userId: actor.id, periodYear: year, periodMonth: month } } }),
-      this.prisma.order.aggregate({ where: { salespersonId: actor.id, createdAt: { gte: start, lt: end }, status: { not: 'CANCELLED' } }, _sum: { totalAmount: true }, _count: true }),
+      this.prisma.order.aggregate({ where: { salespersonId: actor.id, createdAt: { gte: start, lt: end }, status: { in: ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] } }, _sum: { totalAmount: true }, _count: true }),
       this.prisma.lead.count({ where: { assignedToId: actor.id, status: { in: ['NEW', 'CONTACTED', 'QUALIFIED'] } } }),
       this.prisma.clientActivity.count({ where: { createdById: actor.id, status: 'OPEN', scheduledAt: { lt: now } } }),
     ]);
@@ -35,7 +35,7 @@ export class SalesService {
       const team = await this.prisma.user.findMany({ where: { OR: [{ id: actor.id }, { managerId: actor.id }] }, select: { id: true, name: true } });
       const teamIds = team.map((member) => member.id);
       const [orderSums, targets] = await Promise.all([
-        this.prisma.order.groupBy({ by: ['salespersonId'], where: { salespersonId: { in: teamIds }, createdAt: { gte: start, lt: end }, status: { not: 'CANCELLED' } }, _sum: { totalAmount: true }, _count: true }),
+        this.prisma.order.groupBy({ by: ['salespersonId'], where: { salespersonId: { in: teamIds }, createdAt: { gte: start, lt: end }, status: { in: ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] } }, _sum: { totalAmount: true }, _count: true }),
         this.prisma.salesTarget.findMany({ where: { userId: { in: teamIds }, periodYear: year, periodMonth: month } }),
       ]);
       leaderboard = team
@@ -67,14 +67,14 @@ export class SalesService {
 
     const [target, revenue, newActiveClients, productiveVisits, callsAndVisits, leadsThisPeriod, productMixRaw] = await Promise.all([
       this.prisma.salesTarget.findUnique({ where: { userId_periodYear_periodMonth: { userId: actor.id, periodYear: year, periodMonth: month } } }),
-      this.prisma.order.aggregate({ where: { salespersonId: actor.id, createdAt: { gte: start, lt: end }, status: { not: 'CANCELLED' } }, _sum: { totalAmount: true }, _count: true }),
+      this.prisma.order.aggregate({ where: { salespersonId: actor.id, createdAt: { gte: start, lt: end }, status: { in: ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] } }, _sum: { totalAmount: true }, _count: true }),
       this.prisma.client.count({ where: { assignedSalespersonId: actor.id, status: 'ACTIVE', createdAt: { gte: start, lt: end } } }),
       this.prisma.clientActivity.count({ where: { createdById: actor.id, type: 'VISIT', status: 'COMPLETED', createdAt: { gte: start, lt: end } } }),
       this.prisma.clientActivity.count({ where: { createdById: actor.id, createdAt: { gte: start, lt: end } } }),
       this.prisma.lead.findMany({ where: { assignedToId: actor.id, createdAt: { gte: start, lt: end } }, select: { status: true } }),
       this.prisma.orderItem.groupBy({
         by: ['productId'],
-        where: { order: { salespersonId: actor.id, createdAt: { gte: start, lt: end }, status: { not: 'CANCELLED' } } },
+        where: { order: { salespersonId: actor.id, createdAt: { gte: start, lt: end }, status: { in: ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] } } },
         _sum: { quantity: true, lineTotal: true },
         orderBy: { _sum: { quantity: 'desc' } },
         take: 5,

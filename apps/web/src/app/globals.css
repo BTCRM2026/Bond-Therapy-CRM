@@ -26,6 +26,7 @@
 
 @theme inline {
   --color-background: var(--background);
+  --color-sidebar: var(--sidebar, var(--background));
   --color-surface: var(--surface);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
@@ -60,34 +61,35 @@ body {
 button, input { font: inherit; }
 
 .crm-shell {
-  --background: #f7f4ef;
+  --background: #f2f5ee;
+  --sidebar: #ffffff;
   --surface: #ffffff;
-  --foreground: #26231f;
-  --muted: #716a61;
-  --subtle: #9d958a;
-  --border: #e3ddd4;
-  --brand: #8a5a22;
-  --brand-dark: #70481c;
-  --brand-soft: #f5ead8;
-  --accent: #a66d28;
-  --accent-soft: #f8eedf;
-  --info: #587c78;
-  --info-soft: #eaf2f0;
-  --magenta: #966178;
-  --magenta-soft: #f5ebef;
-  --warning: #b27a27;
-  --warning-soft: #fbf1dc;
-  --danger: #a65345;
-  --success: #5f7653;
-  --success-soft: #edf4eb;
-  --button-shadow: 0 1px 2px rgba(112, 72, 28, 0.2);
+  --foreground: #1a1f1a;
+  --muted: #64705f;
+  --subtle: #98a390;
+  --border: #dfe6d8;
+  --brand: #24402f;
+  --brand-dark: #182c20;
+  --brand-soft: #e3ebdc;
+  --accent: #24402f;
+  --accent-soft: #e3ebdc;
+  --info: #0284c7;
+  --info-soft: #e0f2fe;
+  --magenta: #b45309;
+  --magenta-soft: #fef3c7;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --danger: #dc2626;
+  --success: #2f7d4f;
+  --success-soft: #e1f1e4;
+  --button-shadow: 0 1px 2px rgba(26, 31, 26, 0.1), 0 1px 1px rgba(26, 31, 26, 0.04);
   color: var(--foreground);
-  font-family: "Manrope Variable", Manrope, "Segoe UI", sans-serif;
+  font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", "Segoe UI", sans-serif;
 }
 
 .crm-shell ::selection {
-  background: #f5ead8;
-  color: #26231f;
+  background: #e3ebdc;
+  color: #1a1f1a;
 }
 
 .crm-shell input,
@@ -104,21 +106,23 @@ button, input { font: inherit; }
 
 .crm-shell .crm-surface {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--surface);
-  box-shadow: 0 1px 2px rgba(55, 43, 29, 0.05), 0 3px 8px rgba(55, 43, 29, 0.035);
+  box-shadow: 0 1px 2px rgba(26, 31, 26, 0.04), 0 3px 10px rgba(26, 31, 26, 0.035);
 }
 
 .crm-shell :where(section, article)[class*="rounded-xl"][class*="bg-white"] {
-  box-shadow: 0 1px 2px rgba(55, 43, 29, 0.05), 0 3px 8px rgba(55, 43, 29, 0.035);
+  box-shadow: 0 1px 2px rgba(26, 31, 26, 0.04), 0 3px 10px rgba(26, 31, 26, 0.035);
 }
 
 .crm-shell :where(input, select, textarea):focus-visible {
   outline: none;
+  box-shadow: 0 0 0 3px var(--brand-soft);
+  border-color: var(--brand);
 }
 
 .crm-shell table thead {
-  background: #faf7f2;
+  background: var(--background);
 }
 
 .crm-shell table tbody tr {

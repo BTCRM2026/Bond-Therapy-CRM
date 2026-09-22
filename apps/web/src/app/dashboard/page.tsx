@@ -40,7 +40,7 @@ export default async function DashboardPage() {
               </dl>
             </section>
 
-            <section className="rounded-xl bg-brand p-5 text-white shadow-[0_10px_24px_rgba(112,72,28,0.14)]">
+            <section className="rounded-xl bg-brand p-5 text-white shadow-[0_10px_24px_rgba(26,31,26,0.14)]">
               <LockKeyhole size={20} className="text-white/80" />
               <h2 className="mt-4 text-sm font-semibold">Secure Staff Portal</h2>
               <p className="mt-1.5 text-xs leading-5 text-white/70">This session works only on the Staff Portal. Use Settings to review and update your profile.</p>

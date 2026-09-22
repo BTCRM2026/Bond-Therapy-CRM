@@ -70,7 +70,7 @@ export class ProductsService {
   async create(actor: SessionUser, dto: ProductDto, ipAddress?: string) {
     this.ensureAdminAccess(actor);
     const product = await this.prisma.product.create({
-      data: { sku: internalSku(), name: titleCase(dto.name), category: dto.category, variant: dto.variant?.trim() || null, unit: dto.unit?.trim() || 'pcs', unitPrice: dto.unitPrice, stockOnHand: dto.stockOnHand ?? 0 },
+      data: { sku: internalSku(), name: titleCase(dto.name), category: dto.category, variant: dto.variant?.trim() || null, unit: dto.unit?.trim() || 'pcs', unitPrice: dto.unitPrice, hsnCode: dto.hsnCode?.trim() || null, gstRate: dto.gstRate, stockOnHand: dto.stockOnHand ?? 0 },
     });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'PRODUCT_CREATE', entity: 'PRODUCT', entityId: product.id, details: { name: product.name, category: product.category }, ipAddress });
     return product;
@@ -82,7 +82,7 @@ export class ProductsService {
     if (!existing) throw new NotFoundException('Product not found.');
     const product = await this.prisma.product.update({
       where: { id },
-      data: { name: titleCase(dto.name), category: dto.category, variant: dto.variant?.trim() || null, unit: dto.unit?.trim() || 'pcs', unitPrice: dto.unitPrice },
+      data: { name: titleCase(dto.name), category: dto.category, variant: dto.variant?.trim() || null, unit: dto.unit?.trim() || 'pcs', unitPrice: dto.unitPrice, hsnCode: dto.hsnCode?.trim() || null, gstRate: dto.gstRate },
     });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'PRODUCT_UPDATE', entity: 'PRODUCT', entityId: id, details: { changes: dto }, ipAddress });
     return product;

@@ -11,8 +11,12 @@ const toneClasses: Record<KpiTone, string> = {
 };
 
 export function KpiCard({ icon: Icon, label, value, detail, tone = "brand", className }: { icon: LucideIcon; label: string; value: string | number; detail?: string; tone?: KpiTone; className?: string }) {
-  return <div className={cn("crm-surface flex min-h-[108px] items-center justify-between gap-4 p-5 transition duration-150", className)}>
-    <div className="min-w-0"><p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">{label}</p><p className="mt-1.5 truncate text-xl font-semibold tracking-[-0.025em] text-foreground">{value}</p>{detail && <p className="mt-1 truncate text-xs text-muted">{detail}</p>}</div>
-    <span className={`grid size-10 shrink-0 place-items-center rounded-xl border border-current/15 ${toneClasses[tone]}`}><Icon size={18} strokeWidth={1.9} /></span>
+  return <div className={cn("crm-surface flex min-h-[132px] items-center justify-between gap-4 p-6 transition duration-150", className)}>
+    <div className="min-w-0">
+      <p className="truncate text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">{label}</p>
+      <p className="mt-2.5 truncate text-[28px] font-bold leading-none tracking-[-0.02em] text-foreground">{value}</p>
+      {detail && <p className="mt-2.5 truncate text-xs text-muted">{detail}</p>}
+    </div>
+    <span className={`grid size-12 shrink-0 place-items-center rounded-xl ${toneClasses[tone]}`}><Icon size={20} strokeWidth={1.9} /></span>
   </div>;
 }

@@ -73,9 +73,10 @@ export class ClientsService {
     const activities = await this.prisma.clientActivity.findMany({ where: { clientId: client.id }, orderBy: { createdAt: 'desc' }, take: 10, include: { createdBy: { select: { id: true, name: true } } } });
     const nextVisit = await this.prisma.clientActivity.findFirst({ where: { clientId: client.id, type: ClientActivityType.VISIT, status: ClientActivityStatus.OPEN, scheduledAt: { not: null, gte: new Date() } }, orderBy: { scheduledAt: 'asc' } });
     const openActions = await this.prisma.clientActivity.findMany({ where: { clientId: client.id, status: ClientActivityStatus.OPEN }, orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }], take: 8 });
-    const orderAggregate = await this.prisma.order.aggregate({ where: { clientId: client.id, status: { not: 'CANCELLED' } }, _sum: { totalAmount: true }, _avg: { totalAmount: true }, _count: true });
-    const lastOrder = await this.prisma.order.findFirst({ where: { clientId: client.id, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, select: { orderNumber: true, createdAt: true, totalAmount: true } });
-    const recentOrders = await this.prisma.order.findMany({ where: { clientId: client.id, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, take: 5, include: { items: { include: { product: { select: { name: true } } } } } });
+    const financialStatuses = ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] as const;
+    const orderAggregate = await this.prisma.order.aggregate({ where: { clientId: client.id, status: { in: [...financialStatuses] } }, _sum: { totalAmount: true }, _avg: { totalAmount: true }, _count: true });
+    const lastOrder = await this.prisma.order.findFirst({ where: { clientId: client.id, status: { in: [...financialStatuses] } }, orderBy: { createdAt: 'desc' }, select: { orderNumber: true, createdAt: true, totalAmount: true } });
+    const recentOrders = await this.prisma.order.findMany({ where: { clientId: client.id, status: { in: [...financialStatuses] } }, orderBy: { createdAt: 'desc' }, take: 5, include: { items: { include: { product: { select: { name: true } } } } } });
     return {
       client, activities, openActions, nextVisit,
       salesSnapshot: {
@@ -113,7 +114,7 @@ export class ClientsService {
     return {
       salonName: dto.salonName.trim(), category: dto.category, status: dto.status ?? 'PROSPECT', ownerName: dto.ownerName?.trim() || null, managerName: dto.managerName?.trim() || null,
       primaryContact: dto.primaryContact.trim(), whatsappNumber: dto.whatsappNumber?.trim() || null, email: dto.email?.trim().toLowerCase() || null, keyProfessional: dto.keyProfessional?.trim() || null,
-      fullAddress: dto.fullAddress?.trim() || null, area: dto.area?.trim() || null, city: dto.city.trim(), pincode: dto.pincode?.trim() || null, googleMapsUrl: dto.googleMapsUrl?.trim() || null,
+      fullAddress: dto.fullAddress?.trim() || null, billingName: dto.billingName?.trim() || null, gstin: dto.gstin?.trim().toUpperCase() || null, state: dto.state?.trim() || null, stateCode: dto.stateCode?.trim() || null, area: dto.area?.trim() || null, city: dto.city.trim(), pincode: dto.pincode?.trim() || null, googleMapsUrl: dto.googleMapsUrl?.trim() || null,
       chairCount: dto.chairCount, staffCount: dto.staffCount, stylistCount: dto.stylistCount, approximateDailyCustomers: dto.approximateDailyCustomers, potential: dto.potential, customerSegment: dto.customerSegment,
       estimatedMonthlyBusiness: dto.estimatedMonthlyBusiness, purchasingFrequency: dto.purchasingFrequency?.trim() || null, territory: dto.territory?.trim() || null, routeBeat: dto.routeBeat?.trim() || null,
       businessPotentialRating: dto.businessPotentialRating, relationshipRating: dto.relationshipRating, paymentBehaviourRating: dto.paymentBehaviourRating, productOpportunityRating: dto.productOpportunityRating, overallRating: dto.overallRating,

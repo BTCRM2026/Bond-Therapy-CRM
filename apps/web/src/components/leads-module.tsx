@@ -158,7 +158,7 @@ function LeadForm({ lead, onClose, onSaved }: { lead?: Lead; onClose: () => void
       await onSaved();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save this lead."); setSaving(false); }
   };
-  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#0f172a]/40 p-0 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={lead ? "Edit lead" : "Add lead"}>
+  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/40 p-0 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={lead ? "Edit lead" : "Add lead"}>
     <div className="flex min-h-full w-full flex-col bg-white sm:my-4 sm:min-h-0 sm:max-h-[calc(100dvh-32px)] sm:max-w-lg sm:rounded-xl sm:border sm:shadow-[0_20px_48px_rgba(15,23,42,0.18)]">
       <div className="flex items-center justify-between border-b px-4 py-4 sm:px-5"><div><h2 className="text-base font-semibold text-foreground">{lead ? "Edit lead" : "Add lead"}</h2><p className="mt-1 text-xs text-muted">A quick capture — you can fill in the rest later</p></div><button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-lg text-muted hover:bg-background sm:size-8" aria-label="Close"><X size={18} /></button></div>
       <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">

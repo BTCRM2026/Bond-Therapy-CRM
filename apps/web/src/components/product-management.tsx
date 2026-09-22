@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KpiCard } from "@/components/ui/kpi-card";
 
-type Product = { id: string; name: string; category: string; unitPrice: string; stockOnHand: number; isActive: boolean };
+type Product = { id: string; name: string; category: string; unitPrice: string; hsnCode?: string | null; gstRate?: string | null; stockOnHand: number; isActive: boolean };
 export type ProductListResponse = { items: Product[]; page: number; pageSize: number; total: number; hasMore: boolean };
 type ProductStats = { totalProducts: number; inStock: number; lowStock: number; outOfStock: number; inventoryValue: number };
 
@@ -143,7 +143,7 @@ function ProductRow({ product, busy, onEdit, onToggleActive, onDelete }: RowProp
 }
 
 function ProductCard({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
-  return <article className="rounded-xl border bg-white p-4 shadow-[0_3px_12px_rgba(45,36,28,0.04)]">
+  return <article className="rounded-xl border bg-white p-4 shadow-[0_3px_12px_rgba(26,31,26,0.04)]">
     <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{pretty(product.category)}</p></div><div className="flex shrink-0 items-center gap-2"><StatusBadge isActive={product.isActive} /><ProductActions product={product} busy={busy} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} /></div></div>
     <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs">
       <div><dt className="text-muted">MRP</dt><dd className="mt-1 font-medium text-foreground">{money(product.unitPrice)}</dd></div>
@@ -163,7 +163,7 @@ function ProductActions({ product, busy, onEdit, onToggleActive, onDelete }: Row
   const run = (action: () => void) => { setOpen(false); action(); };
   return <div className="relative" ref={root}>
     <button type="button" disabled={busy} onClick={() => setOpen((value) => !value)} className="grid size-9 place-items-center rounded-lg border bg-white text-muted transition-colors hover:border-brand/25 hover:bg-brand-soft hover:text-brand disabled:opacity-50" aria-label={`Open actions for ${product.name}`} aria-expanded={open}>{busy ? <LoaderCircle className="animate-spin" size={16} /> : <MoreHorizontal size={17} />}</button>
-    {open && <div className="absolute right-0 top-10 z-50 w-44 overflow-hidden rounded-lg border bg-white p-1.5 shadow-[0_12px_32px_rgba(45,36,28,0.14)]"><MenuAction icon={Pencil} label="Edit product" onClick={() => run(onEdit)} /><MenuAction icon={product.isActive ? UserX : UserCheck} label={product.isActive ? "Deactivate" : "Activate"} onClick={() => run(onToggleActive)} /><div className="my-1 border-t" /><MenuAction icon={Trash2} label="Delete product" danger onClick={() => run(onDelete)} /></div>}
+    {open && <div className="absolute right-0 top-10 z-50 w-44 overflow-hidden rounded-lg border bg-white p-1.5 shadow-[0_12px_32px_rgba(26,31,26,0.14)]"><MenuAction icon={Pencil} label="Edit product" onClick={() => run(onEdit)} /><MenuAction icon={product.isActive ? UserX : UserCheck} label={product.isActive ? "Deactivate" : "Activate"} onClick={() => run(onToggleActive)} /><div className="my-1 border-t" /><MenuAction icon={Trash2} label="Delete product" danger onClick={() => run(onDelete)} /></div>}
   </div>;
 }
 
@@ -175,9 +175,9 @@ function IconAction({ icon: Icon, label, onClick, busy = false, danger = false }
   return <button type="button" disabled={busy} onClick={onClick} className={`grid size-9 place-items-center rounded-lg border bg-white transition-colors disabled:opacity-50 ${danger ? "text-danger hover:border-red-200 hover:bg-red-50" : "text-muted hover:border-brand/25 hover:bg-brand-soft hover:text-brand"}`} aria-label={label}>{busy ? <LoaderCircle className="animate-spin" size={15} /> : <Icon size={15} />}</button>;
 }
 
-type FormState = { name: string; category: string; unitPrice: string; stockOnHand: string };
+type FormState = { name: string; category: string; unitPrice: string; stockOnHand: string; hsnCode: string; gstRate: string };
 function toFormState(product?: Product): FormState {
-  return { name: product?.name ?? "", category: product?.category ?? "SHAMPOO", unitPrice: product?.unitPrice ?? "", stockOnHand: product ? String(product.stockOnHand) : "" };
+  return { name: product?.name ?? "", category: product?.category ?? "SHAMPOO", unitPrice: product?.unitPrice ?? "", stockOnHand: product ? String(product.stockOnHand) : "", hsnCode: product?.hsnCode ?? "", gstRate: product?.gstRate ?? "" };
 }
 
 function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "edit"; product?: Product; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
@@ -189,7 +189,7 @@ function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError("");
     try {
-      const payload = { name: form.name, category: form.category, unitPrice: Number(form.unitPrice), ...(mode === "create" ? { stockOnHand: form.stockOnHand ? Number(form.stockOnHand) : 0 } : {}) };
+      const payload = { name: form.name, category: form.category, unitPrice: Number(form.unitPrice), hsnCode: form.hsnCode || undefined, gstRate: form.gstRate ? Number(form.gstRate) : undefined, ...(mode === "create" ? { stockOnHand: form.stockOnHand ? Number(form.stockOnHand) : 0 } : {}) };
       const response = await fetch(mode === "create" ? "/api/products" : `/api/products/${product?.id}`, { method: mode === "create" ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(messageFrom(data, `Unable to ${mode === "create" ? "add" : "update"} this product.`));
@@ -197,13 +197,14 @@ function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save this product."); setSaving(false); }
   };
 
-  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#0f172a]/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={mode === "create" ? "Add product" : "Edit product"}>
+  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={mode === "create" ? "Add product" : "Edit product"}>
     <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-lg flex-col overflow-hidden rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-32px)]">
       <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><div><h2 className="text-base font-semibold text-foreground">{mode === "create" ? "Add product" : "Edit product"}</h2><p className="mt-1 text-xs text-muted">Visible to Sales and Warehouse once saved</p></div><button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-background sm:size-8" aria-label="Close"><X size={17} /></button></div>
       <form onSubmit={submit} className="overflow-y-auto p-4 sm:p-5">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2"><Field label="Product name *"><Input value={form.name} onChange={set("name")} required minLength={2} maxLength={160} autoFocus /></Field><Field label="Category *"><select value={form.category} onChange={set("category")} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field></div>
           <div className="grid gap-4 sm:grid-cols-2"><Field label="Quantity *"><Input value={form.stockOnHand} onChange={set("stockOnHand")} required={mode === "create"} type="number" min="0" inputMode="numeric" placeholder="0" readOnly={mode === "edit"} /></Field><Field label="MRP (₹) *"><Input value={form.unitPrice} onChange={set("unitPrice")} required type="number" min="0" step="0.01" inputMode="decimal" /></Field></div>
+          <div className="grid gap-4 sm:grid-cols-2"><Field label="HSN / SAC code"><Input value={form.hsnCode} onChange={set("hsnCode")} maxLength={20} placeholder="Optional" /></Field><Field label="GST rate (%)"><Input value={form.gstRate} onChange={set("gstRate")} type="number" min="0" max="100" step="0.01" placeholder="Use global default" /></Field></div>
           {mode === "edit" && <p className="rounded-lg border border-brand/15 bg-brand-soft/50 px-3 py-2.5 text-xs leading-5 text-muted">Stock changes go through the Warehouse Inventory screen, not this form, so every movement stays on the audit trail.</p>}
           {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}
         </div>

@@ -16,6 +16,7 @@ import { SalesModule } from './sales/sales.module.js';
 import { WarehouseModule } from './warehouse/warehouse.module.js';
 import { IncentivesModule } from './incentives/incentives.module.js';
 import { AttendanceModule } from './attendance/attendance.module.js';
+import { BillingModule } from './billing/billing.module.js';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AttendanceModule } from './attendance/attendance.module.js';
     WarehouseModule,
     IncentivesModule,
     AttendanceModule,
+    BillingModule,
   ],
   controllers: [AppController],
 })

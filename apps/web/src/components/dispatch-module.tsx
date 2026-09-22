@@ -1,73 +1,54 @@
 "use client";
 
-import { PackageCheck, Truck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Camera, CheckCircle2, ClipboardCheck, MapPin, PackageCheck, PackageOpen, Route, Truck, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { OrderStatus, type Order, type OrderListResponse } from "@/components/orders-module";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { KpiCard } from "@/components/ui/kpi-card";
 
 const money = (value: string | number) => `₹${Number(value).toLocaleString("en-IN")}`;
 const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? String((data as { message: unknown }).message) : fallback;
-
-const TABS = [
-  ["CONFIRMED", "Ready to dispatch"],
-  ["DISPATCHED", "On the way"],
+const GROUPS = [
+  { key: "QUEUE", label: "Stock queue", statuses: ["INVOICE_GENERATED"] },
+  { key: "FULFILMENT", label: "Pick & pack", statuses: ["STOCK_RESERVED", "PICKING", "PACKED"] },
+  { key: "READY", label: "Ready", statuses: ["READY_FOR_DISPATCH", "CONFIRMED"] },
+  { key: "TRANSIT", label: "In transit", statuses: ["OUT_FOR_DELIVERY", "ARRIVED_AT_CUSTOMER", "DISPATCHED"] },
 ] as const;
 
 export function DispatchModule({ initial }: { initial: OrderListResponse | null }) {
-  const [status, setStatus] = useState<"CONFIRMED" | "DISPATCHED">("CONFIRMED");
-  const [data, setData] = useState(initial);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(initial ? "" : "Unable to load the dispatch queue. Please try again.");
-  const [busyId, setBusyId] = useState("");
+  const [data, setData] = useState(initial); const [group, setGroup] = useState<(typeof GROUPS)[number]["key"]>("QUEUE"); const [loading, setLoading] = useState(false); const [error, setError] = useState(initial ? "" : "Unable to load warehouse orders."); const [busyId, setBusyId] = useState(""); const [dispatching, setDispatching] = useState<Order | null>(null);
+  const load = async () => { setLoading(true); try { const response = await fetch("/api/orders?pageSize=100", { cache: "no-store" }); const json = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(json, "Unable to load warehouse orders.")); setData(json); setError(""); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load warehouse orders."); } finally { setLoading(false); } };
+  useEffect(() => { const timer = setInterval(() => void load(), 30000); return () => clearInterval(timer); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const active = GROUPS.find((item) => item.key === group)!;
+  const orders = useMemo(() => data?.items.filter((order) => (active.statuses as readonly string[]).includes(order.status)) ?? [], [data, active]);
+  const counts = (statuses: readonly string[]) => data?.items.filter((order) => statuses.includes(order.status)).length ?? 0;
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/orders?status=${status}&pageSize=50`, { cache: "no-store" });
-        const json = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(messageFrom(json, "Unable to load the dispatch queue."));
-        if (!cancelled) { setData(json as OrderListResponse); setError(""); }
-      } catch (cause) { if (!cancelled) setError(cause instanceof Error ? cause.message : "Unable to load the dispatch queue."); }
-      finally { if (!cancelled) setLoading(false); }
-    })();
-    return () => { cancelled = true; };
-  }, [status]);
+  const transition = async (order: Order, status: string, extra: Record<string, string> = {}) => { setBusyId(order.id); setError(""); try { const response = await fetch(`/api/orders/${order.id}/status`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status, version: order.version, ...extra }) }); const json = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(json, "Unable to update this order.")); setData((current) => current ? { ...current, items: current.items.map((item) => item.id === order.id ? json : item) } : current); setDispatching(null); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to update this order."); } finally { setBusyId(""); } };
+  const upload = async (order: Order, kind: "arrival" | "delivery", file?: File) => { if (!file) return; setBusyId(order.id); setError(""); try { const form = new FormData(); form.set("photo", file); const response = await fetch(`/api/orders/${order.id}/delivery-proof/${kind}`, { method: "POST", body: form }); const json = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(json, "Unable to upload the photo.")); await load(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to upload the photo."); } finally { setBusyId(""); } };
 
-  const advance = async (order: Order) => {
-    const nextStatus = order.status === "CONFIRMED" ? "DISPATCHED" : "DELIVERED";
-    setBusyId(order.id);
-    try {
-      const response = await fetch(`/api/orders/${order.id}/status`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: nextStatus }) });
-      const json = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(messageFrom(json, "Unable to update this order."));
-      setData((current) => current ? { ...current, items: current.items.filter((item) => item.id !== order.id), total: current.total - 1 } : current);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to update this order."); }
-    finally { setBusyId(""); }
-  };
-
-  return <div className="space-y-4">
-    <div className="flex gap-2">
-      {TABS.map(([value, label]) => <button key={value} type="button" onClick={() => setStatus(value)} className={`h-10 rounded-lg border px-4 text-xs font-semibold transition-colors ${status === value ? "border-brand bg-brand text-white" : "text-muted hover:bg-brand-soft/60"}`}>{label}</button>)}
-    </div>
-    {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
-    <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5"><div><p className="text-sm font-semibold text-foreground">{status === "CONFIRMED" ? "Ready to dispatch" : "On the way"}</p><p className="mt-0.5 text-xs text-muted">{data?.total ?? 0} order{data?.total === 1 ? "" : "s"}</p></div></div>
-      {loading && !data ? <div className="space-y-3 p-4"><div className="h-20 animate-pulse rounded-lg bg-background" /><div className="h-20 animate-pulse rounded-lg bg-background" /></div>
-        : data?.items.length ? <div className="divide-y">{data.items.map((order) => <div key={order.id} className="p-4 sm:px-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0"><p className="text-sm font-semibold text-foreground">{order.orderNumber}</p><p className="mt-0.5 truncate text-xs text-muted">{order.client.salonName} · {order.client.city}</p></div>
-            <div className="shrink-0 text-right"><p className="text-sm font-semibold text-foreground">{money(order.totalAmount)}</p><div className="mt-1"><OrderStatus value={order.status} /></div></div>
-          </div>
-          <p className="mt-2 text-xs text-muted">{order.items.map((item) => `${item.product.name} × ${item.quantity}`).join(", ")}</p>
-          <div className="mt-3">
-            <Button variant="secondary" className="h-10" disabled={busyId === order.id} onClick={() => advance(order)}>
-              {order.status === "CONFIRMED" ? <><Truck size={15} />{busyId === order.id ? "Updating…" : "Mark dispatched"}</> : <><PackageCheck size={15} />{busyId === order.id ? "Updating…" : "Mark delivered"}</>}
-            </Button>
-          </div>
-        </div>)}</div>
-        : <div className="px-5 py-14 text-center">{status === "CONFIRMED" ? <Truck className="mx-auto text-subtle" size={28} /> : <PackageCheck className="mx-auto text-subtle" size={28} />}<p className="mt-3 text-sm font-semibold text-foreground">{status === "CONFIRMED" ? "Nothing waiting to dispatch" : "Nothing on the way"}</p><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted">{status === "CONFIRMED" ? "New confirmed orders from Sales will appear here." : "Orders you mark dispatched will show up here until delivered."}</p></div>}
-    </section>
+  return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><KpiCard icon={ClipboardCheck} label="Awaiting stock" value={counts(["INVOICE_GENERATED"])} /><KpiCard icon={PackageOpen} label="In fulfilment" value={counts(["STOCK_RESERVED", "PICKING", "PACKED"])} tone="warning" /><KpiCard icon={PackageCheck} label="Ready" value={counts(["READY_FOR_DISPATCH", "CONFIRMED"])} tone="success" /><KpiCard icon={Truck} label="In transit" value={counts(["OUT_FOR_DELIVERY", "ARRIVED_AT_CUSTOMER", "DISPATCHED"])} /></div>
+    <div className="flex gap-2 overflow-x-auto pb-1">{GROUPS.map((item) => <button key={item.key} type="button" onClick={() => setGroup(item.key)} className={`h-9 shrink-0 rounded-lg px-3 text-xs font-semibold transition-colors ${group === item.key ? "bg-brand text-white" : "border bg-white text-muted hover:bg-brand-soft"}`}>{item.label}<span className={`ml-2 rounded-full px-1.5 py-0.5 text-[10px] ${group === item.key ? "bg-white/20" : "bg-background"}`}>{counts(item.statuses)}</span></button>)}</div>
+    {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger">{error}</div>}
+    <section className="overflow-hidden rounded-xl border bg-white"><div className="border-b px-5 py-4"><h2 className="text-sm font-semibold text-foreground">{active.label}</h2><p className="mt-0.5 text-xs text-muted">Operational steps are recorded automatically. Packing proof remains on CCTV.</p></div>{loading && !data ? <div className="p-5"><div className="h-24 animate-pulse rounded-lg bg-background" /></div> : orders.length ? <div className="divide-y">{orders.map((order) => <article key={order.id} className="p-4 sm:px-5"><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{order.orderNumber}</p><OrderStatus value={order.status} /></div><p className="mt-1 text-xs text-muted">{order.client.salonName} · {order.client.city} · {order.client.primaryContact}</p></div><p className="text-sm font-semibold">{money(order.totalAmount)}</p></div><div className="mt-3 rounded-lg bg-background p-3 text-xs text-muted">{order.items.map((item) => `${item.product.name} × ${item.quantity}`).join(" · ")}</div>{order.trackingNumber && <p className="mt-3 text-xs text-muted">{order.courierName}: <span className="font-semibold text-foreground">{order.trackingNumber}</span></p>}{order.deliveryPersonName && <p className="mt-3 text-xs text-muted">Delivery: <span className="font-semibold text-foreground">{order.deliveryPersonName}</span> · {order.deliveryPersonMobile}</p>}<div className="mt-3 flex flex-wrap gap-2"><OrderAction order={order} busy={busyId === order.id} transition={transition} onDispatch={() => setDispatching(order)} upload={upload} /></div></article>)}</div> : <div className="px-5 py-14 text-center"><PackageCheck className="mx-auto text-subtle" size={28} /><p className="mt-3 text-sm font-semibold">No orders in this stage</p><p className="mt-1 text-xs text-muted">Orders move here automatically as each previous step is completed.</p></div>}</section>
+    {dispatching && <DispatchModal order={dispatching} busy={busyId === dispatching.id} onClose={() => setDispatching(null)} onSubmit={(status, values) => transition(dispatching, status, values)} />}
   </div>;
+}
+
+function OrderAction({ order, busy, transition, onDispatch, upload }: { order: Order; busy: boolean; transition: (order: Order, status: string) => void; onDispatch: () => void; upload: (order: Order, kind: "arrival" | "delivery", file?: File) => void }) {
+  if (order.status === "INVOICE_GENERATED") return <Button disabled={busy} onClick={() => transition(order, "STOCK_RESERVED")}><ClipboardCheck size={15} />{busy ? "Checking…" : "Check & reserve stock"}</Button>;
+  if (order.status === "STOCK_RESERVED") return <Button disabled={busy} onClick={() => transition(order, "PICKING")}><PackageOpen size={15} />Start picking</Button>;
+  if (order.status === "PICKING") return <Button disabled={busy} onClick={() => transition(order, "PACKED")}><PackageCheck size={15} />Mark packed</Button>;
+  if (order.status === "PACKED") return <Button disabled={busy} onClick={() => transition(order, "READY_FOR_DISPATCH")}><CheckCircle2 size={15} />Ready for dispatch</Button>;
+  if (["READY_FOR_DISPATCH", "CONFIRMED"].includes(order.status)) return <Button disabled={busy} onClick={onDispatch}><Route size={15} />Plan dispatch</Button>;
+  if (order.status === "OUT_FOR_DELIVERY") return <>{order.deliveryProof?.arrivalPhotoMime ? <><a href={`/api/orders/${order.id}/delivery-proof/arrival`} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-xs font-semibold">View arrival photo</a><Button disabled={busy} onClick={() => transition(order, "ARRIVED_AT_CUSTOMER")}><MapPin size={15} />Confirm arrival</Button></> : <PhotoButton label="Upload arrival photo" onFile={(file) => upload(order, "arrival", file)} />}</>;
+  if (order.status === "ARRIVED_AT_CUSTOMER") return <>{order.deliveryProof?.deliveryPhotoMime ? <><a href={`/api/orders/${order.id}/delivery-proof/delivery`} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-xs font-semibold">View delivery photo</a><Button disabled={busy} onClick={() => transition(order, "DELIVERED")}><CheckCircle2 size={15} />Mark delivered</Button></> : <PhotoButton label="Upload delivery photo" onFile={(file) => upload(order, "delivery", file)} />}</>;
+  if (order.status === "DISPATCHED") return <Button disabled={busy} onClick={() => transition(order, "DELIVERED")}><CheckCircle2 size={15} />Confirm delivered</Button>;
+  return null;
+}
+function PhotoButton({ label, onFile }: { label: string; onFile: (file?: File) => void }) { return <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-brand px-3 text-xs font-semibold text-white"><Camera size={15} />{label}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => onFile(event.target.files?.[0])} /></label>; }
+
+function DispatchModal({ order, busy, onClose, onSubmit }: { order: Order; busy: boolean; onClose: () => void; onSubmit: (status: string, values: Record<string, string>) => void }) {
+  const [mode, setMode] = useState<"LOCAL" | "OUTSTATION">(order.client.city.trim().toLowerCase() === "vadodara" ? "LOCAL" : "OUTSTATION"); const [name, setName] = useState(""); const [mobile, setMobile] = useState(""); const [tracking, setTracking] = useState("");
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/35 p-4"><div className="w-full max-w-lg rounded-xl border bg-white shadow-2xl"><div className="flex items-start justify-between border-b p-4"><div><h2 className="text-base font-semibold">Plan dispatch</h2><p className="mt-1 text-xs text-muted">{order.orderNumber} · {order.client.salonName}</p></div><button onClick={onClose} className="grid size-9 place-items-center rounded-lg hover:bg-background"><X size={18} /></button></div><div className="space-y-4 p-4"><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setMode("LOCAL")} className={`rounded-lg border p-3 text-left ${mode === "LOCAL" ? "border-brand bg-brand-soft" : ""}`}><MapPin size={17} className="text-brand" /><p className="mt-2 text-sm font-semibold">Vadodara</p><p className="text-xs text-muted">Own delivery person + photo proof</p></button><button type="button" onClick={() => setMode("OUTSTATION")} className={`rounded-lg border p-3 text-left ${mode === "OUTSTATION" ? "border-brand bg-brand-soft" : ""}`}><Truck size={17} className="text-brand" /><p className="mt-2 text-sm font-semibold">Outstation</p><p className="text-xs text-muted">Mark Courier + tracking sticker</p></button></div>{mode === "LOCAL" ? <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5"><span className="text-xs font-medium">Delivery person</span><Input value={name} onChange={(event) => setName(event.target.value)} /></label><label className="space-y-1.5"><span className="text-xs font-medium">Mobile number</span><Input value={mobile} onChange={(event) => setMobile(event.target.value)} inputMode="tel" /></label></div> : <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5"><span className="text-xs font-medium">Courier</span><Input value="Mark Courier" readOnly className="bg-background" /></label><label className="space-y-1.5"><span className="text-xs font-medium">Sticker / tracking number</span><Input value={tracking} onChange={(event) => setTracking(event.target.value)} /></label></div>}<p className="rounded-lg bg-background px-3 py-2.5 text-xs text-muted">No packing photo or video is stored in CRM. Packing proof is maintained through CCTV.</p></div><div className="flex justify-end gap-2 border-t p-4"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={busy || (mode === "LOCAL" ? !name.trim() || !mobile.trim() : !tracking.trim())} onClick={() => onSubmit(mode === "LOCAL" ? "OUT_FOR_DELIVERY" : "DISPATCHED", mode === "LOCAL" ? { deliveryMode: "VADODARA_LOCAL", deliveryPersonName: name.trim(), deliveryPersonMobile: mobile.trim() } : { deliveryMode: "OUTSTATION_COURIER", courierName: "Mark Courier", trackingNumber: tracking.trim() })}>{mode === "LOCAL" ? "Start local delivery" : "Mark dispatched"}</Button></div></div></div>;
 }

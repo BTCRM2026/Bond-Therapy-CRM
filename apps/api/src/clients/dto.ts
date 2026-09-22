@@ -24,6 +24,10 @@ export class ClientDto {
   @IsOptional() @IsEmail() @MaxLength(254) email?: string;
   @IsOptional() @IsString() @MaxLength(120) keyProfessional?: string;
   @IsOptional() @IsString() @MaxLength(500) fullAddress?: string;
+  @IsOptional() @IsString() @MaxLength(160) billingName?: string;
+  @IsOptional() @IsString() @MaxLength(30) gstin?: string;
+  @IsOptional() @IsString() @MaxLength(100) state?: string;
+  @IsOptional() @IsString() @MaxLength(5) stateCode?: string;
   @IsOptional() @IsString() @MaxLength(120) area?: string;
   @IsString() @MinLength(2) @MaxLength(100) city!: string;
   @IsOptional() @IsString() @MaxLength(10) pincode?: string;

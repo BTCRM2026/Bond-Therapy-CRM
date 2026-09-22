@@ -20,7 +20,7 @@ export class AttendanceService {
   async today(actor: SessionUser) {
     this.ensureAccess(actor);
     const record = await this.prisma.attendanceRecord.findUnique({ where: { userId_date: { userId: actor.id, date: this.todayKey() } } });
-    return record;
+    return record ?? { punchInAt: null, punchOutAt: null };
   }
 
   async punchIn(actor: SessionUser) {

@@ -19,10 +19,10 @@ export class WarehouseService {
     startOfToday.setHours(0, 0, 0, 0);
 
     const [pendingDispatch, lowStockCount, receivedToday, dispatchedToday] = await Promise.all([
-      this.prisma.order.count({ where: { status: 'CONFIRMED' } }),
+      this.prisma.order.count({ where: { status: { in: ['CONFIRMED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH'] } } }),
       this.prisma.product.count({ where: { isActive: true, stockOnHand: { lte: LOW_STOCK_THRESHOLD } } }),
       this.prisma.stockMovement.aggregate({ where: { type: 'RECEIVED', createdAt: { gte: startOfToday } }, _sum: { quantityChange: true } }),
-      this.prisma.order.count({ where: { status: { in: ['DISPATCHED', 'DELIVERED'] }, updatedAt: { gte: startOfToday } } }),
+      this.prisma.order.count({ where: { status: { in: ['OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'DISPATCHED', 'DELIVERED'] }, updatedAt: { gte: startOfToday } } }),
     ]);
 
     const lowStockItems = await this.prisma.product.findMany({ where: { isActive: true, stockOnHand: { lte: LOW_STOCK_THRESHOLD } }, orderBy: { stockOnHand: 'asc' }, take: 8, select: { id: true, name: true, sku: true, stockOnHand: true, unit: true } });

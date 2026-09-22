@@ -20,7 +20,8 @@ export default async function ProductsPage() {
   const session = await requireSession();
   const isAdmin = session.portal === "ADMIN" && session.roles.some((role) => role.key === "SUPER_ADMIN");
   const isSales = session.portal === "STAFF" && SALES_ROLE_KEYS.has(session.roles[0]?.key ?? "");
-  if (!isAdmin && !isSales) redirect("/dashboard/access-denied");
+  const isAccounts = session.portal === "STAFF" && session.roles.some((role) => role.key === "ACCOUNTS_BILLING");
+  if (!isAdmin && !isSales && !isAccounts) redirect("/dashboard/access-denied");
 
   const initial = await loadProducts(session.portal);
   return (

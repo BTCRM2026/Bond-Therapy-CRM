@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Building2, CalendarClock, Clock3, IndianRupee, LayoutDashboard, ListChecks, MapPin, Package, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, Clock3, FileCheck2, IndianRupee, LayoutDashboard, ListChecks, MapPin, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
@@ -12,14 +12,21 @@ const WAREHOUSE_ROLE_KEYS = new Set(["WAREHOUSE"]);
 function staffGroups(roleKey?: string) {
   const isSales = roleKey ? SALES_ROLE_KEYS.has(roleKey) : false;
   const isWarehouse = roleKey ? WAREHOUSE_ROLE_KEYS.has(roleKey) : false;
+  const isAccounts = roleKey === "ACCOUNTS_BILLING";
   const overview = [{ href: "/dashboard", label: "My workspace", icon: LayoutDashboard, exact: true }];
   const operations = isSales ? [
     { href: "/dashboard/follow-ups", label: "Follow-ups", icon: ListChecks, exact: false },
     { href: "/dashboard/leads", label: "Leads", icon: UserPlus, exact: false },
     { href: "/dashboard/clients", label: "Clients", icon: Building2, exact: false },
     { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart, exact: false },
+    { href: "/dashboard/invoices", label: "Invoices", icon: ReceiptText, exact: false },
     { href: "/dashboard/products", label: "Products", icon: Package, exact: false },
     { href: "/dashboard/demos", label: "Demo Booking", icon: CalendarClock, exact: false },
+  ] : isAccounts ? [
+    { href: "/dashboard/orders", label: "Order approvals", icon: FileCheck2, exact: false },
+    { href: "/dashboard/invoices", label: "Invoices & payments", icon: ReceiptText, exact: false },
+    { href: "/dashboard/clients", label: "Customers", icon: Building2, exact: false },
+    { href: "/dashboard/products", label: "Product master", icon: Package, exact: false },
   ] : [
     ...(isWarehouse ? [{ href: "/dashboard/dispatch", label: "Dispatch", icon: Truck, exact: false }] : []),
     { href: "/dashboard/clients", label: "Clients", icon: Building2, exact: false },
@@ -33,7 +40,7 @@ function staffGroups(roleKey?: string) {
   ] : [];
   return [
     { label: "Overview", items: overview },
-    { label: isWarehouse ? "Warehouse" : "Sales & Clients", items: operations },
+    { label: isWarehouse ? "Warehouse" : isAccounts ? "Accounts & Billing" : "Sales & Clients", items: operations },
     ...(planning.length ? [{ label: "Planning & Performance", items: planning }] : []),
     { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
   ];
@@ -44,6 +51,7 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
   const managementItems = [
     ...(canManageStaff ? [{ href: "/dashboard/staff", label: "Staff & Access", icon: UsersRound, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/products", label: "Products", icon: Package, exact: false }] : []),
+    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/orders", label: "Order approvals", icon: FileCheck2, exact: false }, { href: "/dashboard/invoices", label: "Invoices & payments", icon: ReceiptText, exact: false }] : []),
   ];
   const groups = portal === "ADMIN" ? [
     { label: "Overview", items: [
@@ -70,11 +78,11 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
                   className={cn(
                     "flex h-12 items-center gap-2.5 rounded-[10px] px-3 text-sm font-medium transition-colors duration-150",
                     active
-                      ? "bg-brand-soft font-semibold text-brand-dark ring-1 ring-inset ring-brand/15"
-                      : "text-muted hover:bg-brand-soft/55 hover:text-brand-dark",
+                      ? "bg-brand-soft font-semibold text-brand-dark"
+                      : "text-muted hover:bg-brand-soft/50 hover:text-brand-dark",
                   )}
                 >
-                  <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg transition-colors", active ? "bg-brand text-white shadow-[0_1px_2px_rgba(112,72,28,0.22)]" : "text-muted")}>
+                  <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg transition-colors", active ? "bg-brand text-white" : "text-muted")}>
                     <Icon size={18} strokeWidth={1.8} />
                   </span>
                   {label}

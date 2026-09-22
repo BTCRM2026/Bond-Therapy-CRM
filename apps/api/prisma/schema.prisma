@@ -53,41 +53,45 @@ enum BloodGroup {
 }
 
 model User {
-  id                  String         @id @default(cuid())
-  loginId             String         @unique
-  email               String         @unique
-  name                String
-  passwordHash        String
-  status              UserStatus     @default(ACTIVE)
-  failedLoginAttempts Int            @default(0)
-  lockedUntil         DateTime?
-  lastLoginAt         DateTime?
-  department          Department?
-  dataScope           DataScope      @default(OWN)
-  managerId           String?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-  roles               UserRole[]
-  sessions            Session[]
-  auditLogs           AuditLog[]     @relation("AuditActor")
-  notifications       Notification[] @relation("NotificationRecipient")
-  distributors        Distributor[]  @relation("DistributorSalesperson")
-  manager             User?          @relation("StaffManager", fields: [managerId], references: [id], onDelete: SetNull)
-  teamMembers         User[]         @relation("StaffManager")
-  staffProfile        StaffProfile?
-  clientsCreated      Client[]         @relation("ClientCreator")
-  clientsAssigned     Client[]         @relation("ClientSalesperson")
-  clientsTrained      Client[]         @relation("ClientTrainer")
-  clientActivities    ClientActivity[] @relation("ClientActivityCreator")
-  clientActivitiesAssigned ClientActivity[] @relation("ClientActivityAssignee")
-  leadsAssigned       Lead[]           @relation("LeadAssignee")
-  leadsCreated        Lead[]           @relation("LeadCreator")
-  ordersBooked        Order[]          @relation("OrderSalesperson")
-  salesTargets        SalesTarget[]    @relation("SalesTargetOwner")
-  stockMovementsRecorded StockMovement[] @relation("StockMovementRecorder")
-  attendanceRecords   AttendanceRecord[] @relation("AttendanceOwner")
-  incentiveStatements IncentiveStatement[] @relation("IncentiveOwner")
-  incentivesApproved  IncentiveStatement[] @relation("IncentiveApprover")
+  id                       String               @id @default(cuid())
+  loginId                  String               @unique
+  email                    String               @unique
+  name                     String
+  passwordHash             String
+  status                   UserStatus           @default(ACTIVE)
+  failedLoginAttempts      Int                  @default(0)
+  lockedUntil              DateTime?
+  lastLoginAt              DateTime?
+  department               Department?
+  dataScope                DataScope            @default(OWN)
+  managerId                String?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  roles                    UserRole[]
+  sessions                 Session[]
+  auditLogs                AuditLog[]           @relation("AuditActor")
+  notifications            Notification[]       @relation("NotificationRecipient")
+  distributors             Distributor[]        @relation("DistributorSalesperson")
+  manager                  User?                @relation("StaffManager", fields: [managerId], references: [id], onDelete: SetNull)
+  teamMembers              User[]               @relation("StaffManager")
+  staffProfile             StaffProfile?
+  clientsCreated           Client[]             @relation("ClientCreator")
+  clientsAssigned          Client[]             @relation("ClientSalesperson")
+  clientsTrained           Client[]             @relation("ClientTrainer")
+  clientActivities         ClientActivity[]     @relation("ClientActivityCreator")
+  clientActivitiesAssigned ClientActivity[]     @relation("ClientActivityAssignee")
+  leadsAssigned            Lead[]               @relation("LeadAssignee")
+  leadsCreated             Lead[]               @relation("LeadCreator")
+  ordersBooked             Order[]              @relation("OrderSalesperson")
+  ordersReviewed           Order[]              @relation("OrderReviewer")
+  invoicesGenerated        Invoice[]            @relation("InvoiceGenerator")
+  paymentsRecorded         Payment[]            @relation("PaymentRecorder")
+  billingSettingsUpdated   BillingSettings[]    @relation("BillingSettingsUpdater")
+  salesTargets             SalesTarget[]        @relation("SalesTargetOwner")
+  stockMovementsRecorded   StockMovement[]      @relation("StockMovementRecorder")
+  attendanceRecords        AttendanceRecord[]   @relation("AttendanceOwner")
+  incentiveStatements      IncentiveStatement[] @relation("IncentiveOwner")
+  incentivesApproved       IncentiveStatement[] @relation("IncentiveApprover")
 
   @@index([department])
   @@index([managerId])
@@ -275,50 +279,55 @@ enum DemoOutcome {
 }
 
 model Client {
-  id                       String           @id @default(cuid())
-  salonName                String
-  category                 ClientCategory
-  status                   ClientStatus     @default(PROSPECT)
-  ownerName                String?
-  managerName              String?
-  primaryContact           String
-  whatsappNumber           String?
-  email                    String?
-  keyProfessional          String?
-  fullAddress              String?
-  area                     String?
-  city                     String
-  pincode                  String?
-  googleMapsUrl            String?
-  chairCount               Int?
-  staffCount               Int?
-  stylistCount             Int?
+  id                        String           @id @default(cuid())
+  salonName                 String
+  category                  ClientCategory
+  status                    ClientStatus     @default(PROSPECT)
+  ownerName                 String?
+  managerName               String?
+  primaryContact            String
+  whatsappNumber            String?
+  email                     String?
+  keyProfessional           String?
+  fullAddress               String?
+  billingName               String?
+  gstin                     String?
+  state                     String?
+  stateCode                 String?
+  area                      String?
+  city                      String
+  pincode                   String?
+  googleMapsUrl             String?
+  chairCount                Int?
+  staffCount                Int?
+  stylistCount              Int?
   approximateDailyCustomers Int?
-  potential                ClientPotential?
-  customerSegment          CustomerSegment?
-  estimatedMonthlyBusiness Decimal?         @db.Decimal(12, 2)
-  purchasingFrequency      String?
-  territory                String?
-  routeBeat                String?
-  businessPotentialRating  Int?
-  relationshipRating       Int?
-  paymentBehaviourRating   Int?
-  productOpportunityRating Int?
-  overallRating            Int?
-  assignedSalespersonId    String?
-  assignedTrainerId        String?
-  distributorId            String?
-  createdById              String
-  version                  Int              @default(1)
-  createdAt                DateTime         @default(now())
-  updatedAt                DateTime         @updatedAt
-  assignedSalesperson      User?            @relation("ClientSalesperson", fields: [assignedSalespersonId], references: [id], onDelete: SetNull)
-  assignedTrainer          User?            @relation("ClientTrainer", fields: [assignedTrainerId], references: [id], onDelete: SetNull)
-  distributor              Distributor?     @relation(fields: [distributorId], references: [id], onDelete: SetNull)
-  createdBy                User             @relation("ClientCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  activities               ClientActivity[]
-  leadSource               Lead?            @relation("LeadConversion")
-  orders                   Order[]
+  potential                 ClientPotential?
+  customerSegment           CustomerSegment?
+  estimatedMonthlyBusiness  Decimal?         @db.Decimal(12, 2)
+  purchasingFrequency       String?
+  territory                 String?
+  routeBeat                 String?
+  businessPotentialRating   Int?
+  relationshipRating        Int?
+  paymentBehaviourRating    Int?
+  productOpportunityRating  Int?
+  overallRating             Int?
+  assignedSalespersonId     String?
+  assignedTrainerId         String?
+  distributorId             String?
+  createdById               String
+  version                   Int              @default(1)
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+  assignedSalesperson       User?            @relation("ClientSalesperson", fields: [assignedSalespersonId], references: [id], onDelete: SetNull)
+  assignedTrainer           User?            @relation("ClientTrainer", fields: [assignedTrainerId], references: [id], onDelete: SetNull)
+  distributor               Distributor?     @relation(fields: [distributorId], references: [id], onDelete: SetNull)
+  createdBy                 User             @relation("ClientCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  activities                ClientActivity[]
+  leadSource                Lead?            @relation("LeadConversion")
+  orders                    Order[]
+  invoices                  Invoice[]
 
   @@index([assignedSalespersonId, status])
   @@index([assignedTrainerId, status])
@@ -419,19 +428,22 @@ enum ProductCategory {
 }
 
 model Product {
-  id          String          @id @default(cuid())
-  sku         String          @unique
-  name        String
-  category    ProductCategory @default(OTHER)
-  variant     String?
-  unit        String          @default("pcs")
-  unitPrice   Decimal         @db.Decimal(12, 2)
-  stockOnHand Int             @default(0)
-  isActive    Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  orderItems  OrderItem[]
-  movements   StockMovement[]
+  id           String          @id @default(cuid())
+  sku          String          @unique
+  name         String
+  category     ProductCategory @default(OTHER)
+  variant      String?
+  unit         String          @default("pcs")
+  unitPrice    Decimal         @db.Decimal(12, 2)
+  hsnCode      String?
+  gstRate      Decimal?        @db.Decimal(5, 2)
+  stockOnHand  Int             @default(0)
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  orderItems   OrderItem[]
+  invoiceItems InvoiceItem[]
+  movements    StockMovement[]
 
   @@index([isActive])
   @@index([category])
@@ -439,32 +451,92 @@ model Product {
 
 enum OrderStatus {
   DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  RETURNED_FOR_CORRECTION
+  APPROVED
+  REJECTED
+  INVOICE_GENERATED
+  STOCK_RESERVED
+  PICKING
+  PACKED
+  READY_FOR_DISPATCH
+  OUT_FOR_DELIVERY
+  ARRIVED_AT_CUSTOMER
   CONFIRMED
   DISPATCHED
   DELIVERED
   CANCELLED
 }
 
+enum DeliveryMode {
+  VADODARA_LOCAL
+  OUTSTATION_COURIER
+}
+
 model Order {
-  id             String      @id @default(cuid())
-  orderNumber    String      @unique
-  clientId       String
-  client         Client      @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  salespersonId  String
-  salesperson    User        @relation("OrderSalesperson", fields: [salespersonId], references: [id], onDelete: Restrict)
-  status         OrderStatus @default(DRAFT)
-  subtotal       Decimal     @db.Decimal(12, 2)
-  discountAmount Decimal     @default(0) @db.Decimal(12, 2)
-  totalAmount    Decimal     @db.Decimal(12, 2)
-  notes          String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  items          OrderItem[]
-  stockMovements StockMovement[]
+  id                   String          @id @default(cuid())
+  orderNumber          String          @unique
+  clientId             String
+  client               Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  salespersonId        String
+  salesperson          User            @relation("OrderSalesperson", fields: [salespersonId], references: [id], onDelete: Restrict)
+  status               OrderStatus     @default(DRAFT)
+  subtotal             Decimal         @db.Decimal(12, 2)
+  discountAmount       Decimal         @default(0) @db.Decimal(12, 2)
+  taxableAmount        Decimal         @default(0) @db.Decimal(12, 2)
+  taxRate              Decimal         @default(0) @db.Decimal(5, 2)
+  taxAmount            Decimal         @default(0) @db.Decimal(12, 2)
+  cgstAmount           Decimal         @default(0) @db.Decimal(12, 2)
+  sgstAmount           Decimal         @default(0) @db.Decimal(12, 2)
+  igstAmount           Decimal         @default(0) @db.Decimal(12, 2)
+  totalAmount          Decimal         @db.Decimal(12, 2)
+  notes                String?
+  reviewComment        String?
+  reviewedById         String?
+  reviewedBy           User?           @relation("OrderReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  submittedAt          DateTime?
+  reviewStartedAt      DateTime?
+  returnedAt           DateTime?
+  rejectedAt           DateTime?
+  approvedAt           DateTime?
+  stockReservedAt      DateTime?
+  pickingStartedAt     DateTime?
+  packedAt             DateTime?
+  readyForDispatchAt   DateTime?
+  deliveryMode         DeliveryMode?
+  deliveryPersonName   String?
+  deliveryPersonMobile String?
+  courierName          String?
+  trackingNumber       String?
+  dispatchedAt         DateTime?
+  outForDeliveryAt     DateTime?
+  arrivedAt            DateTime?
+  deliveredAt          DateTime?
+  version              Int             @default(1)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  items                OrderItem[]
+  stockMovements       StockMovement[]
+  invoice              Invoice?
+  deliveryProof        DeliveryProof?
 
   @@index([clientId])
   @@index([salespersonId, createdAt])
   @@index([status])
+  @@index([reviewedById])
+}
+
+model DeliveryProof {
+  id                String   @id @default(cuid())
+  orderId           String   @unique
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  arrivalPhoto      Bytes?
+  arrivalPhotoMime  String?
+  deliveryPhoto     Bytes?
+  deliveryPhotoMime String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 enum StockMovementType {
@@ -492,17 +564,147 @@ model StockMovement {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
-  quantity  Int
-  unitPrice Decimal @db.Decimal(12, 2)
-  lineTotal Decimal @db.Decimal(12, 2)
+  id             String  @id @default(cuid())
+  orderId        String
+  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity       Int
+  unitPrice      Decimal @db.Decimal(12, 2)
+  discountAmount Decimal @default(0) @db.Decimal(12, 2)
+  taxableAmount  Decimal @default(0) @db.Decimal(12, 2)
+  gstRate        Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount      Decimal @default(0) @db.Decimal(12, 2)
+  lineTotal      Decimal @db.Decimal(12, 2)
 
   @@index([orderId])
   @@index([productId])
+}
+
+enum InvoiceStatus {
+  GENERATED
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+}
+
+enum PaymentMode {
+  CASH
+  BANK_TRANSFER
+  UPI
+  CHEQUE
+  CARD
+  OTHER
+}
+
+model BillingSettings {
+  id                      String   @id @default("default")
+  legalName               String   @default("Bond Therapy")
+  tradeName               String   @default("Bond Therapy Professional")
+  gstin                   String?
+  pan                     String?
+  registeredAddress       String?
+  city                    String?
+  state                   String?
+  stateCode               String?
+  pincode                 String?
+  phone                   String?
+  email                   String?
+  website                 String?
+  bankName                String?
+  accountName             String?
+  accountNumber           String?
+  ifsc                    String?
+  branch                  String?
+  upiId                   String?
+  invoicePrefix           String   @default("BT")
+  defaultGstRate          Decimal  @default(18) @db.Decimal(5, 2)
+  defaultPaymentTermsDays Int      @default(30)
+  allowSalesDiscount      Boolean  @default(false)
+  maxSalesDiscountPercent Decimal  @default(0) @db.Decimal(5, 2)
+  invoiceTerms            String?
+  footerNote              String?
+  updatedById             String?
+  updatedBy               User?    @relation("BillingSettingsUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model Invoice {
+  id               String        @id @default(cuid())
+  invoiceNumber    String        @unique
+  orderId          String        @unique
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  clientId         String
+  client           Client        @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  status           InvoiceStatus @default(GENERATED)
+  companySnapshot  Json
+  customerSnapshot Json
+  subtotal         Decimal       @db.Decimal(12, 2)
+  discountAmount   Decimal       @default(0) @db.Decimal(12, 2)
+  taxableAmount    Decimal       @db.Decimal(12, 2)
+  cgstAmount       Decimal       @default(0) @db.Decimal(12, 2)
+  sgstAmount       Decimal       @default(0) @db.Decimal(12, 2)
+  igstAmount       Decimal       @default(0) @db.Decimal(12, 2)
+  taxAmount        Decimal       @default(0) @db.Decimal(12, 2)
+  totalAmount      Decimal       @db.Decimal(12, 2)
+  amountPaid       Decimal       @default(0) @db.Decimal(12, 2)
+  balanceDue       Decimal       @db.Decimal(12, 2)
+  issuedAt         DateTime      @default(now())
+  dueDate          DateTime
+  sentAt           DateTime?
+  paidAt           DateTime?
+  generatedById    String
+  generatedBy      User          @relation("InvoiceGenerator", fields: [generatedById], references: [id], onDelete: Restrict)
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  items            InvoiceItem[]
+  payments         Payment[]
+
+  @@index([clientId, issuedAt])
+  @@index([status, dueDate])
+  @@index([generatedById])
+}
+
+model InvoiceItem {
+  id             String   @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId      String?
+  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  sku            String
+  productName    String
+  hsnCode        String?
+  unit           String
+  quantity       Int
+  unitPrice      Decimal  @db.Decimal(12, 2)
+  discountAmount Decimal  @default(0) @db.Decimal(12, 2)
+  taxableAmount  Decimal  @db.Decimal(12, 2)
+  gstRate        Decimal  @db.Decimal(5, 2)
+  taxAmount      Decimal  @db.Decimal(12, 2)
+  lineTotal      Decimal  @db.Decimal(12, 2)
+
+  @@index([invoiceId])
+  @@index([productId])
+}
+
+model Payment {
+  id           String      @id @default(cuid())
+  invoiceId    String
+  invoice      Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  paymentDate  DateTime    @db.Date
+  amount       Decimal     @db.Decimal(12, 2)
+  mode         PaymentMode
+  reference    String?
+  notes        String?
+  recordedById String
+  recordedBy   User        @relation("PaymentRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime    @default(now())
+
+  @@index([invoiceId, paymentDate])
+  @@index([recordedById])
 }
 
 model SalesTarget {
@@ -526,20 +728,20 @@ enum IncentiveStatus {
 }
 
 model IncentiveStatement {
-  id              String           @id @default(cuid())
+  id              String          @id @default(cuid())
   userId          String
-  user            User             @relation("IncentiveOwner", fields: [userId], references: [id], onDelete: Cascade)
+  user            User            @relation("IncentiveOwner", fields: [userId], references: [id], onDelete: Cascade)
   periodMonth     Int
   periodYear      Int
-  ratePercent     Decimal          @db.Decimal(5, 2)
-  eligibleRevenue Decimal          @db.Decimal(12, 2)
-  incentiveAmount Decimal          @db.Decimal(12, 2)
-  status          IncentiveStatus  @default(PENDING)
+  ratePercent     Decimal         @db.Decimal(5, 2)
+  eligibleRevenue Decimal         @db.Decimal(12, 2)
+  incentiveAmount Decimal         @db.Decimal(12, 2)
+  status          IncentiveStatus @default(PENDING)
   approvedById    String?
-  approvedBy      User?            @relation("IncentiveApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedBy      User?           @relation("IncentiveApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt      DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@unique([userId, periodYear, periodMonth])
   @@index([periodYear, periodMonth])
@@ -547,14 +749,14 @@ model IncentiveStatement {
 }
 
 model AttendanceRecord {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation("AttendanceOwner", fields: [userId], references: [id], onDelete: Cascade)
-  date        DateTime  @db.Date
-  punchInAt   DateTime?
-  punchOutAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation("AttendanceOwner", fields: [userId], references: [id], onDelete: Cascade)
+  date       DateTime  @db.Date
+  punchInAt  DateTime?
+  punchOutAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@unique([userId, date])
   @@index([userId, date])

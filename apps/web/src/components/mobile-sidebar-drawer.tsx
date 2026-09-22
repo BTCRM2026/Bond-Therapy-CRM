@@ -28,7 +28,7 @@ export function MobileSidebarDrawer({ portal, roleKey, canManageStaff = false }:
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" className="absolute inset-0 bg-foreground/40 backdrop-blur-[1px]" onClick={() => setOpen(false)} aria-label="Close navigation" />
-          <aside role="dialog" aria-modal="true" aria-label="Portal navigation" className="relative flex h-[100dvh] w-[min(86vw,304px)] flex-col border-r bg-white px-4 py-5 shadow-[16px_0_40px_rgba(55,43,29,0.14)]">
+          <aside role="dialog" aria-modal="true" aria-label="Portal navigation" className="relative flex h-[100dvh] w-[min(86vw,304px)] flex-col border-r bg-sidebar px-4 py-5 shadow-[16px_0_40px_rgba(26,31,26,0.12)]">
             <div className="flex min-h-14 items-center justify-between border-b px-2 pb-4">
               <SidebarBrand />
               <button type="button" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-lg text-muted hover:bg-background" aria-label="Close navigation">

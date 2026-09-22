@@ -36,6 +36,18 @@ await prisma.rolePermission.upsert({
   create: { roleId: adminRole.id, permissionId: staffManagementPermission.id },
 });
 
+const billingSettingsPermission = await prisma.permission.upsert({
+  where: { key: 'admin.billing.manage' },
+  update: { module: 'BILLING_SETTINGS', action: 'MANAGE' },
+  create: { key: 'admin.billing.manage', module: 'BILLING_SETTINGS', action: 'MANAGE' },
+});
+await prisma.rolePermission.upsert({
+  where: { roleId_permissionId: { roleId: adminRole.id, permissionId: billingSettingsPermission.id } },
+  update: {},
+  create: { roleId: adminRole.id, permissionId: billingSettingsPermission.id },
+});
+await prisma.billingSettings.upsert({ where: { id: 'default' }, update: {}, create: { id: 'default' } });
+
 const purchaseRole = await prisma.role.upsert({
   where: { key: 'PURCHASE_MANAGER' },
   update: { name: 'Purchase Manager', portal: 'ADMIN', dashboardPath: '/dashboard', priority: 10, isActive: true },

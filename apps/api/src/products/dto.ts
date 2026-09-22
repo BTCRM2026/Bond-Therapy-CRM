@@ -15,6 +15,8 @@ export class ProductDto {
   @IsOptional() @IsString() @MaxLength(80) variant?: string;
   @IsOptional() @IsString() @MaxLength(20) unit?: string;
   @Type(() => Number) @IsNumber() @Min(0) unitPrice!: number;
+  @IsOptional() @IsString() @MaxLength(20) hsnCode?: string;
+  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(100) gstRate?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) stockOnHand?: number;
 }
 

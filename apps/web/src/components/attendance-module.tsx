@@ -25,16 +25,21 @@ export function AttendanceModule() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const load = async () => {
+  const load = async (cancelled?: () => boolean) => {
     try {
       const [todayResponse, monthlyResponse] = await Promise.all([fetch("/api/attendance/today", { cache: "no-store" }), fetch("/api/attendance/monthly", { cache: "no-store" })]);
+      if (cancelled?.()) return;
       if (todayResponse.ok) setToday(await todayResponse.json());
       if (monthlyResponse.ok) setMonthly(await monthlyResponse.json());
       setError("");
-    } catch { setError("Unable to load attendance data."); }
-    finally { setLoading(false); }
+    } catch { if (!cancelled?.()) setError("Unable to load attendance data."); }
+    finally { if (!cancelled?.()) setLoading(false); }
   };
-  useEffect(() => { (async () => { await load(); })(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => { await load(() => cancelled); })();
+    return () => { cancelled = true; };
+  }, []);
 
   const punch = async (action: "punch-in" | "punch-out") => {
     setBusy(true); setError("");
