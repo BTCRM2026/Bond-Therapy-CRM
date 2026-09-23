@@ -15,6 +15,7 @@ const ROLE_CONFIG: Record<string, { department: Department; dataScope: DataScope
   DEMO_TEAM: { department: 'DEMO', dataScope: 'OWN', portal: 'STAFF' },
 };
 const MANAGED_ROLE_KEYS = Object.keys(ROLE_CONFIG);
+const employeeCode = (number: number) => `BT-${String(number).padStart(2, '0')}`;
 
 type PresentedUser = {
   id: string;
@@ -101,12 +102,12 @@ export class UsersService {
     const passwordHash = await hashPassword(dto.password);
     const user = await this.prisma.$transaction(async (tx) => {
       const counter = await tx.employeeCounter.upsert({
-        where: { key: 'PMB' },
-        create: { key: 'PMB', nextNumber: 12 },
+        where: { key: 'BT' },
+        create: { key: 'BT', nextNumber: 1 },
         update: { nextNumber: { increment: 1 } },
       });
-      const employeeCode = `PMB-${String(counter.nextNumber).padStart(3, '0')}`;
-      const loginId = generatedLoginId(dto.name, employeeCode);
+      const code = employeeCode(counter.nextNumber);
+      const loginId = generatedLoginId(dto.name, code);
       return tx.user.create({
         data: {
           loginId,
@@ -119,7 +120,7 @@ export class UsersService {
           roles: { create: { roleId: role.id } },
           staffProfile: {
             create: {
-              employeeCode,
+              employeeCode: code,
               mobile: dto.mobile.trim(),
               jobTitle: dto.jobTitle.trim(),
               employmentType: dto.employmentType as EmploymentType,
@@ -191,8 +192,8 @@ export class UsersService {
           await tx.staffProfile.update({ where: { userId: id }, data: profileData });
         } else {
           if (!dto.mobile || !dto.jobTitle || !dto.employmentType || !dto.joiningDate) throw new BadRequestException('Complete the required employment details.');
-          const counter = await tx.employeeCounter.upsert({ where: { key: 'PMB' }, create: { key: 'PMB', nextNumber: 12 }, update: { nextNumber: { increment: 1 } } });
-          await tx.staffProfile.create({ data: { ...profileData, userId: id, employeeCode: `PMB-${String(counter.nextNumber).padStart(3, '0')}`, mobile: dto.mobile.trim(), jobTitle: dto.jobTitle.trim(), employmentType: dto.employmentType as EmploymentType, joiningDate: dateOnly(dto.joiningDate) } });
+          const counter = await tx.employeeCounter.upsert({ where: { key: 'BT' }, create: { key: 'BT', nextNumber: 1 }, update: { nextNumber: { increment: 1 } } });
+          await tx.staffProfile.create({ data: { ...profileData, userId: id, employeeCode: employeeCode(counter.nextNumber), mobile: dto.mobile.trim(), jobTitle: dto.jobTitle.trim(), employmentType: dto.employmentType as EmploymentType, joiningDate: dateOnly(dto.joiningDate) } });
         }
       }
       const updated = await tx.user.update({

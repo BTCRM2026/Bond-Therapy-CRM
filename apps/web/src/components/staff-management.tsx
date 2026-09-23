@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KpiCard } from "@/components/ui/kpi-card";
+import { SuccessToast } from "@/components/ui/toast";
 
 type Role = { key: string; name: string; portal: "ADMIN" | "STAFF"; department: string; dataScope: string };
 type StaffProfile = {
@@ -101,6 +102,7 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
 
   return (
     <>
+      {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
       {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add staff</span><span className="sr-only sm:hidden">Add staff</span></Button>, headerSlot)}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
@@ -121,7 +123,7 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
           </select>
         </div>
 
-        {(notice || error) && <div className={`mx-4 mt-4 rounded-lg border px-3 py-2.5 text-xs sm:mx-5 ${error ? "border-red-200 bg-red-50 text-danger" : "border-success/25 bg-success-soft text-success"}`} role={error ? "alert" : "status"}>{error || notice}</div>}
+        {error && <div className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger sm:mx-5" role="alert">{error}</div>}
 
         <div className="hidden overflow-visible xl:block">
           <table className="w-full min-w-[920px] text-left text-[13px]">
