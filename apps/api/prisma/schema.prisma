@@ -625,6 +625,12 @@ model BillingSettings {
   maxSalesDiscountPercent Decimal  @default(0) @db.Decimal(5, 2)
   invoiceTerms            String?
   footerNote              String?
+  logo                    Bytes?
+  logoMime                String?
+  signature               Bytes?
+  signatureMime           String?
+  accountManagerName      String?
+  accountManagerTitle     String?  @default("Account Manager")
   updatedById             String?
   updatedBy               User?    @relation("BillingSettingsUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
   createdAt               DateTime @default(now())

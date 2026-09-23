@@ -7,11 +7,13 @@ type InvoicePdfData = {
   items: Array<{ sku: string; productName: string; hsnCode: string | null; unit: string; quantity: number; unitPrice: unknown; discountAmount: unknown; taxableAmount: unknown; gstRate: unknown; taxAmount: unknown; lineTotal: unknown }>;
 };
 
+type InvoiceBranding = { logo?: Buffer; signature?: Buffer; accountManagerName?: string | null; accountManagerTitle?: string | null };
+
 const currency = (value: unknown) => `INR ${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const date = (value: Date) => new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(value);
 const text = (value: unknown) => typeof value === 'string' ? value : '';
 
-export function renderInvoicePdf(invoice: InvoicePdfData): Promise<Buffer> {
+export function renderInvoicePdf(invoice: InvoicePdfData, branding?: InvoiceBranding): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 42, info: { Title: `Tax Invoice ${invoice.invoiceNumber}`, Author: 'Bond Therapy CRM' }, bufferPages: true });
     const chunks: Buffer[] = [];
@@ -23,8 +25,10 @@ export function renderInvoicePdf(invoice: InvoicePdfData): Promise<Buffer> {
     const green = '#0D5C52'; const ink = '#17231F'; const muted = '#64736E'; const line = '#DFE6E3'; const soft = '#F3F6F5';
 
     doc.rect(0, 0, 595.28, 12).fill(green);
-    doc.fillColor(ink).font('Helvetica-Bold').fontSize(22).text(text(company.tradeName) || text(company.legalName) || 'Bond Therapy', 42, 42, { width: 320 });
-    doc.fillColor(muted).font('Helvetica').fontSize(8.5).text([text(company.registeredAddress), [text(company.city), text(company.state), text(company.pincode)].filter(Boolean).join(' '), text(company.gstin) ? `GSTIN: ${text(company.gstin)}` : '', [text(company.phone), text(company.email)].filter(Boolean).join('  |  ')].filter(Boolean).join('\n'), 42, 72, { width: 320, lineGap: 2 });
+    let headerX = 42;
+    if (branding?.logo) { try { doc.image(branding.logo, 42, 40, { fit: [46, 46] }); headerX = 96; } catch { headerX = 42; } }
+    doc.fillColor(ink).font('Helvetica-Bold').fontSize(headerX === 96 ? 18 : 22).text(text(company.tradeName) || text(company.legalName) || 'Bond Therapy', headerX, headerX === 96 ? 46 : 42, { width: 320 - (headerX - 42) });
+    doc.fillColor(muted).font('Helvetica').fontSize(8.5).text([text(company.registeredAddress), [text(company.city), text(company.state), text(company.pincode)].filter(Boolean).join(' '), text(company.gstin) ? `GSTIN: ${text(company.gstin)}` : '', [text(company.phone), text(company.email)].filter(Boolean).join('  |  ')].filter(Boolean).join('\n'), headerX, headerX === 96 ? 70 : 72, { width: 320 - (headerX - 42), lineGap: 2 });
     doc.fillColor(green).font('Helvetica-Bold').fontSize(20).text('TAX INVOICE', 380, 42, { width: 173, align: 'right' });
     doc.fillColor(muted).font('Helvetica').fontSize(8).text('INVOICE NUMBER', 400, 73, { width: 153, align: 'right' });
     doc.fillColor(ink).font('Helvetica-Bold').fontSize(10).text(invoice.invoiceNumber, 400, 85, { width: 153, align: 'right' });
@@ -68,13 +72,34 @@ export function renderInvoicePdf(invoice: InvoicePdfData): Promise<Buffer> {
     y += 46;
     if (Number(invoice.amountPaid) > 0) { doc.fillColor(muted).font('Helvetica').fontSize(8.5).text(`Paid: ${currency(invoice.amountPaid)}   Balance due: ${currency(invoice.balanceDue)}`, summaryX, y, { width: 213, align: 'right' }); }
 
-    const infoY = Math.max(y + 35, 660);
-    if (infoY > 720) doc.addPage();
-    const finalY = infoY > 720 ? 50 : infoY;
+    const infoY = Math.max(y + 35, 640);
+    if (infoY > 700) doc.addPage();
+    const finalY = infoY > 700 ? 50 : infoY;
     doc.fillColor(ink).font('Helvetica-Bold').fontSize(8.5).text('PAYMENT DETAILS', 42, finalY);
-    doc.fillColor(muted).font('Helvetica').fontSize(8).text([text(company.bankName) ? `Bank: ${text(company.bankName)}` : '', text(company.accountNumber) ? `A/C: ${text(company.accountNumber)}` : '', text(company.ifsc) ? `IFSC: ${text(company.ifsc)}` : '', text(company.upiId) ? `UPI: ${text(company.upiId)}` : ''].filter(Boolean).join('  |  '), 42, finalY + 15, { width: 500 });
-    if (text(company.invoiceTerms)) doc.text(`Terms: ${text(company.invoiceTerms)}`, 42, finalY + 37, { width: 500, lineGap: 2 });
-    doc.fillColor(green).font('Helvetica-Bold').fontSize(8).text(text(company.footerNote) || 'Thank you for your business.', 42, 785, { width: 511, align: 'center' });
+    doc.fillColor(muted).font('Helvetica').fontSize(8).text([text(company.bankName) ? `Bank: ${text(company.bankName)}` : '', text(company.accountNumber) ? `A/C: ${text(company.accountNumber)}` : '', text(company.ifsc) ? `IFSC: ${text(company.ifsc)}` : '', text(company.upiId) ? `UPI: ${text(company.upiId)}` : ''].filter(Boolean).join('\n'), 42, finalY + 15, { width: 300, lineGap: 2 });
+    let paymentBottom = finalY + 15 + doc.heightOfString([text(company.bankName), text(company.accountNumber), text(company.ifsc), text(company.upiId)].filter(Boolean).join('\n'), { width: 300, lineGap: 2 }) + 10;
+    if (text(company.invoiceTerms)) {
+      doc.fillColor(ink).font('Helvetica-Bold').fontSize(8.5).text('TERMS & CONDITIONS', 42, paymentBottom);
+      doc.fillColor(muted).font('Helvetica').fontSize(8).text(text(company.invoiceTerms), 42, paymentBottom + 15, { width: 300, lineGap: 2 });
+      paymentBottom += 15 + doc.heightOfString(text(company.invoiceTerms), { width: 300, lineGap: 2 });
+    }
+
+    const sigX = 390; const sigW = 163;
+    const accountManagerName = branding?.accountManagerName ?? '';
+    const accountManagerTitle = branding?.accountManagerTitle || 'Account Manager';
+    let sigBottom = finalY;
+    if (accountManagerName || branding?.signature) {
+      doc.fillColor(muted).font('Helvetica').fontSize(7.5).text(accountManagerTitle.toUpperCase(), sigX, finalY, { width: sigW, align: 'right' });
+      if (branding?.signature) { try { doc.image(branding.signature, sigX + sigW - 110, finalY + 12, { fit: [110, 30], align: 'right' }); } catch { /* skip broken signature image */ } }
+      else if (accountManagerName) doc.fillColor(ink).font('Helvetica-Oblique').fontSize(17).text(accountManagerName, sigX, finalY + 10, { width: sigW, align: 'right' });
+      doc.moveTo(sigX, finalY + 48).lineTo(sigX + sigW, finalY + 48).strokeColor(line).lineWidth(0.75).stroke();
+      doc.fillColor(ink).font('Helvetica-Bold').fontSize(8).text(accountManagerName || '—', sigX, finalY + 53, { width: sigW, align: 'right' });
+      doc.fillColor(muted).font('Helvetica').fontSize(7).text(accountManagerTitle, sigX, finalY + 65, { width: sigW, align: 'right' });
+      sigBottom = finalY + 77;
+    }
+
+    const footerY = Math.min(785, Math.max(paymentBottom, sigBottom) + 20);
+    doc.fillColor(green).font('Helvetica-Bold').fontSize(8).text(text(company.footerNote) || 'Thank you for your business.', 42, footerY, { width: 511, align: 'center' });
     doc.end();
   });
 }

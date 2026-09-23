@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ChevronLeft, ChevronRight, IndianRupee, LoaderCircle, MoreHorizontal, Package, PackageCheck, PackageX, Pencil, Plus, Search, Trash2, UserCheck, UserX, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, IndianRupee, LoaderCircle, MoreHorizontal, Package, PackageCheck, PackageX, Pencil, Plus, Search, SlidersHorizontal, Trash2, UserCheck, UserX, X } from "lucide-react";
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ export type ProductListResponse = { items: Product[]; page: number; pageSize: nu
 type ProductStats = { totalProducts: number; inStock: number; lowStock: number; outOfStock: number; inventoryValue: number };
 
 const CATEGORIES = [["SHAMPOO", "Shampoo"], ["CONDITIONER", "Conditioner"], ["MASK", "Mask"], ["TREATMENT", "Treatment"], ["KIT", "Kit"], ["COLOR", "Color"], ["DEVELOPER", "Developer"], ["STYLING", "Styling"], ["OIL_SERUM", "Oil / Serum"], ["LIQUID", "Liquid"], ["TOOLS", "Tools"], ["OTHER", "Other"]];
-const pretty = (value: string) => value[0] + value.slice(1).toLowerCase();
+const pretty = (value: string) => value.toLowerCase().split("_").map((part) => part[0].toUpperCase() + part.slice(1)).join(" / ");
 const money = (value: string | number) => `₹${Number(value).toLocaleString("en-IN")}`;
 const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? (Array.isArray((data as { message: unknown }).message) ? (data as { message: string[] }).message.join(" ") : String((data as { message: unknown }).message)) : fallback;
 
@@ -115,7 +115,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
         {data && data.total > 0 && <Pagination page={data.page} pageSize={data.pageSize} total={data.total} hasMore={data.hasMore} onPageChange={setPage} />}
       </section>
 
-      {editor && <ProductEditor mode={editor.mode} product={editor.product} onClose={() => setEditor(null)} onSaved={async (message) => { setEditor(null); await Promise.all([reload(), reloadStats()]); setError(""); setNotice(message); }} />}
+      {editor && <ProductEditor mode={editor.mode} product={editor.product} onClose={() => setEditor(null)} onSaved={async (message) => { setEditor(null); await Promise.all([reload(), reloadStats()]); setError(""); setNotice(message); }} onStockAdjusted={() => { void Promise.all([reload(), reloadStats()]); }} />}
     </>
   );
 }
@@ -180,10 +180,11 @@ function toFormState(product?: Product): FormState {
   return { name: product?.name ?? "", category: product?.category ?? "SHAMPOO", unitPrice: product?.unitPrice ?? "", stockOnHand: product ? String(product.stockOnHand) : "", hsnCode: product?.hsnCode ?? "", gstRate: product?.gstRate ?? "" };
 }
 
-function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "edit"; product?: Product; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
+function ProductEditor({ mode, product, onClose, onSaved, onStockAdjusted }: { mode: "create" | "edit"; product?: Product; onClose: () => void; onSaved: (message: string) => Promise<void>; onStockAdjusted: () => void }) {
   const [form, setForm] = useState<FormState>(toFormState(product));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [adjusting, setAdjusting] = useState(false);
   const set = (key: keyof FormState) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((value) => ({ ...value, [key]: event.target.value }));
 
   const submit = async (event: FormEvent) => {
@@ -203,13 +204,56 @@ function ProductEditor({ mode, product, onClose, onSaved }: { mode: "create" | "
       <form onSubmit={submit} className="overflow-y-auto p-4 sm:p-5">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2"><Field label="Product name *"><Input value={form.name} onChange={set("name")} required minLength={2} maxLength={160} autoFocus /></Field><Field label="Category *"><select value={form.category} onChange={set("category")} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field></div>
-          <div className="grid gap-4 sm:grid-cols-2"><Field label="Quantity *"><Input value={form.stockOnHand} onChange={set("stockOnHand")} required={mode === "create"} type="number" min="0" inputMode="numeric" placeholder="0" readOnly={mode === "edit"} /></Field><Field label="MRP (₹) *"><Input value={form.unitPrice} onChange={set("unitPrice")} required type="number" min="0" step="0.01" inputMode="decimal" /></Field></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Quantity *">
+              <div className="flex items-center gap-2">
+                <Input value={form.stockOnHand} onChange={set("stockOnHand")} required={mode === "create"} type="number" min="0" inputMode="numeric" placeholder="0" readOnly={mode === "edit"} className={mode === "edit" ? "bg-background text-muted" : undefined} />
+                {mode === "edit" && <Button type="button" variant="secondary" className="h-11 shrink-0 px-3 sm:h-10" onClick={() => setAdjusting(true)}><SlidersHorizontal size={14} />Adjust</Button>}
+              </div>
+            </Field>
+            <Field label="MRP (₹) *"><Input value={form.unitPrice} onChange={set("unitPrice")} required type="number" min="0" step="0.01" inputMode="decimal" /></Field>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2"><Field label="HSN / SAC code"><Input value={form.hsnCode} onChange={set("hsnCode")} maxLength={20} placeholder="Optional" /></Field><Field label="GST rate (%)"><Input value={form.gstRate} onChange={set("gstRate")} type="number" min="0" max="100" step="0.01" placeholder="Use global default" /></Field></div>
-          {mode === "edit" && <p className="rounded-lg border border-brand/15 bg-brand-soft/50 px-3 py-2.5 text-xs leading-5 text-muted">Stock changes go through the Warehouse Inventory screen, not this form, so every movement stays on the audit trail.</p>}
+          {mode === "edit" && <p className="rounded-lg border border-brand/15 bg-brand-soft/50 px-3 py-2.5 text-xs leading-5 text-muted">Quantity is not typed directly here — use Adjust to record a correction, so it stays on the stock movement audit trail.</p>}
           {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}
         </div>
         <div className="sticky bottom-0 mt-5 flex flex-col-reverse gap-2 border-t bg-white pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Saving…" : mode === "create" ? "Add product" : "Save changes"}</Button></div>
       </form>
+    </div>
+    {adjusting && product && <AdjustStockForm product={product} currentStock={Number(form.stockOnHand) || 0} onClose={() => setAdjusting(false)} onAdjusted={(newStock) => { setForm((value) => ({ ...value, stockOnHand: String(newStock) })); setAdjusting(false); onStockAdjusted(); }} />}
+  </div>;
+}
+
+function AdjustStockForm({ product, currentStock, onClose, onAdjusted }: { product: Product; currentStock: number; onClose: () => void; onAdjusted: (newStock: number) => void }) {
+  const [newQuantity, setNewQuantity] = useState(String(currentStock));
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    const target = Number(newQuantity);
+    if (!Number.isInteger(target) || target < 0) { setError("Enter a valid quantity of 0 or more."); return; }
+    const quantityChange = target - currentStock;
+    if (quantityChange === 0) { setError("Enter a different quantity to record an adjustment."); return; }
+    setSaving(true); setError("");
+    try {
+      const response = await fetch(`/api/products/${product.id}/movements`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "ADJUSTMENT", quantityChange, reason: reason.trim() || undefined }) });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(messageFrom(data, "Unable to adjust stock for this product."));
+      onAdjusted(target);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to adjust stock for this product."); setSaving(false); }
+  };
+
+  return <div className="fixed inset-0 z-[60] grid place-items-center bg-foreground/40 p-3 backdrop-blur-[1px]" role="dialog" aria-modal="true" aria-label="Adjust stock">
+    <div className="w-full max-w-sm rounded-xl border bg-white p-5 shadow-[0_20px_48px_rgba(15,23,42,0.18)]">
+      <h2 className="text-base font-semibold text-foreground">Adjust stock</h2>
+      <p className="mt-1 text-xs text-muted">{product.name} · currently {currentStock}</p>
+      <div className="mt-4 space-y-3">
+        <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">New quantity</span><Input type="number" min="0" inputMode="numeric" value={newQuantity} onChange={(event) => setNewQuantity(event.target.value)} autoFocus /></label>
+        <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Reason (optional)</span><Input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Physical count correction" /></label>
+        {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}
+      </div>
+      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" disabled={saving} onClick={submit}>{saving ? "Saving…" : "Save adjustment"}</Button></div>
     </div>
   </div>;
 }

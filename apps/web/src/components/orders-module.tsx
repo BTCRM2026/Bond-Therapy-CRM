@@ -1,11 +1,22 @@
 "use client";
 
 import { Check, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, FileCheck2, FileText, Minus, Package, Plus, RotateCcw, Search, Send, ShoppingCart, X, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { FilterMenu } from "@/components/ui/filter-menu";
 import { Input } from "@/components/ui/input";
 import { KpiCard } from "@/components/ui/kpi-card";
+import { PageSizeMenu } from "@/components/ui/page-size-menu";
+
+const APPROVED_ONWARD = ["APPROVED", "INVOICE_GENERATED", "STOCK_RESERVED", "PICKING", "PACKED", "READY_FOR_DISPATCH", "OUT_FOR_DELIVERY", "ARRIVED_AT_CUSTOMER", "CONFIRMED", "DISPATCHED", "DELIVERED"];
+const GROUPS = [
+  { key: "ALL", label: "All orders", statuses: [] as string[] },
+  { key: "DRAFTS", label: "Drafts", statuses: ["DRAFT"] },
+  { key: "REVIEW", label: "Needs review", statuses: ["SUBMITTED", "UNDER_REVIEW"] },
+  { key: "APPROVED", label: "Approved", statuses: APPROVED_ONWARD },
+  { key: "RETURNED", label: "Returned / Rejected", statuses: ["RETURNED_FOR_CORRECTION", "REJECTED", "CANCELLED"] },
+] as const;
 
 type OrderItemRow = { id: string; quantity: number; unitPrice: string; discountAmount: string; taxableAmount: string; gstRate: string; taxAmount: string; lineTotal: string; product: { id: string; name: string; sku: string; unit: string; stockOnHand: number } };
 export type Order = { id: string; orderNumber: string; status: string; version: number; subtotal: string; discountAmount: string; taxableAmount: string; taxAmount: string; cgstAmount: string; sgstAmount: string; igstAmount: string; totalAmount: string; notes: string | null; reviewComment: string | null; createdAt: string; submittedAt: string | null; approvedAt: string | null; deliveryMode: string | null; deliveryPersonName: string | null; deliveryPersonMobile: string | null; courierName: string | null; trackingNumber: string | null; client: { id: string; salonName: string; city: string; primaryContact: string }; salesperson: { id: string; name: string }; reviewedBy: { id: string; name: string } | null; invoice: { id: string; invoiceNumber: string; status: string; amountPaid: string; balanceDue: string } | null; deliveryProof: { id: string; arrivalPhotoMime: string | null; deliveryPhotoMime: string | null } | null; items: OrderItemRow[] };
@@ -15,6 +26,14 @@ const money = (value: string | number) => `₹${Number(value).toLocaleString("en
 const pretty = (value: string) => value.toLowerCase().split("_").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ");
 const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? String((data as { message: unknown }).message) : fallback;
 
+function actionHint(order: Order, isAccounts: boolean): { label: string; tone: "warning" | "brand" } | null {
+  if (!isAccounts) return null;
+  if (order.status === "SUBMITTED") return { label: "Needs your review", tone: "warning" };
+  if (order.status === "UNDER_REVIEW") return { label: "Review in progress", tone: "warning" };
+  if (order.status === "APPROVED" && !order.invoice) return { label: "Ready to invoice", tone: "brand" };
+  return null;
+}
+
 export function OrderStatus({ value }: { value: string }) {
   const tone = ["APPROVED", "INVOICE_GENERATED", "DELIVERED"].includes(value) ? "bg-success-soft text-success" : ["REJECTED", "CANCELLED"].includes(value) ? "bg-red-50 text-danger" : ["UNDER_REVIEW", "DISPATCHED"].includes(value) ? "bg-brand-soft text-brand" : ["SUBMITTED", "RETURNED_FOR_CORRECTION"].includes(value) ? "bg-warning-soft text-warning" : "bg-gray-100 text-muted";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone}`}>{pretty(value)}</span>;
@@ -22,7 +41,6 @@ export function OrderStatus({ value }: { value: string }) {
 
 export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse | null; roleKey: string }) {
   const [data, setData] = useState(initial);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(initial ? "" : "Unable to load orders. Please try again.");
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -30,6 +48,10 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [selected, setSelected] = useState<Order | null>(null);
+  const [group, setGroup] = useState<(typeof GROUPS)[number]["key"]>("ALL");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const isSales = ["SALES_MANAGER", "SALES_EXECUTIVE"].includes(roleKey);
   const isAccounts = roleKey === "ACCOUNTS_BILLING" || roleKey === "SUPER_ADMIN";
 
@@ -40,7 +62,7 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
     (async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/orders?page=${page}&pageSize=20`, { cache: "no-store" });
+        const response = await fetch("/api/orders?page=1&pageSize=100", { cache: "no-store" });
         const json = await response.json().catch(() => null);
         if (!response.ok) throw new Error(messageFrom(json, "Unable to load orders."));
         if (!cancelled) { setData(json as OrderListResponse); setError(""); }
@@ -48,33 +70,60 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [page, refreshToken]);
+  }, [refreshToken]);
 
-  const reload = async () => { setPage(1); setRefreshToken((value) => value + 1); };
+  const reload = async () => { setRefreshToken((value) => value + 1); };
+
+  const counts = (statuses: readonly string[]) => statuses.length ? data?.items.filter((order) => (statuses as string[]).includes(order.status)).length ?? 0 : data?.items.length ?? 0;
+  const active = GROUPS.find((item) => item.key === group)!;
+  const filtered = useMemo(() => {
+    let base = active.statuses.length ? data?.items.filter((order) => (active.statuses as readonly string[]).includes(order.status)) ?? [] : data?.items ?? [];
+    const query = search.trim().toLowerCase();
+    if (query) base = base.filter((order) => order.orderNumber.toLowerCase().includes(query) || order.client.salonName.toLowerCase().includes(query));
+    if (group !== "ALL") return base;
+    return [...base].sort((a, b) => (actionHint(b, isAccounts) ? 1 : 0) - (actionHint(a, isAccounts) ? 1 : 0));
+  }, [data, active, group, isAccounts, search]);
+  const filterKey = `${group}:${search}:${pageSize}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) { setPrevFilterKey(filterKey); setPage(1); }
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageSafe = Math.min(page, pageCount);
+  const paginated = filtered.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   return <>
     {headerSlot && isSales && createPortal(<Button onClick={() => { setEditing(null); setBookingOpen(true); }}><Plus size={16} /><span className="hidden sm:inline">New draft</span><span className="sr-only sm:hidden">New draft</span></Button>, headerSlot)}
     <div className="space-y-4">
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard icon={FileText} label="Total drafts" value={data?.total ?? 0} detail="All visible orders" />
-        <KpiCard icon={Clock3} label="Awaiting review" value={data?.items.filter((order) => ["SUBMITTED", "UNDER_REVIEW"].includes(order.status)).length ?? 0} detail="Needs Accounts action" tone="warning" />
-        <KpiCard icon={FileCheck2} label="Approved" value={data?.items.filter((order) => ["APPROVED", "INVOICE_GENERATED"].includes(order.status)).length ?? 0} detail="Ready or invoiced" tone="success" />
-        <KpiCard icon={CircleDollarSign} label="Visible value" value={money(data?.items.reduce((sum, order) => sum + Number(order.totalAmount), 0) ?? 0)} detail="Current page total" />
+        <KpiCard icon={FileText} label="Total orders" value={data?.items.length ?? 0} detail="All visible orders" />
+        <KpiCard icon={Clock3} label="Needs review" value={counts(GROUPS[2].statuses)} detail="Needs Accounts action" tone="warning" />
+        <KpiCard icon={FileCheck2} label="Approved" value={counts(APPROVED_ONWARD)} detail="Approved through delivery" tone="success" />
+        <KpiCard icon={CircleDollarSign} label="Order value" value={money(data?.items.reduce((sum, order) => sum + Number(order.totalAmount), 0) ?? 0)} detail="Across all visible orders" />
       </div>
-      <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
-        <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5"><div><p className="text-sm font-semibold text-foreground">Order drafts</p><p className="mt-0.5 text-xs text-muted">{data?.total ?? 0} record{data?.total === 1 ? "" : "s"} · click a row to review</p></div></div>
+      <div className="flex gap-2">
+        <label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={17} /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order number or salon name" aria-label="Search orders" /></label>
+        <FilterMenu value={group} onSelect={setGroup} options={GROUPS.map((item) => ({ key: item.key, label: item.label, count: counts(item.statuses) }))} />
+      </div>
+      <section className="rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between gap-3 rounded-t-xl border-b px-4 py-3 sm:px-5">
+          <div className="min-w-0"><p className="text-sm font-semibold text-foreground">{active.label}</p><p className="mt-0.5 text-xs text-muted">{filtered.length} record{filtered.length === 1 ? "" : "s"} · click a row to review</p></div>
+          {filtered.length > 0 && <div className="flex shrink-0 items-center gap-2 text-xs text-muted">
+            <span className="hidden sm:inline">{(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, filtered.length)} of {filtered.length}</span>
+            <PageSizeMenu pageSize={pageSize} onSelect={setPageSize} />
+            <button type="button" disabled={pageSafe <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="grid size-7 place-items-center rounded-md border bg-white text-muted transition-colors hover:bg-background disabled:pointer-events-none disabled:opacity-40" aria-label="Previous page"><ChevronLeft size={14} /></button>
+            <button type="button" disabled={pageSafe >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))} className="grid size-7 place-items-center rounded-md border bg-white text-muted transition-colors hover:bg-background disabled:pointer-events-none disabled:opacity-40" aria-label="Next page"><ChevronRight size={14} /></button>
+          </div>}
+        </div>
+        <div className="overflow-hidden rounded-b-xl">
         {loading && !data ? <div className="space-y-3 p-4"><div className="h-16 animate-pulse rounded-lg bg-background" /><div className="h-16 animate-pulse rounded-lg bg-background" /></div>
-          : data?.items.length ? <div className="divide-y">{data.items.map((order) => <button type="button" onClick={() => setSelected(order)} key={order.id} className="block w-full p-4 text-left transition-colors hover:bg-background/70 sm:px-5">
+          : paginated.length ? <div className="divide-y">{paginated.map((order) => { const hint = actionHint(order, isAccounts); return <button type="button" onClick={() => setSelected(order)} key={order.id} className="block w-full p-4 text-left transition-colors hover:bg-background/70 sm:px-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0"><p className="text-sm font-semibold text-foreground">{order.orderNumber}</p><p className="mt-0.5 truncate text-xs text-muted">{order.client.salonName} · {new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(order.createdAt))}</p></div>
-              <div className="shrink-0 text-right"><p className="text-sm font-semibold text-foreground">{money(order.totalAmount)}</p><div className="mt-1"><OrderStatus value={order.status} /></div></div>
+              <div className="flex shrink-0 flex-col items-end gap-1"><p className="text-sm font-semibold text-foreground">{money(order.totalAmount)}</p><OrderStatus value={order.status} />{hint && <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${hint.tone === "warning" ? "bg-warning-soft text-warning" : "bg-brand-soft text-brand"}`}><Clock3 size={10} />{hint.label}</span>}</div>
             </div>
-            <p className="mt-2 text-xs text-muted">{order.items.map((item) => `${item.product.name} × ${item.quantity}`).join(", ")}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted"><span>{order.items.length} product{order.items.length === 1 ? "" : "s"}</span><span>Sales: {order.salesperson.name}</span>{order.reviewedBy && <span>Reviewed by {order.reviewedBy.name}</span>}</div>
-          </button>)}</div>
-          : <div className="px-5 py-14 text-center"><ShoppingCart className="mx-auto text-subtle" size={28} /><p className="mt-3 text-sm font-semibold text-foreground">No order drafts</p><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted">{isSales ? "Create a draft for a customer and submit it to Accounts when ready." : "Submitted drafts will appear here for review."}</p>{isSales && <Button className="mt-5" onClick={() => setBookingOpen(true)}><Plus size={15} />New draft</Button>}</div>}
-        {data && data.total > data.pageSize && <div className="flex items-center justify-between border-t px-4 py-3"><p className="text-xs text-muted">Page {data.page} of {Math.max(1, Math.ceil(data.total / data.pageSize))}</p><div className="flex gap-2"><Button variant="secondary" className="h-9 px-3" disabled={data.page <= 1 || loading} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={15} />Previous</Button><Button variant="secondary" className="h-9 px-3" disabled={!data.hasMore || loading} onClick={() => setPage((value) => value + 1)}>Next<ChevronRight size={15} /></Button></div></div>}
+          </button>; })}</div>
+          : <div className="px-5 py-14 text-center"><ShoppingCart className="mx-auto text-subtle" size={28} /><p className="mt-3 text-sm font-semibold text-foreground">No orders in this view</p><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted">{isSales ? "Create a draft for a customer and submit it to Accounts when ready." : "Orders will appear here as they move through this stage."}</p>{isSales && group === "DRAFTS" && <Button className="mt-5" onClick={() => setBookingOpen(true)}><Plus size={15} />New draft</Button>}</div>}
+        </div>
       </section>
     </div>
     {bookingOpen && <OrderBookingModal initialOrder={editing ?? undefined} onClose={() => { setBookingOpen(false); setEditing(null); }} onBooked={async () => { setBookingOpen(false); setEditing(null); await reload(); }} />}
@@ -82,13 +131,13 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
   </>;
 }
 
-
 function OrderDetailModal({ order, canReview, canSubmit, onEdit, onClose, onChanged }: { order: Order; canReview: boolean; canSubmit: boolean; onEdit: () => void; onClose: () => void; onChanged: (order: Order) => Promise<void> }) {
   const [comment, setComment] = useState(""); const [busy, setBusy] = useState(""); const [error, setError] = useState("");
   const transition = async (status: string) => { setBusy(status); setError(""); try { const response = await fetch(`/api/orders/${order.id}/status`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status, version: order.version, comment: comment.trim() || undefined }) }); const data = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(data, "Unable to update this order.")); setComment(""); await onChanged(data as Order); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to update this order."); } finally { setBusy(""); } };
   const generateInvoice = async () => { setBusy("INVOICE"); setError(""); try { const response = await fetch(`/api/billing/orders/${order.id}/invoice`, { method: "POST" }); const data = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(data, "Unable to generate invoice.")); const refreshed = await fetch(`/api/orders/${order.id}`, { cache: "no-store" }); await onChanged(await refreshed.json()); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to generate invoice."); } finally { setBusy(""); } };
-  return <div className="fixed inset-0 z-50 flex justify-end bg-foreground/35 backdrop-blur-[1px]" role="dialog" aria-modal="true"><div className="flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
-    <div className="flex items-start justify-between border-b px-5 py-4"><div><div className="flex items-center gap-2"><h2 className="text-base font-semibold text-foreground">{order.orderNumber}</h2><OrderStatus value={order.status} /></div><p className="mt-1 text-xs text-muted">{order.client.salonName} · {order.salesperson.name}</p></div><button onClick={onClose} className="grid size-9 place-items-center rounded-lg text-muted hover:bg-background"><X size={18} /></button></div>
+  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={`${order.orderNumber} details`}>
+    <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-32px)]">
+    <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><div><div className="flex items-center gap-2"><h2 className="text-base font-semibold text-foreground">{order.orderNumber}</h2><OrderStatus value={order.status} /></div><p className="mt-1 text-xs text-muted">{order.client.salonName} · Sales: {order.salesperson.name}{order.reviewedBy && ` · Reviewed by ${order.reviewedBy.name}`}</p></div><button onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-background"><X size={18} /></button></div>
     <div className="flex-1 space-y-5 overflow-y-auto p-5"><div className="overflow-hidden rounded-lg border"><div className="grid grid-cols-[1fr_auto_auto] gap-3 bg-background px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted"><span>Product</span><span>Qty</span><span>Amount</span></div>{order.items.map((item) => <div key={item.id} className="grid grid-cols-[1fr_auto_auto] gap-3 border-t px-3 py-3 text-sm"><div><p className="font-medium text-foreground">{item.product.name}</p><p className="text-xs text-muted">{item.product.sku} · GST {Number(item.gstRate)}%</p></div><span className="text-muted">{item.quantity}</span><span className="min-w-24 text-right font-medium text-foreground">{money(item.lineTotal)}</span></div>)}</div>
       <div className="ml-auto max-w-sm space-y-2 rounded-lg bg-background p-4 text-sm"><Row label="Subtotal" value={money(order.subtotal)} /><Row label="Discount" value={`− ${money(order.discountAmount)}`} /><Row label="Taxable" value={money(order.taxableAmount)} /><Row label={Number(order.igstAmount) > 0 ? "IGST" : "CGST + SGST"} value={money(order.taxAmount)} /><div className="flex justify-between border-t pt-2 font-semibold text-foreground"><span>Grand total</span><span>{money(order.totalAmount)}</span></div></div>
       {(order.notes || order.reviewComment) && <div className="grid gap-3 sm:grid-cols-2">{order.notes && <Note label="Sales notes" value={order.notes} />}{order.reviewComment && <Note label="Review comment" value={order.reviewComment} />}</div>}

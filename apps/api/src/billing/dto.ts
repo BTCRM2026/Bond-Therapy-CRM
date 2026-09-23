@@ -28,6 +28,8 @@ export class UpdateBillingSettingsDto {
   @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(100) maxSalesDiscountPercent!: number;
   @IsOptional() @IsString() @MaxLength(2000) invoiceTerms?: string;
   @IsOptional() @IsString() @MaxLength(500) footerNote?: string;
+  @IsOptional() @IsString() @MaxLength(160) accountManagerName?: string;
+  @IsOptional() @IsString() @MaxLength(80) accountManagerTitle?: string;
 }
 
 export class ListInvoicesDto {

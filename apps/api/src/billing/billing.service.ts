@@ -23,15 +23,47 @@ export class BillingService {
 
   getSettings(actor: SessionUser) {
     if (!this.isAdmin(actor)) throw new ForbiddenException('Billing settings are restricted to the administrator.');
-    return this.prisma.billingSettings.upsert({ where: { id: 'default' }, create: { id: 'default' }, update: {} });
+    return this.prisma.billingSettings.upsert({ where: { id: 'default' }, create: { id: 'default' }, update: {}, omit: { logo: true, signature: true } });
   }
 
   async updateSettings(actor: SessionUser, dto: UpdateBillingSettingsDto, ipAddress?: string) {
     if (!this.isAdmin(actor)) throw new ForbiddenException('Billing settings are restricted to the administrator.');
     const clean = Object.fromEntries(Object.entries(dto).map(([key, value]) => [key, typeof value === 'string' ? value.trim() || null : value]));
-    const updated = await this.prisma.billingSettings.upsert({ where: { id: 'default' }, create: { id: 'default', ...clean, legalName: dto.legalName.trim(), tradeName: dto.tradeName.trim(), invoicePrefix: dto.invoicePrefix.trim().toUpperCase(), updatedById: actor.id }, update: { ...clean, legalName: dto.legalName.trim(), tradeName: dto.tradeName.trim(), invoicePrefix: dto.invoicePrefix.trim().toUpperCase(), updatedById: actor.id } });
+    const updated = await this.prisma.billingSettings.upsert({ where: { id: 'default' }, create: { id: 'default', ...clean, legalName: dto.legalName.trim(), tradeName: dto.tradeName.trim(), invoicePrefix: dto.invoicePrefix.trim().toUpperCase(), updatedById: actor.id }, update: { ...clean, legalName: dto.legalName.trim(), tradeName: dto.tradeName.trim(), invoicePrefix: dto.invoicePrefix.trim().toUpperCase(), updatedById: actor.id }, omit: { logo: true, signature: true } });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'BILLING_SETTINGS_UPDATED', entity: 'BILLING_SETTINGS', entityId: updated.id, details: { invoicePrefix: updated.invoicePrefix, defaultGstRate: updated.defaultGstRate.toString(), paymentTerms: updated.defaultPaymentTermsDays }, ipAddress });
     return updated;
+  }
+
+  private ensureImage(file: { mimetype: string }) {
+    if (!['image/png', 'image/jpeg'].includes(file.mimetype)) throw new ConflictException('Upload a PNG or JPG image.');
+  }
+
+  async uploadLogo(actor: SessionUser, file: { buffer: Buffer; mimetype: string }) {
+    if (!this.isAdmin(actor)) throw new ForbiddenException('Billing settings are restricted to the administrator.');
+    this.ensureImage(file);
+    await this.prisma.billingSettings.upsert({ where: { id: 'default' }, create: { id: 'default', logo: file.buffer, logoMime: file.mimetype }, update: { logo: file.buffer, logoMime: file.mimetype } });
+    return { uploaded: true };
+  }
+
+  async logoAsset(actor: SessionUser) {
+    if (!this.isAdmin(actor)) throw new ForbiddenException('Billing settings are restricted to the administrator.');
+    const settings = await this.prisma.billingSettings.findUnique({ where: { id: 'default' }, select: { logo: true, logoMime: true } });
+    if (!settings?.logo || !settings.logoMime) throw new NotFoundException('No logo uploaded.');
+    return { buffer: Buffer.from(settings.logo), mime: settings.logoMime };
+  }
+
+  async uploadSignature(actor: SessionUser, file: { buffer: Buffer; mimetype: string }) {
+    if (!this.isAdmin(actor)) throw new ForbiddenException('Billing settings are restricted to the administrator.');
+    this.ensureImage(file);
+    await this.prisma.billingSettings.upsert({ where: { id: 'default' }, create: { id: 'default', signature: file.buffer, signatureMime: file.mimetype }, update: { signature: file.buffer, signatureMime: file.mimetype } });
+    return { uploaded: true };
+  }
+
+  async signatureAsset(actor: SessionUser) {
+    if (!this.isAdmin(actor)) throw new ForbiddenException('Billing settings are restricted to the administrator.');
+    const settings = await this.prisma.billingSettings.findUnique({ where: { id: 'default' }, select: { signature: true, signatureMime: true } });
+    if (!settings?.signature || !settings.signatureMime) throw new NotFoundException('No signature uploaded.');
+    return { buffer: Buffer.from(settings.signature), mime: settings.signatureMime };
   }
 
   async list(actor: SessionUser, query: ListInvoicesDto) {
@@ -101,6 +133,8 @@ export class BillingService {
 
   async pdf(actor: SessionUser, id: string) {
     const invoice = await this.detail(actor, id);
-    return { filename: `${invoice.invoiceNumber.replaceAll('/', '-')}.pdf`, buffer: await renderInvoicePdf(invoice) };
+    const settings = await this.prisma.billingSettings.findUnique({ where: { id: 'default' }, select: { logo: true, logoMime: true, signature: true, signatureMime: true, accountManagerName: true, accountManagerTitle: true } });
+    const branding = settings ? { logo: settings.logo ? Buffer.from(settings.logo) : undefined, signature: settings.signature ? Buffer.from(settings.signature) : undefined, accountManagerName: settings.accountManagerName, accountManagerTitle: settings.accountManagerTitle } : undefined;
+    return { filename: `${invoice.invoiceNumber.replaceAll('/', '-')}.pdf`, buffer: await renderInvoicePdf(invoice, branding) };
   }
 }
