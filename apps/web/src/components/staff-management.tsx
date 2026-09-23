@@ -149,7 +149,7 @@ function Status({ value }: { value: StaffUser["status"] }) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone}`}>{pretty(value)}</span>;
 }
 
-const lastLogin = (value: string | null) => value ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "Never";
+const lastLogin = (value: string | null) => value ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(value)) : "Never";
 
 type StaffActionsProps = { user: StaffUser; busy: boolean; onEdit: () => void; onPassword: () => void; onStatus: () => void; onDelete: () => void };
 
