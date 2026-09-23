@@ -96,7 +96,7 @@ export class ClientsService {
     const assignedSalespersonId = this.isAdmin(actor) ? dto.assignedSalespersonId?.trim() || null : trainer ? null : actor.id;
     const assignedTrainerId = this.isAdmin(actor) ? dto.assignedTrainerId?.trim() || null : trainer ? actor.id : null;
     if (assignedSalespersonId) {
-      const salesperson = await this.prisma.user.findFirst({ where: { id: assignedSalespersonId, status: 'ACTIVE', roles: { some: { role: { key: { in: ['SALES_MANAGER', 'SALES_EXECUTIVE'], isActive: true } } } } }, select: { id: true } });
+      const salesperson = await this.prisma.user.findFirst({ where: { id: assignedSalespersonId, status: 'ACTIVE', roles: { some: { role: { key: { in: ['SALES_MANAGER', 'SALES_EXECUTIVE'] }, isActive: true } } } }, select: { id: true } });
       if (!salesperson) throw new ForbiddenException('Select an active sales team member.');
     }
     if (assignedTrainerId) {
