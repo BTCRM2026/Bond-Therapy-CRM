@@ -17,6 +17,10 @@ import { WarehouseModule } from './warehouse/warehouse.module.js';
 import { IncentivesModule } from './incentives/incentives.module.js';
 import { AttendanceModule } from './attendance/attendance.module.js';
 import { BillingModule } from './billing/billing.module.js';
+import { TerritoryModule } from './territory/territory.module.js';
+import { RoutesModule } from './routes/routes.module.js';
+import { TargetsModule } from './targets/targets.module.js';
+import { IncentiveRulesModule } from './incentive-rules/incentive-rules.module.js';
 
 @Module({
   imports: [
@@ -37,6 +41,10 @@ import { BillingModule } from './billing/billing.module.js';
     IncentivesModule,
     AttendanceModule,
     BillingModule,
+    TerritoryModule,
+    RoutesModule,
+    TargetsModule,
+    IncentiveRulesModule,
   ],
   controllers: [AppController],
 })

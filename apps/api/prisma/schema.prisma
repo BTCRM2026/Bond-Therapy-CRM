@@ -92,6 +92,13 @@ model User {
   attendanceRecords        AttendanceRecord[]   @relation("AttendanceOwner")
   incentiveStatements      IncentiveStatement[] @relation("IncentiveOwner")
   incentivesApproved       IncentiveStatement[] @relation("IncentiveApprover")
+  beatsAssigned            Beat[]               @relation("BeatAssignedStaff")
+  routes                   Route[]              @relation("RouteStaff")
+  routeChangesMade         RouteChangeLog[]     @relation("RouteChangeActor")
+  targetsCreated           Target[]             @relation("TargetCreator")
+  incentiveRulesCreated    IncentiveRule[]       @relation("IncentiveRuleCreator")
+  incentiveCalculations    IncentiveCalculation[] @relation("IncentiveCalcOwner")
+  incentiveCalcsApproved   IncentiveCalculation[] @relation("IncentiveCalcApprover")
 
   @@index([department])
   @@index([managerId])
@@ -308,6 +315,8 @@ model Client {
   purchasingFrequency       String?
   territory                 String?
   routeBeat                 String?
+  beatId                    String?
+  beat                      Beat?            @relation(fields: [beatId], references: [id], onDelete: SetNull)
   businessPotentialRating   Int?
   relationshipRating        Int?
   paymentBehaviourRating    Int?
@@ -328,6 +337,7 @@ model Client {
   leadSource                Lead?            @relation("LeadConversion")
   orders                    Order[]
   invoices                  Invoice[]
+  routeStops                RouteStop[]
 
   @@index([assignedSalespersonId, status])
   @@index([assignedTrainerId, status])
@@ -337,6 +347,19 @@ model Client {
   @@index([salonName])
   @@index([primaryContact])
   @@index([updatedAt])
+  @@index([beatId])
+}
+
+enum VisitOutcome {
+  PRODUCTIVE
+  ORDER_GENERATED
+  QUOTATION_REQUIRED
+  FOLLOW_UP_REQUIRED
+  OWNER_UNAVAILABLE
+  CLOSED
+  NOT_INTERESTED
+  RESCHEDULED
+  OTHER
 }
 
 model ClientActivity {
@@ -354,11 +377,18 @@ model ClientActivity {
   attendeeCount     Int?
   requestedProducts Json?
   outcome           DemoOutcome?
+  routeStopId       String?              @unique
+  checkInAt         DateTime?
+  checkOutAt        DateTime?
+  visitOutcome      VisitOutcome?
+  sampleGiven       Boolean              @default(false)
+  nextAction        String?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
   client            Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdBy         User                 @relation("ClientActivityCreator", fields: [createdById], references: [id], onDelete: Restrict)
   assignedTo        User?                @relation("ClientActivityAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  routeStop         RouteStop?           @relation(fields: [routeStopId], references: [id], onDelete: SetNull)
 
   @@index([clientId, createdAt])
   @@index([clientId, status, scheduledAt])
@@ -804,6 +834,292 @@ enum NotificationSeverity {
   INFO
   WARNING
   CRITICAL
+}
+
+model Region {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  code        String?     @unique
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  states      State[]
+  territories Territory[]
+}
+
+model State {
+  id          String      @id @default(cuid())
+  name        String
+  regionId    String
+  region      Region      @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  cities      City[]
+  territories Territory[]
+
+  @@unique([regionId, name])
+  @@index([regionId])
+}
+
+model City {
+  id          String      @id @default(cuid())
+  name        String
+  stateId     String
+  state       State       @relation(fields: [stateId], references: [id], onDelete: Restrict)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  territories Territory[]
+
+  @@unique([stateId, name])
+  @@index([stateId])
+}
+
+model Territory {
+  id        String   @id @default(cuid())
+  name      String
+  regionId  String
+  region    Region   @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  stateId   String
+  state     State    @relation(fields: [stateId], references: [id], onDelete: Restrict)
+  cityId    String
+  city      City     @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  beats     Beat[]
+
+  @@unique([cityId, name])
+  @@index([regionId])
+  @@index([stateId])
+  @@index([cityId])
+}
+
+model Beat {
+  id                 String    @id @default(cuid())
+  name               String
+  territoryId        String
+  territory          Territory @relation(fields: [territoryId], references: [id], onDelete: Restrict)
+  assignedStaffId    String?
+  assignedStaff      User?     @relation("BeatAssignedStaff", fields: [assignedStaffId], references: [id], onDelete: SetNull)
+  visitFrequencyDays Int?
+  preferredVisitDays Json?
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  clients            Client[]
+
+  @@unique([territoryId, name])
+  @@index([territoryId])
+  @@index([assignedStaffId])
+}
+
+enum RouteStatus {
+  DRAFT
+  PLANNED
+  IN_PROGRESS
+  PARTIALLY_COMPLETED
+  COMPLETED
+  CANCELLED
+}
+
+enum RouteStopStatus {
+  PLANNED
+  VISITED
+  UNABLE_TO_MEET
+  RESCHEDULED
+  REMOVED
+}
+
+enum RouteChangeType {
+  ADDED
+  REMOVED
+  REORDERED
+  RESCHEDULED
+  STATUS_CHANGE
+}
+
+model Route {
+  id        String      @id @default(cuid())
+  staffId   String
+  staff     User        @relation("RouteStaff", fields: [staffId], references: [id], onDelete: Cascade)
+  routeDate DateTime    @db.Date
+  status    RouteStatus @default(DRAFT)
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  stops     RouteStop[]
+  changes   RouteChangeLog[]
+
+  @@unique([staffId, routeDate])
+  @@index([staffId, routeDate])
+  @@index([status])
+}
+
+model RouteStop {
+  id          String          @id @default(cuid())
+  routeId     String
+  route       Route           @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  sequence    Int
+  plannedTime DateTime?
+  status      RouteStopStatus @default(PLANNED)
+  note        String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  activity    ClientActivity?
+
+  @@index([routeId])
+  @@index([clientId])
+}
+
+model RouteChangeLog {
+  id            String          @id @default(cuid())
+  routeId       String
+  route         Route           @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  changedById   String
+  changedBy     User            @relation("RouteChangeActor", fields: [changedById], references: [id], onDelete: Restrict)
+  changeType    RouteChangeType
+  clientId      String?
+  reason        String?
+  previousValue Json?
+  newValue      Json?
+  createdAt     DateTime        @default(now())
+
+  @@index([routeId, createdAt])
+}
+
+enum TargetScope {
+  STAFF
+  TERRITORY
+  REGION
+}
+
+enum TargetMetric {
+  REVENUE
+  COLLECTION
+  NEW_ACTIVE_SALONS
+  VISITS
+  PRODUCTIVE_VISITS
+  CALLS
+  FOLLOW_UPS
+}
+
+enum TargetPeriod {
+  MONTHLY
+  QUARTERLY
+}
+
+model Target {
+  id          String       @id @default(cuid())
+  scope       TargetScope
+  scopeId     String
+  metric      TargetMetric
+  period      TargetPeriod
+  periodYear  Int
+  periodIndex Int
+  targetValue Decimal      @db.Decimal(12, 2)
+  createdById String
+  createdBy   User         @relation("TargetCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([scope, scopeId, metric, period, periodYear, periodIndex])
+  @@index([scope, scopeId])
+  @@index([period, periodYear, periodIndex])
+}
+
+enum IncentiveSourceType {
+  INVOICE
+  PAYMENT
+  ORDER
+}
+
+enum IncentiveCalcType {
+  PERCENT
+  FIXED
+  SLAB
+}
+
+enum IncentiveRuleStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum IncentiveCalcStatus {
+  CALCULATED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model IncentiveRule {
+  id          String                 @id @default(cuid())
+  name        String
+  description String?
+  createdById String
+  createdBy   User                   @relation("IncentiveRuleCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  versions    IncentiveRuleVersion[]
+}
+
+model IncentiveRuleVersion {
+  id                        String              @id @default(cuid())
+  ruleId                    String
+  rule                      IncentiveRule       @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  versionNumber             Int
+  sourceType                IncentiveSourceType
+  calcType                  IncentiveCalcType
+  percent                   Decimal?            @db.Decimal(5, 2)
+  fixedAmount               Decimal?            @db.Decimal(12, 2)
+  slabs                     Json?
+  roleEligibility           Json?
+  territoryEligibility      Json?
+  productCategoryEligibility Json?
+  minThreshold              Decimal?            @db.Decimal(12, 2)
+  maxThreshold              Decimal?            @db.Decimal(12, 2)
+  effectiveFrom             DateTime
+  effectiveUntil            DateTime?
+  requiresApproval          Boolean             @default(true)
+  status                    IncentiveRuleStatus @default(ACTIVE)
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  calculations              IncentiveCalculation[]
+
+  @@unique([ruleId, versionNumber])
+  @@index([ruleId])
+}
+
+model IncentiveCalculation {
+  id             String               @id @default(cuid())
+  ruleVersionId  String
+  ruleVersion    IncentiveRuleVersion @relation(fields: [ruleVersionId], references: [id], onDelete: Restrict)
+  userId         String
+  user           User                 @relation("IncentiveCalcOwner", fields: [userId], references: [id], onDelete: Cascade)
+  sourceType     IncentiveSourceType
+  sourceId       String
+  sourceReference String
+  sourceDate     DateTime
+  eligibleAmount Decimal              @db.Decimal(12, 2)
+  calculation    Json
+  incentiveAmount Decimal             @db.Decimal(12, 2)
+  status         IncentiveCalcStatus  @default(PENDING_APPROVAL)
+  approvedById   String?
+  approvedBy     User?                @relation("IncentiveCalcApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt     DateTime?
+  rejectedReason String?
+  paidAt         DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([ruleVersionId, sourceType, sourceId])
+  @@index([userId, status])
+  @@index([ruleVersionId])
 }
 
 model Notification {

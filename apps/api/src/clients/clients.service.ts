@@ -207,13 +207,16 @@ export class ClientsService {
       where: this.visibility(actor),
       select: {
         id: true, salonName: true, city: true, area: true, territory: true, routeBeat: true, potential: true, status: true,
-        activities: { where: { type: 'VISIT' }, orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
+        beat: { select: { id: true, name: true, visitFrequencyDays: true } },
+        activities: { where: { type: 'VISIT', status: 'COMPLETED' }, orderBy: { checkOutAt: 'desc' }, take: 1, select: { checkOutAt: true, completedAt: true } },
       },
       orderBy: { salonName: 'asc' },
     });
     return clients.map((client) => ({
-      id: client.id, salonName: client.salonName, city: client.city, area: client.area, territory: client.territory, routeBeat: client.routeBeat,
-      potential: client.potential, status: client.status, lastVisitAt: client.activities[0]?.createdAt ?? null,
+      id: client.id, salonName: client.salonName, city: client.city, area: client.area,
+      territory: client.beat?.name ?? client.territory, routeBeat: client.routeBeat,
+      beatId: client.beat?.id ?? null, visitFrequencyDays: client.beat?.visitFrequencyDays ?? null,
+      potential: client.potential, status: client.status, lastVisitAt: client.activities[0]?.checkOutAt ?? client.activities[0]?.completedAt ?? null,
     }));
   }
 }

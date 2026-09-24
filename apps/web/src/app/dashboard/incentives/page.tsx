@@ -9,5 +9,5 @@ export default async function IncentivesPage() {
   const session = await requireSession("STAFF");
   const roleKey = session.roles[0]?.key ?? "";
   if (!SALES_ROLE_KEYS.has(roleKey)) redirect("/dashboard/access-denied");
-  return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} roleKey={roleKey} headerTitle="Incentives" headerSubtitle="Commission estimate and approval status" portal="STAFF"><IncentivesModule isManager={roleKey === "SALES_MANAGER"} /></DashboardShell>;
+  return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} roleKey={roleKey} headerTitle="Incentives" headerSubtitle="Commission calculations and approval status" portal="STAFF"><IncentivesModule isManager={roleKey === "SALES_MANAGER"} currentUserId={session.id} /></DashboardShell>;
 }

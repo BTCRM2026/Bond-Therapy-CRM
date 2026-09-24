@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Building2, CalendarClock, Clock3, FileCheck2, IndianRupee, LayoutDashboard, ListChecks, MapPin, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, Clock3, FileCheck2, IndianRupee, LayoutDashboard, ListChecks, MapPin, Navigation, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
@@ -34,6 +34,7 @@ function staffGroups(roleKey?: string) {
   ];
   const planning = isSales ? [
     { href: "/dashboard/territory", label: "Territory", icon: MapPin, exact: false },
+    { href: "/dashboard/route", label: "My Route", icon: Navigation, exact: false },
     { href: "/dashboard/performance", label: "Performance", icon: TrendingUp, exact: false },
     { href: "/dashboard/incentives", label: "Incentives", icon: IndianRupee, exact: false },
     { href: "/dashboard/attendance", label: "Attendance", icon: Clock3, exact: false },
@@ -52,6 +53,9 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
     ...(canManageStaff ? [{ href: "/dashboard/staff", label: "Staff & Access", icon: UsersRound, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/products", label: "Products", icon: Package, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/orders", label: "Order approvals", icon: FileCheck2, exact: false }, { href: "/dashboard/invoices", label: "Invoices & payments", icon: ReceiptText, exact: false }] : []),
+    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/territory-admin", label: "Territory & Route", icon: MapPin, exact: false }] : []),
+    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/targets", label: "Target & Performance", icon: TrendingUp, exact: false }] : []),
+    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/incentive-rules", label: "Incentives", icon: IndianRupee, exact: false }] : []),
   ];
   const groups = portal === "ADMIN" ? [
     { label: "Overview", items: [

@@ -1,16 +1,72 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { IncentiveCalcStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { SessionUser } from '../common/session.util.js';
 
 const EXPIRY_WINDOW_DAYS = 30;
+const DEFAULT_VISIT_FREQUENCY_DAYS = 14;
+const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 
 @Injectable()
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async refresh(user: SessionUser) {
-    if (user.portal !== 'ADMIN' || !user.roles.some((role) => role.key === 'SUPER_ADMIN')) return;
-    await Promise.all([this.refreshExpiringAgreements(user), this.refreshLockedAccounts(user)]);
+    const isAdmin = user.portal === 'ADMIN' && user.roles.some((role) => role.key === 'SUPER_ADMIN');
+    const isManager = user.portal === 'STAFF' && user.roles.some((role) => role.key === 'SALES_MANAGER');
+    const isSales = user.portal === 'STAFF' && user.roles.some((role) => salesRoles.has(role.key));
+    if (isAdmin) {
+      await Promise.all([this.refreshExpiringAgreements(user), this.refreshLockedAccounts(user), this.refreshIncentivePendingApproval(user)]);
+    } else if (isSales) {
+      const tasks = [this.refreshOverdueVisits(user)];
+      if (isManager) tasks.push(this.refreshIncentivePendingApproval(user));
+      await Promise.all(tasks);
+    }
+  }
+
+  private async refreshOverdueVisits(user: SessionUser) {
+    const clients = await this.prisma.client.findMany({
+      where: { assignedSalespersonId: user.id, status: { not: 'INACTIVE' } },
+      select: {
+        id: true, salonName: true, beat: { select: { visitFrequencyDays: true } },
+        activities: { where: { type: 'VISIT', status: 'COMPLETED' }, orderBy: { checkOutAt: 'desc' }, take: 1, select: { checkOutAt: true } },
+      },
+    });
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const overdue = clients
+      .map((client) => {
+        const frequency = client.beat?.visitFrequencyDays ?? DEFAULT_VISIT_FREQUENCY_DAYS;
+        const lastVisit = client.activities[0]?.checkOutAt ?? null;
+        const daysSince = lastVisit ? Math.floor((now - lastVisit.getTime()) / dayMs) : null;
+        return { id: client.id, salonName: client.salonName, daysSince, isOverdue: daysSince === null || daysSince > frequency };
+      })
+      .filter((client) => client.isOverdue)
+      .sort((a, b) => (b.daysSince ?? 9999) - (a.daysSince ?? 9999))
+      .slice(0, 10);
+
+    for (const client of overdue) {
+      const message = client.daysSince == null ? `${client.salonName} has never been visited.` : `${client.salonName} is overdue for a visit — ${client.daysSince} days since last visit.`;
+      await this.prisma.notification.upsert({
+        where: { sourceKey: `overdue-visit:${client.id}:${user.id}` },
+        create: { type: 'OVERDUE_VISIT', severity: 'WARNING', title: 'Salon visit overdue', message, sourceKey: `overdue-visit:${client.id}:${user.id}`, portal: user.portal, recipientId: user.id },
+        update: { message },
+      });
+    }
+  }
+
+  private async refreshIncentivePendingApproval(user: SessionUser) {
+    const isAdmin = user.portal === 'ADMIN' && user.roles.some((role) => role.key === 'SUPER_ADMIN');
+    const pendingStatuses: IncentiveCalcStatus[] = ['CALCULATED', 'PENDING_APPROVAL'];
+    const where = isAdmin ? { status: { in: pendingStatuses } } : { status: { in: pendingStatuses }, user: { managerId: user.id } };
+    const count = await this.prisma.incentiveCalculation.count({ where });
+    if (count === 0) return;
+    const message = `${count} incentive calculation${count === 1 ? '' : 's'} waiting on your approval.`;
+    await this.prisma.notification.upsert({
+      where: { sourceKey: `incentive-pending:${user.id}` },
+      create: { type: 'INCENTIVE_PENDING_APPROVAL', severity: 'INFO', title: 'Incentives pending approval', message, sourceKey: `incentive-pending:${user.id}`, portal: user.portal, recipientId: user.id },
+      update: { message },
+    });
   }
 
   private async refreshExpiringAgreements(user: SessionUser) {
