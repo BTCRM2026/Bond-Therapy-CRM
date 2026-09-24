@@ -231,12 +231,32 @@ function CompleteVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; 
   const [sampleGiven, setSampleGiven] = useState(false);
   const [nextAction, setNextAction] = useState("");
   const [note, setNote] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationStatus, setLocationStatus] = useState("Locating…");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (!navigator.geolocation) { const timer = window.setTimeout(() => setLocationStatus("Location is not supported on this device."), 0); return () => window.clearTimeout(timer); }
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
+      setLocation({ latitude: coords.latitude, longitude: coords.longitude });
+      if (stop.client.latitude == null || stop.client.longitude == null) setLocationStatus("Salon location not set — GPS distance will be recorded without verification.");
+      else setLocationStatus("Location captured. The server will verify your distance from the salon.");
+    }, () => setLocationStatus("Allow location access to complete this visit."), { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 });
+  }, [stop.client.latitude, stop.client.longitude]);
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setSaving(true); setError("");
+    event.preventDefault(); if (!photo || !location) return; setSaving(true); setError("");
     try {
-      const response = await fetch(`/api/routes/${date}/stops/${stop.id}/complete`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ outcome, personMet: personMet || undefined, sampleGiven, nextAction: nextAction || undefined, note: note || undefined }) });
+      const form = new FormData();
+      form.append("photo", photo);
+      form.append("latitude", String(location.latitude));
+      form.append("longitude", String(location.longitude));
+      form.append("outcome", outcome);
+      if (personMet) form.append("personMet", personMet);
+      form.append("sampleGiven", sampleGiven ? "true" : "false");
+      if (nextAction) form.append("nextAction", nextAction);
+      if (note) form.append("note", note);
+      const response = await fetch(`/api/routes/${date}/stops/${stop.id}/complete`, { method: "POST", body: form });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(messageFrom(data, "Unable to record this visit."));
       await onDone();
@@ -244,13 +264,15 @@ function CompleteVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; 
   };
   return <Modal title="Complete visit" subtitle={stop.client.salonName} onClose={onClose}>
     <form onSubmit={submit} className="space-y-4">
+      <div className={`flex items-start gap-2 rounded-lg border p-3 text-xs ${location ? "border-success/20 bg-success-soft/50 text-success" : "border-warning/20 bg-warning-soft/50 text-warning"}`}><MapPin className="mt-0.5 shrink-0" size={15} /><span>{locationStatus}</span></div>
+      <label className="block cursor-pointer rounded-xl border border-dashed bg-background p-5 text-center hover:border-brand/40"><Camera className="mx-auto text-brand" size={24} /><span className="mt-2 block text-sm font-semibold text-foreground">{photo ? photo.name : "Take a check-out selfie"}</span><span className="mt-1 block text-xs text-muted">Live camera only — gallery photos aren&apos;t accepted.</span><input type="file" accept="image/jpeg,image/png,image/webp" capture="user" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} /></label>
       <Field label="Outcome *"><select value={outcome} onChange={(e) => setOutcome(e.target.value)} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{OUTCOMES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
       <Field label="Person met"><Input value={personMet} onChange={(e) => setPersonMet(e.target.value)} maxLength={120} placeholder="e.g. Owner, Manager" /></Field>
       <label className="flex items-center gap-2.5 rounded-lg border bg-background px-3 py-2.5"><input type="checkbox" checked={sampleGiven} onChange={(e) => setSampleGiven(e.target.checked)} className="size-4 accent-[var(--brand)]" /><span className="text-xs font-medium text-foreground">Sample given during this visit</span></label>
       <Field label="Next action"><Input value={nextAction} onChange={(e) => setNextAction(e.target.value)} maxLength={300} placeholder="e.g. Send quotation by Friday" /></Field>
       <Field label="Notes"><textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} rows={3} className="w-full resize-y rounded-lg border bg-white px-3 py-2.5 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10" /></Field>
       {error && <FormError message={error} />}
-      <FormActions saving={saving} onClose={onClose} label="Save visit" />
+      <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving || !photo || !location}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Saving…" : "Complete visit"}</Button></div>
     </form>
   </Modal>;
 }
@@ -279,7 +301,7 @@ function StartVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; dat
   };
   return <Modal title="Start visit" subtitle={stop.client.salonName} onClose={onClose}><form onSubmit={submit} className="space-y-4">
     <div className={`flex items-start gap-2 rounded-lg border p-3 text-xs ${location ? "border-success/20 bg-success-soft/50 text-success" : "border-warning/20 bg-warning-soft/50 text-warning"}`}><MapPin className="mt-0.5 shrink-0" size={15} /><span>{locationStatus}</span></div>
-    <label className="block cursor-pointer rounded-xl border border-dashed bg-background p-5 text-center hover:border-brand/40"><Camera className="mx-auto text-brand" size={24} /><span className="mt-2 block text-sm font-semibold text-foreground">{photo ? photo.name : "Capture check-in photo"}</span><span className="mt-1 block text-xs text-muted">Use the live camera at the salon entrance.</span><input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} /></label>
+    <label className="block cursor-pointer rounded-xl border border-dashed bg-background p-5 text-center hover:border-brand/40"><Camera className="mx-auto text-brand" size={24} /><span className="mt-2 block text-sm font-semibold text-foreground">{photo ? photo.name : "Take a check-in selfie"}</span><span className="mt-1 block text-xs text-muted">Live camera only — gallery photos aren&apos;t accepted.</span><input type="file" accept="image/jpeg,image/png,image/webp" capture="user" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} /></label>
     {error && <FormError message={error} />}
     <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving || !photo || !location}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Starting…" : "Start visit"}</Button></div>
   </form></Modal>;

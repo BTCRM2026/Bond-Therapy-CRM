@@ -28,7 +28,7 @@ export function WarehouseDashboardWidgets() {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /></div>;
+  if (loading) return <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /></div>;
   if (!data) return null;
 
   return <div className="space-y-5">

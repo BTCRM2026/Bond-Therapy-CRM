@@ -33,7 +33,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
   const [notice, setNotice] = useState("");
   const [error, setError] = useState(initial ? "" : "Products could not be loaded. Check the API connection and try again.");
 
-  useEffect(() => { const frame = requestAnimationFrame(() => setHeaderSlot(document.getElementById("page-header-actions"))); return () => cancelAnimationFrame(frame); }, []);
+  useEffect(() => { const sync = () => setHeaderSlot(document.getElementById("page-header-actions")); sync(); const frame = requestAnimationFrame(sync); return () => cancelAnimationFrame(frame); }, []);
 
   const reload = async () => {
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
@@ -86,7 +86,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
       {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
       {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add product</span><span className="sr-only sm:hidden">Add product</span></Button>, headerSlot)}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-5">
         <KpiCard icon={Package} label="Total products" value={stats?.totalProducts ?? "—"} detail="Active catalogue" />
         <KpiCard icon={PackageCheck} label="In stock" value={stats?.inStock ?? "—"} detail="Above reorder level" tone="success" />
         <KpiCard icon={AlertTriangle} label="Low stock" value={stats?.lowStock ?? "—"} detail="Reorder soon" tone="warning" />

@@ -32,7 +32,7 @@ export function LeadsModule({ initial }: { initial: LeadListResponse | null }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(initial ? "" : "Unable to load leads. Please try again.");
 
-  useEffect(() => { const frame = requestAnimationFrame(() => setHeaderSlot(document.getElementById("page-header-actions"))); return () => cancelAnimationFrame(frame); }, []);
+  useEffect(() => { const sync = () => setHeaderSlot(document.getElementById("page-header-actions")); sync(); const frame = requestAnimationFrame(sync); return () => cancelAnimationFrame(frame); }, []);
   useEffect(() => {
     const timer = setTimeout(async () => {
       setLoading(true);

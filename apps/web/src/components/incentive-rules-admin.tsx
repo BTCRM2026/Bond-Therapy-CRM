@@ -119,7 +119,7 @@ export function IncentiveRulesAdmin() {
     </div>}
 
     {tab === "approvals" && <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <KpiCard icon={IndianRupee} label="Pending" value={money(totals.pending)} tone="warning" />
         <KpiCard icon={IndianRupee} label="Approved (unpaid)" value={money(totals.approved)} tone="brand" />
         <KpiCard icon={IndianRupee} label="Paid" value={money(totals.paid)} tone="success" />

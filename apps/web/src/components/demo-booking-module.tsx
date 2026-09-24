@@ -36,7 +36,7 @@ export function DemoBookingModule() {
   const [outcomeTarget, setOutcomeTarget] = useState<Demo | null>(null);
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
 
-  useEffect(() => { const frame = requestAnimationFrame(() => setHeaderSlot(document.getElementById("page-header-actions"))); return () => cancelAnimationFrame(frame); }, []);
+  useEffect(() => { const sync = () => setHeaderSlot(document.getElementById("page-header-actions")); sync(); const frame = requestAnimationFrame(sync); return () => cancelAnimationFrame(frame); }, []);
 
   const reload = async () => {
     setLoading(true);

@@ -110,11 +110,11 @@ export class ClientsService {
     return { assignedSalespersonId, assignedTrainerId };
   }
 
-  private data(dto: ClientDto, assignments: { assignedSalespersonId: string | null; assignedTrainerId: string | null }) {
+  private data(dto: ClientDto, assignments: { assignedSalespersonId: string | null; assignedTrainerId: string | null }, locationStamp?: { locationSetAt: Date; locationSetById: string }) {
     return {
       salonName: dto.salonName.trim(), category: dto.category, status: dto.status ?? 'PROSPECT', ownerName: dto.ownerName?.trim() || null, managerName: dto.managerName?.trim() || null,
       primaryContact: dto.primaryContact.trim(), whatsappNumber: dto.whatsappNumber?.trim() || null, email: dto.email?.trim().toLowerCase() || null, keyProfessional: dto.keyProfessional?.trim() || null,
-      fullAddress: dto.fullAddress?.trim() || null, billingName: dto.billingName?.trim() || null, gstin: dto.gstin?.trim().toUpperCase() || null, state: dto.state?.trim() || null, stateCode: dto.stateCode?.trim() || null, area: dto.area?.trim() || null, city: dto.city.trim(), pincode: dto.pincode?.trim() || null, googleMapsUrl: dto.googleMapsUrl?.trim() || null, latitude: dto.latitude, longitude: dto.longitude,
+      fullAddress: dto.fullAddress?.trim() || null, billingName: dto.billingName?.trim() || null, gstin: dto.gstin?.trim().toUpperCase() || null, state: dto.state?.trim() || null, stateCode: dto.stateCode?.trim() || null, area: dto.area?.trim() || null, city: dto.city.trim(), pincode: dto.pincode?.trim() || null, googleMapsUrl: dto.googleMapsUrl?.trim() || null, latitude: dto.latitude, longitude: dto.longitude, ...locationStamp,
       chairCount: dto.chairCount, staffCount: dto.staffCount, stylistCount: dto.stylistCount, approximateDailyCustomers: dto.approximateDailyCustomers, potential: dto.potential, customerSegment: dto.customerSegment,
       estimatedMonthlyBusiness: dto.estimatedMonthlyBusiness, purchasingFrequency: dto.purchasingFrequency?.trim() || null, territory: dto.territory?.trim() || null, routeBeat: dto.routeBeat?.trim() || null,
       businessPotentialRating: dto.businessPotentialRating, relationshipRating: dto.relationshipRating, paymentBehaviourRating: dto.paymentBehaviourRating, productOpportunityRating: dto.productOpportunityRating, overallRating: dto.overallRating,
@@ -131,7 +131,8 @@ export class ClientsService {
     const duplicates = await this.possibleDuplicates(actor, dto);
     if (duplicates.length && !dto.continueOnDuplicate) throw new ConflictException({ message: 'Possible existing salon found. Review it before continuing.', candidates: duplicates });
     const assignments = await this.validateAssignments(actor, dto);
-    const client = await this.prisma.client.create({ data: { ...this.data(dto, assignments), createdById: actor.id }, include: clientInclude });
+    const locationStamp = dto.latitude != null && dto.longitude != null ? { locationSetAt: new Date(), locationSetById: actor.id } : undefined;
+    const client = await this.prisma.client.create({ data: { ...this.data(dto, assignments, locationStamp), createdById: actor.id }, include: clientInclude });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'CLIENT_CREATE', entity: 'CLIENT', entityId: client.id, details: { salonName: client.salonName }, ipAddress });
     return client;
   }
@@ -140,8 +141,12 @@ export class ClientsService {
     const existing = await this.getVisible(actor, id);
     if (!this.isAdmin(actor) && dto.assignedSalespersonId !== undefined) throw new ForbiddenException('Salesperson assignment is managed by authorized administrators.');
     if (dto.version !== undefined && dto.version !== existing.version) throw new ConflictException('This salon changed since you opened it. Refresh before saving.');
+    const changingLocation = dto.latitude !== undefined || dto.longitude !== undefined;
+    const locationLocked = existing.latitude != null && existing.longitude != null;
+    if (changingLocation && locationLocked && !this.isAdmin(actor)) throw new ForbiddenException('This salon’s location is locked once set. Ask an administrator to update it.');
+    const locationStamp = changingLocation && dto.latitude != null && dto.longitude != null ? { locationSetAt: new Date(), locationSetById: actor.id } : undefined;
     const assignments = await this.validateAssignments(actor, dto);
-    const client = await this.prisma.client.update({ where: { id, version: existing.version }, data: { ...this.data(dto, assignments), version: { increment: 1 } }, include: clientInclude }).catch((error: unknown) => { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') throw new ConflictException('This salon changed since you opened it. Refresh before saving.'); throw error; });
+    const client = await this.prisma.client.update({ where: { id, version: existing.version }, data: { ...this.data(dto, assignments, locationStamp), version: { increment: 1 } }, include: clientInclude }).catch((error: unknown) => { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') throw new ConflictException('This salon changed since you opened it. Refresh before saving.'); throw error; });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'CLIENT_UPDATE', entity: 'CLIENT', entityId: id, details: { changes: dto }, ipAddress });
     return client;
   }

@@ -8,7 +8,7 @@ import { KpiCard } from "@/components/ui/kpi-card";
 type Assignment = {
   id: string; startDate: string; endDate: string | null; reason: string | null;
   assignedBy: { name: string } | null;
-  territory: { id: string; name: string; code: string | null; isActive: boolean; area: { id: string; name: string; city: { id: string; name: string; state: { id: string; name: string; region: { id: string; name: string } } } } };
+  territory: { id: string; name: string; code: string | null; isActive: boolean; region: { id: string; name: string }; state: { id: string; name: string }; area: { id: string; name: string; city: { id: string; name: string; state: { id: string; name: string }; region: { id: string; name: string } | null } } };
 };
 type MineResponse = { active: Assignment[]; assignments: Assignment[] };
 const date = (value: string) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(value));
@@ -28,7 +28,7 @@ export function TerritoryModule() {
   const summary = useMemo(() => {
     const active = data?.active ?? [];
     return {
-      regions: new Set(active.map((item) => item.territory.area.city.state.region.id)).size,
+      regions: new Set(active.map((item) => item.territory.region.id)).size,
       states: new Set(active.map((item) => item.territory.area.city.state.id)).size,
       cities: new Set(active.map((item) => item.territory.area.city.id)).size,
       areas: new Set(active.map((item) => item.territory.area.id)).size,
@@ -39,7 +39,7 @@ export function TerritoryModule() {
   if (!data) return <div className="space-y-3"><div className="h-24 animate-pulse rounded-xl bg-white" /><div className="h-56 animate-pulse rounded-xl bg-white" /></div>;
 
   return <div className="space-y-5">
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       <KpiCard icon={Map} label="Regions" value={summary.regions} detail="Active responsibility" />
       <KpiCard icon={MapPin} label="States" value={summary.states} detail="Assigned coverage" />
       <KpiCard icon={Route} label="Cities" value={summary.cities} detail="Assigned coverage" />
@@ -50,7 +50,7 @@ export function TerritoryModule() {
       <section className="overflow-hidden rounded-xl border bg-white">
         <div className="border-b px-4 py-3 sm:px-5"><h2 className="text-sm font-semibold text-foreground">My geographical responsibility</h2><p className="mt-0.5 text-xs text-muted">Read-only territory allocation managed by Admin</p></div>
         {data.active.length ? <div className="divide-y">{data.active.map((item) => <article key={item.id} className="px-4 py-4 sm:px-5">
-          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-semibold text-foreground">{item.territory.name}</p><p className="mt-1 text-xs text-muted">{item.territory.area.name} · {item.territory.area.city.name} · {item.territory.area.city.state.name} · {item.territory.area.city.state.region.name}</p></div><span className="shrink-0 rounded-full bg-success-soft px-2.5 py-1 text-[11px] font-semibold text-success">Active</span></div>
+          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-semibold text-foreground">{item.territory.name}</p><p className="mt-1 text-xs text-muted">{item.territory.state.name} → {item.territory.region.name} → {item.territory.area.city.name} → {item.territory.name}</p></div><span className="shrink-0 rounded-full bg-success-soft px-2.5 py-1 text-[11px] font-semibold text-success">Active</span></div>
           <p className="mt-3 flex items-center gap-1.5 text-xs text-muted"><CalendarDays size={13} />Effective from {date(item.startDate)}</p>
         </article>)}</div> : <div className="px-5 py-14 text-center"><MapPin className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">No active territory assigned</p><p className="mt-1 text-xs text-muted">Your administrator can allocate one or more territories.</p></div>}
       </section>

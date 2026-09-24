@@ -21,6 +21,7 @@ import { TerritoryModule } from './territory/territory.module.js';
 import { RoutesModule } from './routes/routes.module.js';
 import { TargetsModule } from './targets/targets.module.js';
 import { IncentiveRulesModule } from './incentive-rules/incentive-rules.module.js';
+import { TargetIncentiveModule } from './target-incentive/target-incentive.module.js';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { IncentiveRulesModule } from './incentive-rules/incentive-rules.module.j
     RoutesModule,
     TargetsModule,
     IncentiveRulesModule,
+    TargetIncentiveModule,
   ],
   controllers: [AppController],
 })

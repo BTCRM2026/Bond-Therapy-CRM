@@ -96,7 +96,7 @@ export function TargetsAdmin() {
 
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
 
-    {overview && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {overview && <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {METRICS.map((metric) => <KpiCard key={metric} icon={CURRENCY_METRICS.has(metric) ? IndianRupee : TrendingUp} label={METRIC_LABELS[metric]} value={format(metric, overview.metrics[metric] ?? 0)} />)}
       <KpiCard icon={TrendingUp} label="Lead conversion" value={overview.conversionRatePercent != null ? `${overview.conversionRatePercent}%` : "—"} detail={`${overview.leadsConverted} of ${overview.leadsCreated} leads`} />
     </div>}

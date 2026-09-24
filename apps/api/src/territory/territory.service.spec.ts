@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import { TerritoryService } from './territory.service.js';
@@ -24,5 +24,16 @@ describe('TerritoryService', () => {
     const service = new TerritoryService(prisma as unknown as PrismaService);
 
     await expect(service.mine(sales)).resolves.toEqual({ assignments, active: [assignments[0]] });
+  });
+
+  it('enforces one active territory per Sales staff member', async () => {
+    const prisma = {
+      user: { findFirst: vi.fn().mockResolvedValue({ id: 'sales-1', name: 'Sales User' }) },
+      territory: { findUnique: vi.fn().mockResolvedValue({ id: 'territory-2', isActive: true, region: { isActive: true }, area: { isActive: true, city: { isActive: true, state: { isActive: true } } } }) },
+      territoryAssignment: { findFirst: vi.fn().mockResolvedValue({ id: 'active-1', userId: 'sales-1' }) },
+    };
+    const service = new TerritoryService(prisma as unknown as PrismaService);
+
+    await expect(service.allocate(admin, { userId: 'sales-1', territoryId: 'territory-2', effectiveFrom: '2026-09-24' })).rejects.toBeInstanceOf(ConflictException);
   });
 });

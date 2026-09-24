@@ -105,7 +105,7 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
       {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
       {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add staff</span><span className="sr-only sm:hidden">Add staff</span></Button>, headerSlot)}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <KpiCard icon={UsersRound} label="Managed accounts" value={directory?.users.length ?? 0} />
         <KpiCard icon={UserRoundCheck} label="Active accounts" value={active} />
         <KpiCard icon={ShieldCheck} label="Approved roles" value={directory?.roles.length ?? 0} />

@@ -34,7 +34,7 @@ export function PerformanceModule() {
 
   return <div className="space-y-5">
     <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">{MONTHS[data.period.month - 1]} {data.period.year}</p>
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
       {data.metrics.map((metric) => <MetricCard key={metric.metric} metric={metric} />)}
     </div>
     {data.productMix.length > 0 && <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
@@ -50,11 +50,11 @@ export function PerformanceModule() {
 function MetricCard({ metric }: { metric: Metric }) {
   const label = METRIC_LABELS[metric.metric] ?? metric.metric;
   const percent = metric.target && metric.target > 0 ? Math.min(100, Math.round((metric.achieved / metric.target) * 100)) : null;
-  return <div className="crm-surface p-5">
-    <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">{label}</p>
+  return <div className="crm-surface p-3 sm:p-5">
+    <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.08em] text-muted sm:text-[11px] sm:tracking-[0.1em]">{label}</p>
     <div className="mt-2 flex items-baseline gap-1.5">
-      <p className="text-2xl font-bold tracking-[-0.02em] text-foreground">{format(metric.metric, metric.achieved)}</p>
-      {metric.target != null && <p className="text-sm text-muted">/ {format(metric.metric, metric.target)}</p>}
+      <p className="min-w-0 truncate text-xl font-bold tracking-[-0.02em] text-foreground sm:text-2xl">{format(metric.metric, metric.achieved)}</p>
+      {metric.target != null && <p className="hidden text-sm text-muted sm:block">/ {format(metric.metric, metric.target)}</p>}
     </div>
     {percent != null ? <>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-brand transition-[width] duration-300" style={{ width: `${percent}%` }} /></div>

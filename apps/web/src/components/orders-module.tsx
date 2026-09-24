@@ -55,7 +55,7 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
   const isSales = ["SALES_MANAGER", "SALES_EXECUTIVE"].includes(roleKey);
   const isAccounts = roleKey === "ACCOUNTS_BILLING" || roleKey === "SUPER_ADMIN";
 
-  useEffect(() => { const frame = requestAnimationFrame(() => setHeaderSlot(document.getElementById("page-header-actions"))); return () => cancelAnimationFrame(frame); }, []);
+  useEffect(() => { const sync = () => setHeaderSlot(document.getElementById("page-header-actions")); sync(); const frame = requestAnimationFrame(sync); return () => cancelAnimationFrame(frame); }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +94,7 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
     {headerSlot && isSales && createPortal(<Button onClick={() => { setEditing(null); setBookingOpen(true); }}><Plus size={16} /><span className="hidden sm:inline">New draft</span><span className="sr-only sm:hidden">New draft</span></Button>, headerSlot)}
     <div className="space-y-4">
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <KpiCard icon={FileText} label="Total orders" value={data?.items.length ?? 0} detail="All visible orders" />
         <KpiCard icon={Clock3} label="Needs review" value={counts(GROUPS[2].statuses)} detail="Needs Accounts action" tone="warning" />
         <KpiCard icon={FileCheck2} label="Approved" value={counts(APPROVED_ONWARD)} detail="Approved through delivery" tone="success" />

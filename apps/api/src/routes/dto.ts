@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsIn, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEnum, IsIn, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { VisitOutcome } from '@prisma/client';
 
 export class RouteStopInputDto {
@@ -24,8 +24,10 @@ export class CompleteVisitDto {
   @IsOptional() @IsString() @MaxLength(160) personMet?: string;
   @IsOptional() @IsString() @MaxLength(160) purpose?: string;
   @IsOptional() @IsString() @MaxLength(1000) note?: string;
-  @IsOptional() @IsBoolean() sampleGiven?: boolean;
+  @IsOptional() @IsIn(['true', 'false']) sampleGiven?: 'true' | 'false';
   @IsOptional() @IsString() @MaxLength(300) nextAction?: string;
+  @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude!: number;
+  @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude!: number;
 }
 
 export class StartVisitDto {

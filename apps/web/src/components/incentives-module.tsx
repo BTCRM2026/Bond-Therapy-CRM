@@ -54,7 +54,7 @@ export function IncentivesModule({ isManager, currentUserId }: { isManager: bool
   return <div className="space-y-5">
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
 
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       <KpiCard icon={IndianRupee} label="Pending approval" value={money(totals.pending)} tone="warning" />
       <KpiCard icon={IndianRupee} label="Approved" value={money(totals.approved)} tone="brand" />
       <KpiCard icon={IndianRupee} label="Paid" value={money(totals.paid)} tone="success" />

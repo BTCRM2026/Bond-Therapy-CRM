@@ -17,6 +17,7 @@ describe('RoutesService visit evidence', () => {
     const service = new RoutesService(prisma as unknown as PrismaService);
     const actor = { id: 'staff-1', portal: 'STAFF', roles: [{ key: 'SALES_EXECUTIVE' }] } as never;
 
-    await expect(service.completeVisit(actor, '2026-09-24', 'stop-1', { outcome: 'PRODUCTIVE' } as never)).rejects.toBeInstanceOf(BadRequestException);
+    const file = { buffer: Buffer.from('x'), mimetype: 'image/jpeg', size: 1 };
+    await expect(service.completeVisit(actor, '2026-09-24', 'stop-1', { outcome: 'PRODUCTIVE', latitude: 22.3, longitude: 73.2 } as never, file)).rejects.toBeInstanceOf(BadRequestException);
   });
 });

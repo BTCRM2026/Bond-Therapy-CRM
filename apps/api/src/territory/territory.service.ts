@@ -10,7 +10,7 @@ const beatInclude = { assignedStaff: { select: { id: true, name: true } }, _coun
 const assignmentInclude = {
   user: { select: { id: true, name: true, status: true } },
   assignedBy: { select: { id: true, name: true } },
-  territory: { include: { area: { include: { city: { include: { state: { include: { region: true } } } } } } } },
+  territory: { include: { area: { include: { city: { include: { state: true, region: true } } } }, region: true, state: true } },
 } satisfies Prisma.TerritoryAssignmentInclude;
 
 @Injectable()
@@ -71,8 +71,9 @@ export class TerritoryService {
   // Regions
   async createRegion(actor: SessionUser, dto: RegionDto, ipAddress?: string) {
     this.ensureAdminAccess(actor);
+    if (!(await this.prisma.state.findUnique({ where: { id: dto.stateId } }))) throw new NotFoundException('State not found.');
     const region = await this.conflictOnDuplicate(
-      this.prisma.region.create({ data: { name: dto.name.trim(), code: dto.code?.trim() || null, description: dto.description?.trim() || null } }),
+      this.prisma.region.create({ data: { name: dto.name.trim(), stateId: dto.stateId, code: dto.code?.trim() || null, description: dto.description?.trim() || null } }),
       'A region with this name or code already exists.',
     );
     await recordAudit(this.prisma, { actorId: actor.id, action: 'REGION_CREATE', entity: 'REGION', entityId: region.id, details: { name: region.name }, ipAddress });
@@ -83,8 +84,9 @@ export class TerritoryService {
     this.ensureAdminAccess(actor);
     const existing = await this.prisma.region.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Region not found.');
+    if (!(await this.prisma.state.findUnique({ where: { id: dto.stateId } }))) throw new NotFoundException('State not found.');
     const region = await this.conflictOnDuplicate(
-      this.prisma.region.update({ where: { id }, data: { name: dto.name.trim(), code: dto.code?.trim() || null, description: dto.description?.trim() || null, isActive: dto.isActive ?? existing.isActive } }),
+      this.prisma.region.update({ where: { id }, data: { name: dto.name.trim(), stateId: dto.stateId, code: dto.code?.trim() || null, description: dto.description?.trim() || null, isActive: dto.isActive ?? existing.isActive } }),
       'A region with this name or code already exists.',
     );
     await recordAudit(this.prisma, { actorId: actor.id, action: 'REGION_UPDATE', entity: 'REGION', entityId: id, details: { changes: dto }, ipAddress });
@@ -93,9 +95,9 @@ export class TerritoryService {
 
   async deleteRegion(actor: SessionUser, id: string, ipAddress?: string) {
     this.ensureAdminAccess(actor);
-    const existing = await this.prisma.region.findUnique({ where: { id }, include: { _count: { select: { states: true, territories: true } } } });
+    const existing = await this.prisma.region.findUnique({ where: { id }, include: { _count: { select: { cities: true, territories: true } } } });
     if (!existing) throw new NotFoundException('Region not found.');
-    if (existing._count.states > 0 || existing._count.territories > 0) throw new ConflictException('Remove the states and territories under this region first.');
+    if (existing._count.cities > 0 || existing._count.territories > 0) throw new ConflictException('Remove the cities and territories under this region first.');
     await this.prisma.region.delete({ where: { id } });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'REGION_DELETE', entity: 'REGION', entityId: id, details: { name: existing.name }, ipAddress });
     return { deleted: true };
@@ -104,10 +106,9 @@ export class TerritoryService {
   // States
   async createState(actor: SessionUser, dto: StateDto, ipAddress?: string) {
     this.ensureAdminAccess(actor);
-    if (!(await this.prisma.region.findUnique({ where: { id: dto.regionId } }))) throw new NotFoundException('Region not found.');
     const state = await this.conflictOnDuplicate(
-      this.prisma.state.create({ data: { name: dto.name.trim(), code: dto.code?.trim() || null, regionId: dto.regionId } }),
-      'A state with this name already exists in the selected region.',
+      this.prisma.state.create({ data: { name: dto.name.trim(), code: dto.code?.trim() || null } }),
+      'A state with this name or code already exists.',
     );
     await recordAudit(this.prisma, { actorId: actor.id, action: 'STATE_CREATE', entity: 'STATE', entityId: state.id, details: { name: state.name }, ipAddress });
     return state;
@@ -117,10 +118,9 @@ export class TerritoryService {
     this.ensureAdminAccess(actor);
     const existing = await this.prisma.state.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('State not found.');
-    if (!(await this.prisma.region.findUnique({ where: { id: dto.regionId } }))) throw new NotFoundException('Region not found.');
     const state = await this.conflictOnDuplicate(
-      this.prisma.state.update({ where: { id }, data: { name: dto.name.trim(), code: dto.code?.trim() || null, regionId: dto.regionId, isActive: dto.isActive ?? existing.isActive } }),
-      'A state with this name already exists in the selected region.',
+      this.prisma.state.update({ where: { id }, data: { name: dto.name.trim(), code: dto.code?.trim() || null, isActive: dto.isActive ?? existing.isActive } }),
+      'A state with this name or code already exists.',
     );
     await recordAudit(this.prisma, { actorId: actor.id, action: 'STATE_UPDATE', entity: 'STATE', entityId: id, details: { changes: dto }, ipAddress });
     return state;
@@ -128,9 +128,9 @@ export class TerritoryService {
 
   async deleteState(actor: SessionUser, id: string, ipAddress?: string) {
     this.ensureAdminAccess(actor);
-    const existing = await this.prisma.state.findUnique({ where: { id }, include: { _count: { select: { cities: true, territories: true } } } });
+    const existing = await this.prisma.state.findUnique({ where: { id }, include: { _count: { select: { regions: true, cities: true, territories: true } } } });
     if (!existing) throw new NotFoundException('State not found.');
-    if (existing._count.cities > 0 || existing._count.territories > 0) throw new ConflictException('Remove the cities and territories under this state first.');
+    if (existing._count.regions > 0 || existing._count.cities > 0 || existing._count.territories > 0) throw new ConflictException('Remove the regions, cities and territories under this state first.');
     await this.prisma.state.delete({ where: { id } });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'STATE_DELETE', entity: 'STATE', entityId: id, details: { name: existing.name }, ipAddress });
     return { deleted: true };
@@ -139,10 +139,10 @@ export class TerritoryService {
   // Cities
   async createCity(actor: SessionUser, dto: CityDto, ipAddress?: string) {
     this.ensureAdminAccess(actor);
-    if (!(await this.prisma.state.findUnique({ where: { id: dto.stateId } }))) throw new NotFoundException('State not found.');
+    await this.validateCityRefs(dto);
     const city = await this.conflictOnDuplicate(
-      this.prisma.city.create({ data: { name: dto.name.trim(), stateId: dto.stateId } }),
-      'A city with this name already exists in the selected state.',
+      this.prisma.city.create({ data: { name: dto.name.trim(), stateId: dto.stateId, regionId: dto.regionId } }),
+      'A city with this name already exists in the selected region.',
     );
     await recordAudit(this.prisma, { actorId: actor.id, action: 'CITY_CREATE', entity: 'CITY', entityId: city.id, details: { name: city.name }, ipAddress });
     return city;
@@ -152,13 +152,18 @@ export class TerritoryService {
     this.ensureAdminAccess(actor);
     const existing = await this.prisma.city.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('City not found.');
-    if (!(await this.prisma.state.findUnique({ where: { id: dto.stateId } }))) throw new NotFoundException('State not found.');
+    await this.validateCityRefs(dto);
     const city = await this.conflictOnDuplicate(
-      this.prisma.city.update({ where: { id }, data: { name: dto.name.trim(), stateId: dto.stateId, isActive: dto.isActive ?? existing.isActive } }),
-      'A city with this name already exists in the selected state.',
+      this.prisma.city.update({ where: { id }, data: { name: dto.name.trim(), stateId: dto.stateId, regionId: dto.regionId, isActive: dto.isActive ?? existing.isActive } }),
+      'A city with this name already exists in the selected region.',
     );
     await recordAudit(this.prisma, { actorId: actor.id, action: 'CITY_UPDATE', entity: 'CITY', entityId: id, details: { changes: dto }, ipAddress });
     return city;
+  }
+
+  private async validateCityRefs(dto: CityDto) {
+    const region = await this.prisma.region.findUnique({ where: { id: dto.regionId } });
+    if (!region || region.stateId !== dto.stateId) throw new BadRequestException('Select a region that belongs to the selected state.');
   }
 
   async deleteCity(actor: SessionUser, id: string, ipAddress?: string) {
@@ -242,9 +247,10 @@ export class TerritoryService {
   }
 
   private async validateTerritoryRefs(dto: TerritoryDto) {
-    const area = await this.prisma.area.findUnique({ where: { id: dto.areaId }, include: { city: { include: { state: { include: { region: true } } } } } });
+    const area = await this.prisma.area.findUnique({ where: { id: dto.areaId }, include: { city: { include: { state: true, region: true } } } });
     if (!area) throw new NotFoundException('Area not found.');
-    return { area, city: area.city, state: area.city.state, region: area.city.state.region };
+    if (!area.city.region) throw new BadRequestException('The selected city is not linked to a region.');
+    return { area, city: area.city, state: area.city.state, region: area.city.region };
   }
 
   private territoryData(dto: TerritoryDto, refs: Awaited<ReturnType<TerritoryService['validateTerritoryRefs']>>) {
@@ -263,18 +269,19 @@ export class TerritoryService {
   async allocate(actor: SessionUser, dto: TerritoryAllocationDto, ipAddress?: string) {
     this.ensureAdminAccess(actor);
     const startDate = new Date(`${dto.effectiveFrom}T00:00:00.000Z`);
-    const [staff, territory, duplicate, replacement] = await Promise.all([
+    const [staff, territory, current, replacement] = await Promise.all([
       this.prisma.user.findFirst({ where: { id: dto.userId, status: 'ACTIVE', roles: { some: { role: { key: { in: [...salesRoles] }, isActive: true } } } }, select: { id: true, name: true } }),
-      this.prisma.territory.findUnique({ where: { id: dto.territoryId }, include: { area: { include: { city: { include: { state: { include: { region: true } } } } } } } }),
-      this.prisma.territoryAssignment.findFirst({ where: { userId: dto.userId, territoryId: dto.territoryId, endDate: null } }),
+      this.prisma.territory.findUnique({ where: { id: dto.territoryId }, include: { area: { include: { city: { include: { state: true, region: true } } } }, region: true, state: true } }),
+      this.prisma.territoryAssignment.findFirst({ where: { userId: dto.userId, endDate: null } }),
       dto.replaceAssignmentId ? this.prisma.territoryAssignment.findUnique({ where: { id: dto.replaceAssignmentId } }) : null,
     ]);
     if (!staff) throw new NotFoundException('Select an active Sales staff member.');
     if (!territory) throw new NotFoundException('Territory not found.');
-    if (!territory.isActive || !territory.area.isActive || !territory.area.city.isActive || !territory.area.city.state.isActive || !territory.area.city.state.region.isActive) throw new BadRequestException('Inactive geography cannot receive a new allocation.');
-    if (duplicate) throw new ConflictException('This staff member already has an active allocation for the selected territory.');
+    if (!territory.isActive || !territory.area.isActive || !territory.area.city.isActive || !territory.area.city.state.isActive || !territory.region.isActive) throw new BadRequestException('Inactive geography cannot receive a new allocation.');
+    if (current && current.id !== dto.replaceAssignmentId) throw new ConflictException('This staff member already has an active territory. Edit or unassign it first.');
     if (replacement && replacement.endDate) throw new BadRequestException('The allocation being replaced is already closed.');
     if (replacement && replacement.userId !== dto.userId) throw new BadRequestException('The replacement allocation must belong to the selected staff member.');
+    if (replacement && replacement.territoryId === dto.territoryId) throw new BadRequestException('Select a different territory before saving.');
     if (replacement && startDate <= replacement.startDate) throw new BadRequestException('The new allocation must start after the previous allocation began.');
 
     const assignment = await this.prisma.$transaction(async (tx) => {

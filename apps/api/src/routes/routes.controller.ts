@@ -30,8 +30,8 @@ export class RoutesController {
   evidence(@CurrentUser() actor: SessionUser, @Param('stopId') stopId: string) { return this.routes.visitEvidence(actor, stopId); }
 
   @Get('stops/:stopId/photo')
-  async photo(@CurrentUser() actor: SessionUser, @Param('stopId') stopId: string, @Res() response: Response) {
-    const proof = await this.routes.visitPhoto(actor, stopId);
+  async photo(@CurrentUser() actor: SessionUser, @Param('stopId') stopId: string, @Query('kind') kind: string | undefined, @Res() response: Response) {
+    const proof = await this.routes.visitPhoto(actor, stopId, kind === 'out' ? 'out' : 'in');
     response.setHeader('content-type', proof.mime);
     response.setHeader('content-disposition', 'inline');
     response.setHeader('cache-control', 'private, max-age=300');
@@ -58,5 +58,9 @@ export class RoutesController {
   }
 
   @Post(':date/stops/:stopId/complete')
-  complete(@CurrentUser() actor: SessionUser, @Param('date') date: string, @Param('stopId') stopId: string, @Body() dto: CompleteVisitDto, @Req() req: Request) { return this.routes.completeVisit(actor, date, stopId, dto, req.ip); }
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  complete(@CurrentUser() actor: SessionUser, @Param('date') date: string, @Param('stopId') stopId: string, @Body() dto: CompleteVisitDto, @UploadedFile() file: { buffer: Buffer; mimetype: string; size: number } | undefined, @Req() req: Request) {
+    if (!file) throw new BadRequestException('Capture a check-out selfie before completing the visit.');
+    return this.routes.completeVisit(actor, date, stopId, dto, file, req.ip);
+  }
 }

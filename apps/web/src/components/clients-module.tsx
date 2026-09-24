@@ -5,6 +5,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  LoaderCircle,
+  MapPin,
   MessageCircle,
   Phone,
   Plus,
@@ -82,9 +84,10 @@ export function ClientsModule({
     initial ? "" : "Unable to load clients. Please try again.",
   );
   useEffect(() => {
-    const frame = requestAnimationFrame(() =>
-      setHeaderSlot(document.getElementById("page-header-actions")),
-    );
+    const syncHeaderSlot = () =>
+      setHeaderSlot(document.getElementById("page-header-actions"));
+    syncHeaderSlot();
+    const frame = requestAnimationFrame(syncHeaderSlot);
     return () => cancelAnimationFrame(frame);
   }, []);
   useEffect(() => {
@@ -534,6 +537,17 @@ function ClientForm({
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const captureLocation = () => {
+    if (!navigator.geolocation) { setLocationError("Location is not supported on this device."); return; }
+    setLocating(true); setLocationError("");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => { setForm((value) => ({ ...value, latitude: String(coords.latitude), longitude: String(coords.longitude) })); setLocating(false); },
+      () => { setLocationError("Allow location access to capture the salon's position."); setLocating(false); },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  };
   const update =
     (key: keyof FormState) =>
     (
@@ -567,6 +581,10 @@ function ClientForm({
     ];
     const payload: Record<string, unknown> = {
       ...form,
+      email: form.email || undefined,
+      potential: form.potential || undefined,
+      customerSegment: form.customerSegment || undefined,
+      purchasingFrequency: form.purchasingFrequency || undefined,
       googleMapsUrl: form.googleMapsUrl || undefined,
       latitude: form.latitude ? Number(form.latitude) : undefined,
       longitude: form.longitude ? Number(form.longitude) : undefined,
@@ -780,12 +798,22 @@ function ClientForm({
                     placeholder="Add a maps link if available"
                   />
                 </Field>
-                <Field label="Latitude (optional)">
-                  <Input value={form.latitude} onChange={update("latitude")} type="number" inputMode="decimal" min="-90" max="90" step="any" placeholder="22.3072" />
-                </Field>
-                <Field label="Longitude (optional)">
-                  <Input value={form.longitude} onChange={update("longitude")} type="number" inputMode="decimal" min="-180" max="180" step="any" placeholder="73.1812" />
-                </Field>
+                <div className="sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-medium text-foreground">Salon location (optional)</span>
+                  {form.latitude && form.longitude ? (
+                    <div className="flex items-center justify-between gap-3 rounded-lg border bg-success-soft/40 px-3 py-2.5">
+                      <span className="flex items-center gap-2 text-xs text-success"><MapPin size={14} className="shrink-0" />Captured — {Number(form.latitude).toFixed(5)}, {Number(form.longitude).toFixed(5)}</span>
+                      <button type="button" onClick={captureLocation} className="shrink-0 text-xs font-semibold text-brand-dark hover:underline">Recapture</button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={captureLocation} disabled={locating} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-dashed bg-background text-xs font-semibold text-foreground hover:border-brand/40 disabled:opacity-60">
+                      {locating ? <LoaderCircle size={15} className="animate-spin" /> : <MapPin size={15} />}
+                      {locating ? "Locating…" : "Use current location"}
+                    </button>
+                  )}
+                  <p className="mt-1.5 text-[11px] text-subtle">Captured once from the device — an administrator can correct it later if needed.</p>
+                  {locationError && <p className="mt-1.5 text-[11px] text-danger">{locationError}</p>}
+                </div>
               </section>
             )}
             {step === 3 && (

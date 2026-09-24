@@ -3,6 +3,7 @@ import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsSt
 
 export class RegionDto {
   @IsString() @MinLength(2) @MaxLength(120) name!: string;
+  @IsString() @MinLength(1) stateId!: string;
   @IsOptional() @IsString() @MaxLength(20) code?: string;
   @IsOptional() @IsString() @MaxLength(500) description?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
@@ -10,7 +11,6 @@ export class RegionDto {
 
 export class StateDto {
   @IsString() @MinLength(2) @MaxLength(120) name!: string;
-  @IsString() @MinLength(1) regionId!: string;
   @IsOptional() @IsString() @MaxLength(20) code?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
@@ -24,6 +24,7 @@ export class AreaDto {
 export class CityDto {
   @IsString() @MinLength(2) @MaxLength(120) name!: string;
   @IsString() @MinLength(1) stateId!: string;
+  @IsString() @MinLength(1) regionId!: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
 
