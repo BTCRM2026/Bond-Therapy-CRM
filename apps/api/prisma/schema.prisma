@@ -93,6 +93,8 @@ model User {
   incentiveStatements      IncentiveStatement[] @relation("IncentiveOwner")
   incentivesApproved       IncentiveStatement[] @relation("IncentiveApprover")
   beatsAssigned            Beat[]               @relation("BeatAssignedStaff")
+  territoryAssignments     TerritoryAssignment[] @relation("TerritoryAssignmentStaff")
+  territoryAssignmentsMade TerritoryAssignment[] @relation("TerritoryAssignmentCreator")
   routes                   Route[]              @relation("RouteStaff")
   routeChangesMade         RouteChangeLog[]     @relation("RouteChangeActor")
   targetsCreated           Target[]             @relation("TargetCreator")
@@ -944,6 +946,7 @@ model Region {
   id          String      @id @default(cuid())
   name        String      @unique
   code        String?     @unique
+  description String?
   isActive    Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -954,6 +957,7 @@ model Region {
 model State {
   id          String      @id @default(cuid())
   name        String
+  code        String?
   regionId    String
   region      Region      @relation(fields: [regionId], references: [id], onDelete: Restrict)
   isActive    Boolean     @default(true)
@@ -963,6 +967,7 @@ model State {
   territories Territory[]
 
   @@unique([regionId, name])
+  @@unique([regionId, code])
   @@index([regionId])
 }
 
@@ -975,9 +980,24 @@ model City {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   territories Territory[]
+  areas       Area[]
 
   @@unique([stateId, name])
   @@index([stateId])
+}
+
+model Area {
+  id          String      @id @default(cuid())
+  name        String
+  cityId      String
+  city        City        @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  territories Territory[]
+
+  @@unique([cityId, name])
+  @@index([cityId])
 }
 
 model Territory {
@@ -989,15 +1009,40 @@ model Territory {
   state     State    @relation(fields: [stateId], references: [id], onDelete: Restrict)
   cityId    String
   city      City     @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  areaId    String
+  area      Area     @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  code      String?  @unique
+  description String?
+  effectiveFrom DateTime @default(now()) @db.Date
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   beats     Beat[]
+  assignments TerritoryAssignment[]
 
-  @@unique([cityId, name])
+  @@unique([areaId, name])
   @@index([regionId])
   @@index([stateId])
   @@index([cityId])
+  @@index([areaId])
+}
+
+model TerritoryAssignment {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation("TerritoryAssignmentStaff", fields: [userId], references: [id], onDelete: Restrict)
+  territoryId  String
+  territory    Territory @relation(fields: [territoryId], references: [id], onDelete: Restrict)
+  startDate    DateTime  @db.Date
+  endDate      DateTime? @db.Date
+  assignedById String?
+  assignedBy   User?     @relation("TerritoryAssignmentCreator", fields: [assignedById], references: [id], onDelete: SetNull)
+  reason       String?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, startDate])
+  @@index([territoryId, startDate])
+  @@index([endDate])
 }
 
 model Beat {

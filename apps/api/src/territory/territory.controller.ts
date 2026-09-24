@@ -7,7 +7,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
-import { BeatDto, CityDto, RegionDto, StateDto, TerritoryDto } from './dto.js';
+import { AreaDto, BeatDto, CityDto, EndTerritoryAllocationDto, RegionDto, StateDto, TerritoryAllocationDto, TerritoryDto } from './dto.js';
 import { TerritoryService } from './territory.service.js';
 
 @Controller('territory')
@@ -18,6 +18,9 @@ export class TerritoryController {
 
   @Get('hierarchy')
   hierarchy(@CurrentUser() actor: SessionUser) { return this.territory.hierarchy(actor); }
+
+  @Get('me')
+  mine(@CurrentUser() actor: SessionUser) { return this.territory.mine(actor); }
 
   @Post('regions')
   createRegion(@CurrentUser() actor: SessionUser, @Body() dto: RegionDto, @Req() req: Request) { return this.territory.createRegion(actor, dto, req.ip); }
@@ -46,6 +49,15 @@ export class TerritoryController {
   @Delete('cities/:id')
   deleteCity(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Req() req: Request) { return this.territory.deleteCity(actor, id, req.ip); }
 
+  @Post('areas')
+  createArea(@CurrentUser() actor: SessionUser, @Body() dto: AreaDto, @Req() req: Request) { return this.territory.createArea(actor, dto, req.ip); }
+
+  @Patch('areas/:id')
+  updateArea(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: AreaDto, @Req() req: Request) { return this.territory.updateArea(actor, id, dto, req.ip); }
+
+  @Delete('areas/:id')
+  deleteArea(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Req() req: Request) { return this.territory.deleteArea(actor, id, req.ip); }
+
   @Post('territories')
   createTerritory(@CurrentUser() actor: SessionUser, @Body() dto: TerritoryDto, @Req() req: Request) { return this.territory.createTerritory(actor, dto, req.ip); }
 
@@ -54,6 +66,12 @@ export class TerritoryController {
 
   @Delete('territories/:id')
   deleteTerritory(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Req() req: Request) { return this.territory.deleteTerritory(actor, id, req.ip); }
+
+  @Post('allocations')
+  allocate(@CurrentUser() actor: SessionUser, @Body() dto: TerritoryAllocationDto, @Req() req: Request) { return this.territory.allocate(actor, dto, req.ip); }
+
+  @Patch('allocations/:id/end')
+  endAllocation(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: EndTerritoryAllocationDto, @Req() req: Request) { return this.territory.endAllocation(actor, id, dto, req.ip); }
 
   @Post('beats')
   createBeat(@CurrentUser() actor: SessionUser, @Body() dto: BeatDto, @Req() req: Request) { return this.territory.createBeat(actor, dto, req.ip); }

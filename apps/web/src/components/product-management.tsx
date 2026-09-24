@@ -1,9 +1,11 @@
 "use client";
 
-import { AlertTriangle, ChevronLeft, ChevronRight, IndianRupee, LoaderCircle, MoreHorizontal, Package, PackageCheck, PackageX, Pencil, Plus, Search, SlidersHorizontal, Trash2, UserCheck, UserX, X } from "lucide-react";
+import { AlertTriangle, IndianRupee, LoaderCircle, MoreHorizontal, Package, PackageCheck, PackageX, Pencil, Plus, Search, SlidersHorizontal, Trash2, UserCheck, UserX, X } from "lucide-react";
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { CompactPagination } from "@/components/ui/compact-pagination";
+import { FilterMenu } from "@/components/ui/filter-menu";
 import { Input } from "@/components/ui/input";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { SuccessToast } from "@/components/ui/toast";
@@ -12,7 +14,8 @@ type Product = { id: string; name: string; category: string; unitPrice: string; 
 export type ProductListResponse = { items: Product[]; page: number; pageSize: number; total: number; hasMore: boolean };
 type ProductStats = { totalProducts: number; inStock: number; lowStock: number; outOfStock: number; inventoryValue: number };
 
-const CATEGORIES = [["SHAMPOO", "Shampoo"], ["CONDITIONER", "Conditioner"], ["MASK", "Mask"], ["TREATMENT", "Treatment"], ["KIT", "Kit"], ["COLOR", "Color"], ["DEVELOPER", "Developer"], ["STYLING", "Styling"], ["OIL_SERUM", "Oil / Serum"], ["LIQUID", "Liquid"], ["TOOLS", "Tools"], ["OTHER", "Other"]];
+const CATEGORIES = [["SHAMPOO", "Shampoo"], ["CONDITIONER", "Conditioner"], ["MASK", "Mask"], ["TREATMENT", "Treatment"], ["KIT", "Kit"], ["COLOR", "Color"], ["DEVELOPER", "Developer"], ["STYLING", "Styling"], ["OIL_SERUM", "Oil / Serum"], ["LIQUID", "Liquid"], ["TOOLS", "Tools"], ["OTHER", "Other"]] as const;
+const CATEGORY_FILTERS = [["ALL", "All categories"], ...CATEGORIES] as const;
 const pretty = (value: string) => value.toLowerCase().split("_").map((part) => part[0].toUpperCase() + part.slice(1)).join(" / ");
 const money = (value: string | number) => `₹${Number(value).toLocaleString("en-IN")}`;
 const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? (Array.isArray((data as { message: unknown }).message) ? (data as { message: string[] }).message.join(" ") : String((data as { message: unknown }).message)) : fallback;
@@ -23,6 +26,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("ALL");
   const [page, setPage] = useState(initial?.page ?? 1);
+  const [pageSize, setPageSize] = useState(10);
   const [editor, setEditor] = useState<{ mode: "create" | "edit"; product?: Product } | null>(null);
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   const [busyId, setBusyId] = useState("");
@@ -32,7 +36,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
   useEffect(() => { const frame = requestAnimationFrame(() => setHeaderSlot(document.getElementById("page-header-actions"))); return () => cancelAnimationFrame(frame); }, []);
 
   const reload = async () => {
-    const params = new URLSearchParams({ page: String(page), pageSize: "24" });
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (search.trim()) params.set("search", search.trim());
     if (category !== "ALL") params.set("category", category);
     const response = await fetch(`/api/products?${params}`, { cache: "no-store" });
@@ -50,7 +54,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
 
   useEffect(() => { const timer = setTimeout(() => { void reloadStats().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load product statistics.")); }, 0); return () => clearTimeout(timer); }, []);
 
-  useEffect(() => { const timer = setTimeout(() => { void reload().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load products.")); }, 250); return () => clearTimeout(timer); }, [search, category, page]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const timer = setTimeout(() => { void reload().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load products.")); }, 250); return () => clearTimeout(timer); }, [search, category, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleActive = async (product: Product) => {
     setBusyId(product.id); setError(""); setNotice("");
@@ -96,10 +100,10 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} />
             <Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="pl-9" placeholder="Search products" aria-label="Search products" />
           </label>
-          <select value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }} className="h-11 rounded-lg border bg-white px-3 text-[13px] text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10" aria-label="Filter by category">
-            <option value="ALL">All categories</option>
-            {CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-          </select>
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
+            <FilterMenu value={category} showLabelOnMobile onSelect={(value) => { setCategory(value); setPage(1); }} options={CATEGORY_FILTERS.map(([key, label]) => ({ key, label }))} />
+            {data && data.total > 0 && <CompactPagination page={data.page} pageSize={data.pageSize} total={data.total} hasMore={data.hasMore} onPageChange={setPage} onPageSizeChange={(value) => { setPage(1); setPageSize(value); }} />}
+          </div>
         </div>
 
         {error && <div className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger sm:mx-5" role="alert">{error}</div>}
@@ -114,7 +118,6 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
         </div>
         <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 xl:hidden">{data?.items.map((product) => <ProductCard key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}</div>
         {!data?.items.length && <div className="px-5 py-12 text-center"><Package className="mx-auto text-subtle" size={24} /><p className="mt-3 text-sm font-semibold text-foreground">No products found</p><p className="mt-1 text-xs text-muted">Adjust the search or add a product.</p></div>}
-        {data && data.total > 0 && <Pagination page={data.page} pageSize={data.pageSize} total={data.total} hasMore={data.hasMore} onPageChange={setPage} />}
       </section>
 
       {editor && <ProductEditor mode={editor.mode} product={editor.product} onClose={() => setEditor(null)} onSaved={async (message) => { setEditor(null); await Promise.all([reload(), reloadStats()]); setError(""); setNotice(message); }} onStockAdjusted={() => { void Promise.all([reload(), reloadStats()]); }} />}
@@ -259,12 +262,6 @@ function AdjustStockForm({ product, currentStock, onClose, onAdjusted }: { produ
       <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" disabled={saving} onClick={submit}>{saving ? "Saving…" : "Save adjustment"}</Button></div>
     </div>
   </div>;
-}
-
-function Pagination({ page, pageSize, total, hasMore, onPageChange }: { page: number; pageSize: number; total: number; hasMore: boolean; onPageChange: (page: number) => void }) {
-  const first = (page - 1) * pageSize + 1;
-  const last = Math.min(page * pageSize, total);
-  return <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-xs text-muted sm:px-5"><span>Showing {first}–{last} of {total}</span><div className="flex gap-2"><Button variant="secondary" className="h-9 px-3" disabled={page <= 1} onClick={() => onPageChange(page - 1)}><ChevronLeft size={14} />Previous</Button><Button variant="secondary" className="h-9 px-3" disabled={!hasMore} onClick={() => onPageChange(page + 1)}>Next<ChevronRight size={14} /></Button></div></div>;
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }

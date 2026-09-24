@@ -43,7 +43,10 @@ export class ProductsService {
     const pageSize = Math.min(200, Math.max(1, Number(query.pageSize) || 100));
     const search = query.search?.trim();
     const filters: Prisma.ProductWhereInput[] = this.isAdmin(actor) ? [] : [{ isActive: true }];
-    if (search) filters.push({ OR: [{ name: { contains: search } }, { variant: { contains: search } }] });
+    if (search) {
+      const variants = [...new Set([search, titleCase(search), search.toLowerCase(), search.toUpperCase()])];
+      filters.push({ OR: variants.flatMap((value) => [{ name: { contains: value } }, { variant: { contains: value } }]) });
+    }
     if (query.category) filters.push({ category: query.category });
     const where = { AND: filters } satisfies Prisma.ProductWhereInput;
     const [items, total] = await this.prisma.$transaction([

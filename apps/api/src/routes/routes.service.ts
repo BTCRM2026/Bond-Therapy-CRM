@@ -44,7 +44,13 @@ export class RoutesService {
   async assignedSalons(actor: SessionUser) {
     this.ensureAccess(actor);
     return this.prisma.client.findMany({
-      where: { assignedSalespersonId: actor.id, status: { not: 'INACTIVE' } },
+      where: {
+        status: { not: 'INACTIVE' },
+        OR: [
+          { assignedSalespersonId: actor.id },
+          { beat: { territory: { assignments: { some: { userId: actor.id, endDate: null } } } } },
+        ],
+      },
       select: { id: true, salonName: true, city: true, area: true, potential: true, beat: { select: { id: true, name: true } } },
       orderBy: { salonName: 'asc' },
     });
@@ -68,7 +74,7 @@ export class RoutesService {
     const date = this.parseDate(dateStr);
     const clientIds = dto.stops.map((stop) => stop.clientId);
     if (new Set(clientIds).size !== clientIds.length) throw new BadRequestException('Each salon can only appear once in a route.');
-    const owned = await this.prisma.client.count({ where: { id: { in: clientIds }, assignedSalespersonId: actor.id } });
+    const owned = await this.prisma.client.count({ where: { id: { in: clientIds }, status: { not: 'INACTIVE' }, OR: [{ assignedSalespersonId: actor.id }, { beat: { territory: { assignments: { some: { userId: actor.id, endDate: null } } } } }] } });
     if (owned !== clientIds.length) throw new BadRequestException('You can only add salons assigned to you.');
 
     const existing = await this.prisma.route.findUnique({ where: { staffId_routeDate: { staffId: actor.id, routeDate: date } }, include: routeInclude });

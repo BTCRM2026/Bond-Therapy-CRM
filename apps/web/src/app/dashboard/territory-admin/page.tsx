@@ -11,8 +11,8 @@ export default async function TerritoryAdminPage() {
       userName={session.name}
       roleName="Super Admin"
       roleKey={session.roles[0]?.key}
-      headerTitle="Territory & Route"
-      headerSubtitle="Manage regions, states, cities, territories and beats"
+      headerTitle="Territory Management"
+      headerSubtitle="Manage geographical hierarchy, staff responsibility and route coverage"
       portal="ADMIN"
       canManageStaff={session.permissions.includes("admin.staff.manage")}
     >

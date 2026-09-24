@@ -1,295 +1,127 @@
 "use client";
 
-import { LoaderCircle, MapPin, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Building2, CalendarDays, CircleOff, LoaderCircle, Map as MapIcon, MapPin, Pencil, Plus, Route, Search, ShieldCheck, UserRound, X } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { KpiCard } from "@/components/ui/kpi-card";
 import { SuccessToast } from "@/components/ui/toast";
 
-type Region = { id: string; name: string; code: string | null; isActive: boolean };
-type State = { id: string; name: string; regionId: string; isActive: boolean };
+type Region = { id: string; name: string; code: string | null; description: string | null; isActive: boolean };
+type State = { id: string; name: string; code: string | null; regionId: string; isActive: boolean };
 type City = { id: string; name: string; stateId: string; isActive: boolean };
-type Territory = { id: string; name: string; regionId: string; stateId: string; cityId: string; isActive: boolean };
-type Beat = { id: string; name: string; territoryId: string; assignedStaffId: string | null; assignedStaff: { id: string; name: string } | null; visitFrequencyDays: number | null; isActive: boolean; _count: { clients: number } };
-type Hierarchy = { regions: Region[]; states: State[]; cities: City[]; territories: Territory[]; beats: Beat[] };
+type Area = { id: string; name: string; cityId: string; isActive: boolean };
+type Territory = { id: string; name: string; code: string | null; description: string | null; effectiveFrom: string; areaId: string; isActive: boolean };
+type TerritoryPath = Territory & { area: Area & { city: City & { state: State & { region: Region } } } };
+type Assignment = { id: string; userId: string; startDate: string; endDate: string | null; reason: string | null; user: { id: string; name: string }; assignedBy: { name: string } | null; territory: TerritoryPath };
+type Hierarchy = { regions: Region[]; states: State[]; cities: City[]; areas: Area[]; territories: Territory[]; assignments: Assignment[]; overview: Record<"regions" | "states" | "cities" | "areas" | "territories" | "assignedStaff", number> };
+type EntityKind = "regions" | "states" | "cities" | "areas" | "territories";
+type Tab = "structure" | "allocations" | "coverage" | "routes";
 type StaffOption = { id: string; name: string };
 
-const LEVEL_TABS = [
-  { key: "regions", label: "Regions", singular: "region" },
-  { key: "states", label: "States", singular: "state" },
-  { key: "cities", label: "Cities", singular: "city" },
-  { key: "territories", label: "Territories", singular: "territory" },
-  { key: "beats", label: "Beats", singular: "beat" },
-] as const;
-const TABS = [...LEVEL_TABS, { key: "routes", label: "Routes", singular: "" }] as const;
-type TabKey = (typeof TABS)[number]["key"];
-
+const LEVELS: Array<{ key: EntityKind; label: string; singular: string }> = [{ key: "regions", label: "Regions", singular: "region" }, { key: "states", label: "States", singular: "state" }, { key: "cities", label: "Cities", singular: "city" }, { key: "areas", label: "Areas", singular: "area" }, { key: "territories", label: "Territories", singular: "territory" }];
+const TABS: Array<{ key: Tab; label: string }> = [{ key: "structure", label: "Structure" }, { key: "allocations", label: "Staff allocations" }, { key: "coverage", label: "Coverage" }, { key: "routes", label: "Route oversight" }];
+const today = () => new Date().toISOString().slice(0, 10);
+const date = (value: string) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(value));
 const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? String((data as { message: unknown }).message) : fallback;
 
 export function TerritoryAdmin() {
   const [data, setData] = useState<Hierarchy | null>(null);
   const [staff, setStaff] = useState<StaffOption[]>([]);
-  const [tab, setTab] = useState<TabKey>("regions");
+  const [tab, setTab] = useState<Tab>("structure");
+  const [level, setLevel] = useState<EntityKind>("regions");
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
-  const [editing, setEditing] = useState<{ mode: "create" | "edit"; id?: string } | null>(null);
-  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
+  const [editor, setEditor] = useState<{ kind: EntityKind; id?: string } | null>(null);
+  const [allocationOpen, setAllocationOpen] = useState(false);
+  const [ending, setEnding] = useState<Assignment | null>(null);
 
-  useEffect(() => {
-    const syncHeaderSlot = () => setHeaderSlot(document.getElementById("page-header-actions"));
-    syncHeaderSlot();
-    const frame = requestAnimationFrame(syncHeaderSlot);
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
+  useEffect(() => { const sync = () => setHeaderSlot(document.getElementById("page-header-actions")); sync(); const frame = requestAnimationFrame(sync); return () => cancelAnimationFrame(frame); }, []);
   const load = async () => {
     try {
       const [hierarchyResponse, staffResponse] = await Promise.all([fetch("/api/territory/hierarchy", { cache: "no-store" }), fetch("/api/staff", { cache: "no-store" })]);
       const hierarchy = await hierarchyResponse.json().catch(() => null);
-      if (!hierarchyResponse.ok) throw new Error(messageFrom(hierarchy, "Unable to load the territory structure."));
+      if (!hierarchyResponse.ok) throw new Error(messageFrom(hierarchy, "Unable to load territory management."));
       setData(hierarchy as Hierarchy);
       const directory = await staffResponse.json().catch(() => null);
-      if (staffResponse.ok && directory) setStaff((directory.users as Array<{ id: string; name: string; roles: Array<{ key: string }> }>).filter((user) => user.roles.some((role) => ["SALES_MANAGER", "SALES_EXECUTIVE"].includes(role.key))).map((user) => ({ id: user.id, name: user.name })));
+      if (staffResponse.ok && directory?.users) setStaff((directory.users as Array<{ id: string; name: string; status: string; roles: Array<{ key: string }> }>).filter((user) => user.status === "ACTIVE" && user.roles.some((role) => ["SALES_MANAGER", "SALES_EXECUTIVE"].includes(role.key))).map(({ id, name }) => ({ id, name })));
       setError("");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load the territory structure."); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load territory management."); }
     finally { setLoading(false); }
   };
-  useEffect(() => { (async () => { await load(); })(); }, []);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, []);
 
-  const remove = async () => {
-    if (!deleting || tab === "routes") return;
-    try {
-      const response = await fetch(`/api/territory/${tab}/${deleting.id}`, { method: "DELETE" });
-      const json = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(messageFrom(json, "Unable to delete this record."));
-      setDeleting(null);
-      await load();
-      setNotice(`${deleting.name} was deleted.`);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to delete this record."); setDeleting(null); }
-  };
+  const headerAction = tab === "allocations" ? { label: "Allocate territory", run: () => setAllocationOpen(true) } : tab === "structure" ? { label: `Add ${LEVELS.find((item) => item.key === level)?.singular}`, run: () => setEditor({ kind: level }) } : null;
+  if (loading) return <div className="space-y-4"><div className="grid grid-cols-2 gap-3 xl:grid-cols-6">{Array.from({ length: 6 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-xl bg-white" />)}</div><div className="h-72 animate-pulse rounded-xl bg-white" /></div>;
 
-  const addLabel = TABS.find((item) => item.key === tab)!.singular;
-
-  if (loading) return <div className="space-y-3"><div className="h-11 w-72 animate-pulse rounded-lg bg-background" /><div className="h-64 animate-pulse rounded-xl bg-background" /></div>;
-
-  return <div className="space-y-4">
+  return <div className="space-y-5">
     {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
-    {headerSlot && tab !== "routes" && createPortal(<Button onClick={() => setEditing({ mode: "create" })}><Plus size={16} />Add {addLabel}</Button>, headerSlot)}
-
-    <div className="flex gap-1 overflow-x-auto rounded-lg border bg-white p-1">
-      {TABS.map((item) => <button key={item.key} type="button" onClick={() => setTab(item.key)} className={`shrink-0 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${tab === item.key ? "bg-brand-soft text-brand-dark" : "text-muted hover:bg-background"}`}>{item.label}</button>)}
-    </div>
-
-    {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
-
-    {tab === "routes" ? <RouteOversight /> : data && <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
-      {tab === "regions" && <RowList empty="No regions yet" items={data.regions.map((region) => ({ id: region.id, name: region.name, meta: region.code ?? undefined, isActive: region.isActive }))} onEdit={(id) => setEditing({ mode: "edit", id })} onDelete={(id, name) => setDeleting({ id, name })} />}
-      {tab === "states" && <RowList empty="No states yet" items={data.states.map((state) => ({ id: state.id, name: state.name, meta: data.regions.find((r) => r.id === state.regionId)?.name, isActive: state.isActive }))} onEdit={(id) => setEditing({ mode: "edit", id })} onDelete={(id, name) => setDeleting({ id, name })} />}
-      {tab === "cities" && <RowList empty="No cities yet" items={data.cities.map((city) => ({ id: city.id, name: city.name, meta: data.states.find((s) => s.id === city.stateId)?.name, isActive: city.isActive }))} onEdit={(id) => setEditing({ mode: "edit", id })} onDelete={(id, name) => setDeleting({ id, name })} />}
-      {tab === "territories" && <RowList empty="No territories yet" items={data.territories.map((territory) => ({ id: territory.id, name: territory.name, meta: [data.cities.find((c) => c.id === territory.cityId)?.name, data.states.find((s) => s.id === territory.stateId)?.name].filter(Boolean).join(" · "), isActive: territory.isActive }))} onEdit={(id) => setEditing({ mode: "edit", id })} onDelete={(id, name) => setDeleting({ id, name })} />}
-      {tab === "beats" && <RowList empty="No beats yet" items={data.beats.map((beat) => ({ id: beat.id, name: beat.name, meta: [data.territories.find((t) => t.id === beat.territoryId)?.name, beat.assignedStaff?.name ?? "Unassigned", `${beat._count.clients} salon${beat._count.clients === 1 ? "" : "s"}`].filter(Boolean).join(" · "), isActive: beat.isActive }))} onEdit={(id) => setEditing({ mode: "edit", id })} onDelete={(id, name) => setDeleting({ id, name })} />}
-    </section>}
-
-    {editing && data && tab !== "routes" && <LevelEditor tab={tab} mode={editing.mode} id={editing.id} data={data} staff={staff} onClose={() => setEditing(null)} onSaved={async (message) => { setEditing(null); await load(); setNotice(message); }} />}
-    {deleting && <ConfirmDelete name={deleting.name} onClose={() => setDeleting(null)} onConfirm={remove} />}
+    {headerSlot && headerAction && createPortal(<Button onClick={headerAction.run} aria-label={headerAction.label}><Plus size={16} /><span className="hidden sm:inline">{headerAction.label}</span></Button>, headerSlot)}
+    {error && <FormError message={error} />}
+    {data && <>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"><KpiCard icon={MapIcon} label="Regions" value={data.overview.regions} detail="Geographical groups" /><KpiCard icon={ShieldCheck} label="States" value={data.overview.states} detail="Operational states" /><KpiCard icon={Building2} label="Cities" value={data.overview.cities} detail="Service cities" /><KpiCard icon={MapPin} label="Areas" value={data.overview.areas} detail="Local coverage" /><KpiCard icon={Route} label="Territories" value={data.overview.territories} detail="Sales territories" /><KpiCard icon={UserRound} label="Assigned staff" value={data.overview.assignedStaff} detail="Active allocations" tone="success" /></div>
+      <nav className="flex gap-1 overflow-x-auto rounded-lg border bg-white p-1" aria-label="Territory sections">{TABS.map((item) => <button key={item.key} type="button" onClick={() => setTab(item.key)} className={`shrink-0 rounded-md px-3 py-2 text-xs font-semibold ${tab === item.key ? "bg-brand-soft text-brand-dark" : "text-muted hover:bg-background"}`}>{item.label}</button>)}</nav>
+      {tab !== "routes" && <div className="flex flex-col gap-2 sm:flex-row sm:justify-between"><div className="relative w-full sm:max-w-sm"><Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "allocations" ? "Search staff or territory" : "Search geography"} className="pl-9" /></div><select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="h-10 rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand"><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive / ended</option></select></div>}
+      {tab === "structure" && <Structure data={data} level={level} setLevel={setLevel} query={query} status={status} onEdit={(kind, id) => setEditor({ kind, id })} />}
+      {tab === "allocations" && <AllocationList assignments={data.assignments} query={query} status={status} onEnd={setEnding} />}
+      {tab === "coverage" && <Coverage assignments={data.assignments} query={query} status={status} />}
+      {tab === "routes" && <RouteOversight />}
+      {editor && <EntityEditor editor={editor} data={data} onClose={() => setEditor(null)} onSaved={async (message) => { setEditor(null); await load(); setNotice(message); }} />}
+      {allocationOpen && <AllocationEditor data={data} staff={staff} onClose={() => setAllocationOpen(false)} onSaved={async () => { setAllocationOpen(false); await load(); setNotice("Territory allocation saved."); }} />}
+      {ending && <EndAllocation assignment={ending} onClose={() => setEnding(null)} onSaved={async () => { setEnding(null); await load(); setNotice("Territory allocation ended."); }} />}
+    </>}
   </div>;
 }
 
-type StaffRoute = { id: string; staff: { id: string; name: string }; status: string; planned: number; visited: number; unableToMeet: number; rescheduled: number; total: number };
-const ROUTE_STATUS_LABEL: Record<string, string> = { DRAFT: "Draft", PLANNED: "Confirmed", IN_PROGRESS: "In progress", PARTIALLY_COMPLETED: "Partially completed", COMPLETED: "Completed", CANCELLED: "Cancelled" };
-const ROUTE_STATUS_TONE: Record<string, string> = { DRAFT: "bg-gray-100 text-muted", PLANNED: "bg-brand-soft text-brand-dark", IN_PROGRESS: "bg-warning-soft text-warning", PARTIALLY_COMPLETED: "bg-warning-soft text-warning", COMPLETED: "bg-success-soft text-success", CANCELLED: "bg-red-50 text-danger" };
-
-function RouteOversight() {
-  const [rows, setRows] = useState<StaffRoute[] | null>(null);
-  const [error, setError] = useState("");
-  const today = useMemo(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }, []);
-
-  useEffect(() => { (async () => {
-    try {
-      const response = await fetch(`/api/routes/admin?date=${today}`, { cache: "no-store" });
-      const json = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(messageFrom(json, "Unable to load today's routes."));
-      setRows(json as StaffRoute[]);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load today's routes."); }
-  })(); }, [today]);
-
-  if (error) return <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>;
-  if (!rows) return <div className="h-48 animate-pulse rounded-xl bg-background" />;
-  if (!rows.length) return <div className="rounded-xl border bg-white px-5 py-14 text-center shadow-[0_3px_12px_rgba(15,23,42,0.04)]"><MapPin className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">No routes planned for today</p></div>;
-
-  return <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
-    <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">Today&apos;s routes</p></div>
-    <div className="divide-y">{rows.map((row) => <div key={row.id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
-      <div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{row.staff.name}</p><p className="mt-0.5 text-xs text-muted">{row.visited} visited · {row.planned} pending{row.unableToMeet ? ` · ${row.unableToMeet} unable to meet` : ""}{row.rescheduled ? ` · ${row.rescheduled} rescheduled` : ""} · {row.total} total</p></div>
-      <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${ROUTE_STATUS_TONE[row.status] ?? "bg-gray-100 text-muted"}`}>{ROUTE_STATUS_LABEL[row.status] ?? row.status}</span>
-    </div>)}</div>
-  </section>;
+function Structure({ data, level, setLevel, query, status, onEdit }: { data: Hierarchy; level: EntityKind; setLevel: (value: EntityKind) => void; query: string; status: "all" | "active" | "inactive"; onEdit: (kind: EntityKind, id: string) => void }) {
+  const parentName = (item: Region | State | City | Area | Territory) => level === "regions" ? "Top-level geography" : level === "states" ? data.regions.find((row) => row.id === (item as State).regionId)?.name : level === "cities" ? data.states.find((row) => row.id === (item as City).stateId)?.name : level === "areas" ? data.cities.find((row) => row.id === (item as Area).cityId)?.name : data.areas.find((row) => row.id === (item as Territory).areaId)?.name;
+  const rows = (data[level] as Array<Region | State | City | Area | Territory>).filter((item) => `${item.name} ${"code" in item ? item.code ?? "" : ""} ${parentName(item)}`.toLowerCase().includes(query.trim().toLowerCase()) && (status === "all" || item.isActive === (status === "active")));
+  return <section className="overflow-hidden rounded-xl border bg-white"><div className="flex gap-1 overflow-x-auto border-b bg-background/60 p-2">{LEVELS.map((item, index) => <button key={item.key} type="button" onClick={() => setLevel(item.key)} className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold ${level === item.key ? "bg-white text-brand shadow-sm" : "text-muted"}`}><span className="grid size-5 place-items-center rounded bg-brand-soft text-[10px] text-brand">{index + 1}</span>{item.label}</button>)}</div><div className="hidden grid-cols-[1fr_1fr_100px_48px] gap-3 border-b px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted sm:grid"><span>Name</span><span>Parent</span><span>Status</span><span /></div>{rows.length ? <div className="divide-y">{rows.map((item) => <div key={item.id} className="grid gap-2 px-4 py-3.5 sm:grid-cols-[1fr_1fr_100px_48px] sm:items-center sm:px-5"><div><p className="text-sm font-semibold text-foreground">{item.name}</p>{"code" in item && item.code && <p className="text-xs text-muted">{item.code}</p>}</div><p className="text-xs text-muted">{parentName(item)}</p><StatusBadge active={item.isActive} /><button type="button" onClick={() => onEdit(level, item.id)} className="grid size-9 place-items-center rounded-lg text-muted hover:bg-brand-soft hover:text-brand" aria-label={`Edit ${item.name}`}><Pencil size={15} /></button></div>)}</div> : <Empty message="No records match these filters." />}</section>;
 }
 
-function RowList({ items, empty, onEdit, onDelete }: { items: Array<{ id: string; name: string; meta?: string; isActive: boolean }>; empty: string; onEdit: (id: string) => void; onDelete: (id: string, name: string) => void }) {
-  if (!items.length) return <div className="px-5 py-14 text-center"><MapPin className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">{empty}</p></div>;
-  return <div className="divide-y">{items.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
-    <div className="min-w-0">
-      <div className="flex items-center gap-2"><p className="truncate text-sm font-medium text-foreground">{item.name}</p>{!item.isActive && <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-muted">Inactive</span>}</div>
-      {item.meta && <p className="mt-0.5 truncate text-xs text-muted">{item.meta}</p>}
-    </div>
-    <div className="flex shrink-0 items-center gap-1.5">
-      <button type="button" onClick={() => onEdit(item.id)} className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-brand-soft hover:text-brand" aria-label={`Edit ${item.name}`}><Pencil size={15} /></button>
-      <button type="button" onClick={() => onDelete(item.id, item.name)} className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-red-50 hover:text-danger" aria-label={`Delete ${item.name}`}><Trash2 size={15} /></button>
-    </div>
-  </div>)}</div>;
+function AllocationList({ assignments, query, status, onEnd }: { assignments: Assignment[]; query: string; status: "all" | "active" | "inactive"; onEnd: (row: Assignment) => void }) {
+  const rows = assignments.filter((item) => `${item.user.name} ${item.territory.name} ${item.territory.area.name}`.toLowerCase().includes(query.trim().toLowerCase()) && (status === "all" || !item.endDate === (status === "active")));
+  return <section className="overflow-hidden rounded-xl border bg-white">{rows.length ? <div className="divide-y">{rows.map((item) => <article key={item.id} className="grid gap-3 px-4 py-4 md:grid-cols-[1fr_1.4fr_170px_120px] md:items-center md:px-5"><div><p className="text-sm font-semibold text-foreground">{item.user.name}</p><p className="text-xs text-muted">By {item.assignedBy?.name ?? "Admin"}</p></div><div><p className="text-sm font-medium text-foreground">{item.territory.name}</p><p className="text-xs text-muted">{item.territory.area.name} · {item.territory.area.city.name} · {item.territory.area.city.state.name}</p></div><p className="text-xs text-muted">{date(item.startDate)}{item.endDate ? ` – ${date(item.endDate)}` : " – Present"}</p><div className="flex items-center justify-between gap-2"><StatusBadge active={!item.endDate} activeLabel="Allocated" inactiveLabel="Ended" />{!item.endDate && <button type="button" onClick={() => onEnd(item)} className="grid size-8 place-items-center rounded-lg text-muted hover:bg-red-50 hover:text-danger" aria-label="End allocation"><CircleOff size={15} /></button>}</div></article>)}</div> : <Empty message="No allocations match these filters." />}</section>;
 }
 
-function LevelEditor({ tab, mode, id, data, staff, onClose, onSaved }: { tab: TabKey; mode: "create" | "edit"; id?: string; data: Hierarchy; staff: StaffOption[]; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
-  if (tab === "regions") return <RegionForm mode={mode} region={data.regions.find((r) => r.id === id)} onClose={onClose} onSaved={onSaved} />;
-  if (tab === "states") return <StateForm mode={mode} state={data.states.find((s) => s.id === id)} regions={data.regions} onClose={onClose} onSaved={onSaved} />;
-  if (tab === "cities") return <CityForm mode={mode} city={data.cities.find((c) => c.id === id)} states={data.states} onClose={onClose} onSaved={onSaved} />;
-  if (tab === "territories") return <TerritoryForm mode={mode} territory={data.territories.find((t) => t.id === id)} data={data} onClose={onClose} onSaved={onSaved} />;
-  return <BeatForm mode={mode} beat={data.beats.find((b) => b.id === id)} territories={data.territories} staff={staff} onClose={onClose} onSaved={onSaved} />;
+function Coverage({ assignments, query, status }: { assignments: Assignment[]; query: string; status: "all" | "active" | "inactive" }) {
+  const groups = useMemo(() => { const map = new Map<string, Assignment[]>(); assignments.forEach((item) => map.set(item.userId, [...(map.get(item.userId) ?? []), item])); return [...map.values()]; }, [assignments]);
+  const rows = groups.filter((items) => `${items[0].user.name} ${items.map((item) => item.territory.name).join(" ")}`.toLowerCase().includes(query.trim().toLowerCase()) && (status === "all" || items.some((item) => !item.endDate) === (status === "active")));
+  return <section className="overflow-hidden rounded-xl border bg-white">{rows.length ? <div className="divide-y">{rows.map((items) => { const active = items.filter((item) => !item.endDate); return <article key={items[0].userId} className="px-4 py-4 sm:px-5"><div className="flex justify-between gap-3"><div><p className="text-sm font-semibold text-foreground">{items[0].user.name}</p><p className="mt-1 text-xs text-muted">{new Set(active.map((item) => item.territory.area.city.state.region.id)).size} regions · {new Set(active.map((item) => item.territory.area.city.id)).size} cities · {active.length} territories</p></div><StatusBadge active={active.length > 0} activeLabel="Covered" inactiveLabel="No coverage" /></div><div className="mt-3 flex flex-wrap gap-2">{active.map((item) => <span key={item.id} className="rounded-md border bg-background px-2.5 py-1.5 text-xs">{item.territory.name} <span className="text-muted">· {item.territory.area.city.name}</span></span>)}</div></article>; })}</div> : <Empty message="No staff coverage matches these filters." />}</section>;
 }
 
-function RegionForm({ mode, region, onClose, onSaved }: { mode: "create" | "edit"; region?: Region; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
-  const [name, setName] = useState(region?.name ?? "");
-  const [code, setCode] = useState(region?.code ?? "");
-  const { saving, error, submit } = useLevelSubmit(async () => {
-    const response = await fetch(mode === "create" ? "/api/territory/regions" : `/api/territory/regions/${region!.id}`, { method: mode === "create" ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, code: code || undefined }) });
-    return { response, message: `${name} was ${mode === "create" ? "added" : "updated"}.` };
-  }, onSaved);
-  return <Modal title={mode === "create" ? "Add region" : "Edit region"} onClose={onClose}>
-    <form onSubmit={submit} className="space-y-4">
-      <Field label="Region name *"><Input value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={120} required /></Field>
-      <Field label="Code"><Input value={code} onChange={(e) => setCode(e.target.value)} maxLength={20} placeholder="e.g. WEST" /></Field>
-      {error && <FormError message={error} />}
-      <FormActions saving={saving} onClose={onClose} />
-    </form>
-  </Modal>;
+function EntityEditor({ editor, data, onClose, onSaved }: { editor: { kind: EntityKind; id?: string }; data: Hierarchy; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
+  const record = (data[editor.kind] as Array<Region | State | City | Area | Territory>).find((item) => item.id === editor.id);
+  const [name, setName] = useState(record?.name ?? ""); const [code, setCode] = useState(record && "code" in record ? record.code ?? "" : ""); const [description, setDescription] = useState(record && "description" in record ? record.description ?? "" : ""); const [isActive, setIsActive] = useState(record?.isActive ?? true); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+  const initialParent = editor.kind === "states" ? (record as State | undefined)?.regionId : editor.kind === "cities" ? (record as City | undefined)?.stateId : editor.kind === "areas" ? (record as Area | undefined)?.cityId : editor.kind === "territories" ? (record as Territory | undefined)?.areaId : "";
+  const parent = editor.kind === "states" ? { label: "Region", rows: data.regions } : editor.kind === "cities" ? { label: "State", rows: data.states } : editor.kind === "areas" ? { label: "City", rows: data.cities } : editor.kind === "territories" ? { label: "Area", rows: data.areas } : null;
+  const [parentId, setParentId] = useState(initialParent || parent?.rows[0]?.id || ""); const [effectiveFrom, setEffectiveFrom] = useState(editor.kind === "territories" && record ? (record as Territory).effectiveFrom.slice(0, 10) : today());
+  const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); setError(""); try { const body: Record<string, unknown> = { name, isActive }; if (editor.kind === "regions") Object.assign(body, { code: code || undefined, description: description || undefined }); if (editor.kind === "states") Object.assign(body, { regionId: parentId, code: code || undefined }); if (editor.kind === "cities") body.stateId = parentId; if (editor.kind === "areas") body.cityId = parentId; if (editor.kind === "territories") Object.assign(body, { areaId: parentId, code: code || undefined, description: description || undefined, effectiveFrom }); const response = await fetch(editor.id ? `/api/territory/${editor.kind}/${editor.id}` : `/api/territory/${editor.kind}`, { method: editor.id ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const json = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(json, "Unable to save this record.")); await onSaved(`${name} was ${editor.id ? "updated" : "added"}.`); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save this record."); setSaving(false); } };
+  const singular = LEVELS.find((item) => item.key === editor.kind)?.singular ?? "record";
+  return <Modal title={`${editor.id ? "Edit" : "Add"} ${singular}`} onClose={onClose}><form onSubmit={submit} className="space-y-4">{parent && <Field label={`${parent.label} *`}><Select value={parentId} onChange={setParentId} options={parent.rows.map((item) => ({ value: item.id, label: item.name }))} /></Field>}<Field label="Name *"><Input value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={120} required /></Field>{["regions", "states", "territories"].includes(editor.kind) && <Field label="Code"><Input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} maxLength={20} /></Field>}{["regions", "territories"].includes(editor.kind) && <Field label="Description"><TextArea value={description} onChange={setDescription} placeholder="Optional operational note" /></Field>}{editor.kind === "territories" && <Field label="Effective from *"><Input type="date" value={effectiveFrom} onChange={(event) => setEffectiveFrom(event.target.value)} required /></Field>}{editor.id && <label className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2.5 text-sm"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} className="size-4" />Active and available for allocation</label>}{error && <FormError message={error} />}<FormActions saving={saving} disabled={Boolean(parent && !parentId)} onClose={onClose} /></form></Modal>;
 }
 
-function StateForm({ mode, state, regions, onClose, onSaved }: { mode: "create" | "edit"; state?: State; regions: Region[]; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
-  const [name, setName] = useState(state?.name ?? "");
-  const [regionId, setRegionId] = useState(state?.regionId ?? regions[0]?.id ?? "");
-  const { saving, error, submit } = useLevelSubmit(async () => {
-    const response = await fetch(mode === "create" ? "/api/territory/states" : `/api/territory/states/${state!.id}`, { method: mode === "create" ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, regionId }) });
-    return { response, message: `${name} was ${mode === "create" ? "added" : "updated"}.` };
-  }, onSaved);
-  return <Modal title={mode === "create" ? "Add state" : "Edit state"} onClose={onClose}>
-    <form onSubmit={submit} className="space-y-4">
-      <Field label="Region *"><Select value={regionId} onChange={setRegionId} options={regions.map((r) => ({ value: r.id, label: r.name }))} /></Field>
-      <Field label="State name *"><Input value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={120} required /></Field>
-      {error && <FormError message={error} />}
-      <FormActions saving={saving} onClose={onClose} disabled={!regionId} />
-    </form>
-  </Modal>;
+function AllocationEditor({ data, staff, onClose, onSaved }: { data: Hierarchy; staff: StaffOption[]; onClose: () => void; onSaved: () => Promise<void> }) {
+  const territories = data.territories.filter((item) => item.isActive); const [userId, setUserId] = useState(staff[0]?.id ?? ""); const [territoryId, setTerritoryId] = useState(territories[0]?.id ?? ""); const [effectiveFrom, setEffectiveFrom] = useState(today()); const [reason, setReason] = useState(""); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+  const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); setError(""); try { const response = await fetch("/api/territory/allocations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId, territoryId, effectiveFrom, reason: reason || undefined }) }); const json = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(json, "Unable to allocate this territory.")); await onSaved(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to allocate this territory."); setSaving(false); } };
+  return <Modal title="Allocate territory" onClose={onClose}><form onSubmit={submit} className="space-y-4"><Field label="Sales staff *"><Select value={userId} onChange={setUserId} options={staff.map((item) => ({ value: item.id, label: item.name }))} /></Field><Field label="Territory *"><Select value={territoryId} onChange={setTerritoryId} options={territories.map((item) => ({ value: item.id, label: `${item.name}${item.code ? ` (${item.code})` : ""}` }))} /></Field><Field label="Effective from *"><Input type="date" value={effectiveFrom} onChange={(event) => setEffectiveFrom(event.target.value)} required /></Field><Field label="Reason / note"><TextArea value={reason} onChange={setReason} placeholder="Optional allocation context" /></Field>{(!staff.length || !territories.length) && <FormError message={!staff.length ? "No active Sales staff are available." : "Create an active territory first."} />}{error && <FormError message={error} />}<FormActions saving={saving} disabled={!userId || !territoryId} onClose={onClose} /></form></Modal>;
 }
 
-function CityForm({ mode, city, states, onClose, onSaved }: { mode: "create" | "edit"; city?: City; states: State[]; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
-  const [name, setName] = useState(city?.name ?? "");
-  const [stateId, setStateId] = useState(city?.stateId ?? states[0]?.id ?? "");
-  const { saving, error, submit } = useLevelSubmit(async () => {
-    const response = await fetch(mode === "create" ? "/api/territory/cities" : `/api/territory/cities/${city!.id}`, { method: mode === "create" ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, stateId }) });
-    return { response, message: `${name} was ${mode === "create" ? "added" : "updated"}.` };
-  }, onSaved);
-  return <Modal title={mode === "create" ? "Add city" : "Edit city"} onClose={onClose}>
-    <form onSubmit={submit} className="space-y-4">
-      <Field label="State *"><Select value={stateId} onChange={setStateId} options={states.map((s) => ({ value: s.id, label: s.name }))} /></Field>
-      <Field label="City name *"><Input value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={120} required /></Field>
-      {error && <FormError message={error} />}
-      <FormActions saving={saving} onClose={onClose} disabled={!stateId} />
-    </form>
-  </Modal>;
-}
+function EndAllocation({ assignment, onClose, onSaved }: { assignment: Assignment; onClose: () => void; onSaved: () => Promise<void> }) { const [endDate, setEndDate] = useState(today()); const [reason, setReason] = useState(""); const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); setError(""); try { const response = await fetch(`/api/territory/allocations/${assignment.id}/end`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ endDate, reason: reason || undefined }) }); const json = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(json, "Unable to end this allocation.")); await onSaved(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to end this allocation."); setSaving(false); } }; return <Modal title="End territory allocation" onClose={onClose}><form onSubmit={submit} className="space-y-4"><div className="rounded-lg border bg-background p-3"><p className="text-sm font-semibold">{assignment.user.name}</p><p className="text-xs text-muted">{assignment.territory.name} · {assignment.territory.area.city.name}</p></div><Field label="End date *"><Input type="date" min={assignment.startDate.slice(0, 10)} value={endDate} onChange={(event) => setEndDate(event.target.value)} required /></Field><Field label="Reason"><TextArea value={reason} onChange={setReason} placeholder="Handover, role change, territory change…" /></Field>{error && <FormError message={error} />}<FormActions saving={saving} onClose={onClose} /></form></Modal>; }
 
-function TerritoryForm({ mode, territory, data, onClose, onSaved }: { mode: "create" | "edit"; territory?: Territory; data: Hierarchy; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
-  const [name, setName] = useState(territory?.name ?? "");
-  const [regionId, setRegionId] = useState(territory?.regionId ?? data.regions[0]?.id ?? "");
-  const statesInRegion = useMemo(() => data.states.filter((s) => s.regionId === regionId), [data.states, regionId]);
-  const [stateId, setStateId] = useState(territory?.stateId ?? statesInRegion[0]?.id ?? "");
-  const citiesInState = useMemo(() => data.cities.filter((c) => c.stateId === stateId), [data.cities, stateId]);
-  const [cityId, setCityId] = useState(territory?.cityId ?? citiesInState[0]?.id ?? "");
-  const { saving, error, submit } = useLevelSubmit(async () => {
-    const response = await fetch(mode === "create" ? "/api/territory/territories" : `/api/territory/territories/${territory!.id}`, { method: mode === "create" ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, regionId, stateId, cityId }) });
-    return { response, message: `${name} was ${mode === "create" ? "added" : "updated"}.` };
-  }, onSaved);
-  return <Modal title={mode === "create" ? "Add territory" : "Edit territory"} onClose={onClose}>
-    <form onSubmit={submit} className="space-y-4">
-      <Field label="Region *"><Select value={regionId} onChange={(v) => { setRegionId(v); const next = data.states.filter((s) => s.regionId === v); setStateId(next[0]?.id ?? ""); setCityId(""); }} options={data.regions.map((r) => ({ value: r.id, label: r.name }))} /></Field>
-      <Field label="State *"><Select value={stateId} onChange={(v) => { setStateId(v); const next = data.cities.filter((c) => c.stateId === v); setCityId(next[0]?.id ?? ""); }} options={statesInRegion.map((s) => ({ value: s.id, label: s.name }))} /></Field>
-      <Field label="City *"><Select value={cityId} onChange={setCityId} options={citiesInState.map((c) => ({ value: c.id, label: c.name }))} /></Field>
-      <Field label="Territory name *"><Input value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={120} required /></Field>
-      {error && <FormError message={error} />}
-      <FormActions saving={saving} onClose={onClose} disabled={!regionId || !stateId || !cityId} />
-    </form>
-  </Modal>;
-}
+type StaffRoute = { id: string; staff: { name: string }; status: string; planned: number; visited: number; total: number };
+function RouteOversight() { const [rows, setRows] = useState<StaffRoute[] | null>(null); const [error, setError] = useState(""); useEffect(() => { void (async () => { try { const response = await fetch(`/api/routes/admin?date=${today()}`, { cache: "no-store" }); const json = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(json, "Unable to load today's routes.")); setRows(json as StaffRoute[]); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load today's routes."); } })(); }, []); if (error) return <FormError message={error} />; if (!rows) return <div className="h-52 animate-pulse rounded-xl bg-white" />; return <section className="overflow-hidden rounded-xl border bg-white"><div className="flex items-center gap-2 border-b px-5 py-3"><CalendarDays size={16} className="text-brand" /><div><h2 className="text-sm font-semibold">Today&apos;s route execution</h2><p className="text-xs text-muted">Operational visibility for allocated sales staff</p></div></div>{rows.length ? <div className="divide-y">{rows.map((row) => <div key={row.id} className="flex items-center justify-between gap-3 px-5 py-4"><div><p className="text-sm font-semibold">{row.staff.name}</p><p className="text-xs text-muted">{row.visited} visited · {row.planned} pending · {row.total} total</p></div><span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand-dark">{row.status.replaceAll("_", " ")}</span></div>)}</div> : <Empty message="No routes are planned for today." />}</section>; }
 
-function BeatForm({ mode, beat, territories, staff, onClose, onSaved }: { mode: "create" | "edit"; beat?: Beat; territories: Territory[]; staff: StaffOption[]; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
-  const [name, setName] = useState(beat?.name ?? "");
-  const [territoryId, setTerritoryId] = useState(beat?.territoryId ?? territories[0]?.id ?? "");
-  const [assignedStaffId, setAssignedStaffId] = useState(beat?.assignedStaffId ?? "");
-  const [visitFrequencyDays, setVisitFrequencyDays] = useState(beat?.visitFrequencyDays ? String(beat.visitFrequencyDays) : "");
-  const { saving, error, submit } = useLevelSubmit(async () => {
-    const response = await fetch(mode === "create" ? "/api/territory/beats" : `/api/territory/beats/${beat!.id}`, { method: mode === "create" ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, territoryId, assignedStaffId: assignedStaffId || undefined, visitFrequencyDays: visitFrequencyDays ? Number(visitFrequencyDays) : undefined }) });
-    return { response, message: `${name} was ${mode === "create" ? "added" : "updated"}.` };
-  }, onSaved);
-  return <Modal title={mode === "create" ? "Add beat" : "Edit beat"} onClose={onClose}>
-    <form onSubmit={submit} className="space-y-4">
-      <Field label="Territory *"><Select value={territoryId} onChange={setTerritoryId} options={territories.map((t) => ({ value: t.id, label: t.name }))} /></Field>
-      <Field label="Beat name *"><Input value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={120} required /></Field>
-      <Field label="Assigned staff"><Select value={assignedStaffId} onChange={setAssignedStaffId} options={[{ value: "", label: "Unassigned" }, ...staff.map((s) => ({ value: s.id, label: s.name }))]} /></Field>
-      <Field label="Visit frequency (days)"><Input type="number" min="1" max="60" value={visitFrequencyDays} onChange={(e) => setVisitFrequencyDays(e.target.value)} placeholder="e.g. 7" /></Field>
-      {error && <FormError message={error} />}
-      <FormActions saving={saving} onClose={onClose} disabled={!territoryId} />
-    </form>
-  </Modal>;
-}
-
-function useLevelSubmit(run: () => Promise<{ response: Response; message: string }>, onSaved: (message: string) => Promise<void>) {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const submit = async (event: FormEvent) => {
-    event.preventDefault(); setSaving(true); setError("");
-    try {
-      const { response, message } = await run();
-      const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(messageFrom(data, "Unable to save this record."));
-      await onSaved(message);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save this record."); setSaving(false); }
-  };
-  return { saving, error, submit };
-}
-
-function ConfirmDelete({ name, onClose, onConfirm }: { name: string; onClose: () => void; onConfirm: () => Promise<void> }) {
-  const [deleting, setDeleting] = useState(false);
-  return <Modal title="Delete record" onClose={onClose}>
-    <p className="text-sm text-foreground">Delete <span className="font-semibold">{name}</span>? This cannot be undone.</p>
-    <div className="mt-5 flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
-      <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-      <button type="button" disabled={deleting} onClick={async () => { setDeleting(true); await onConfirm(); }} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-danger px-4 text-[13px] font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50 sm:h-10">{deleting && <LoaderCircle className="animate-spin" size={16} />}{deleting ? "Deleting…" : "Delete"}</button>
-    </div>
-  </Modal>;
-}
-
-function Select({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
-  return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }
+function StatusBadge({ active, activeLabel = "Active", inactiveLabel = "Inactive" }: { active: boolean; activeLabel?: string; inactiveLabel?: string }) { return <span className={`w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${active ? "bg-success-soft text-success" : "bg-gray-100 text-muted"}`}>{active ? activeLabel : inactiveLabel}</span>; }
+function Empty({ message }: { message: string }) { return <div className="px-5 py-14 text-center"><MapPin className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold">{message}</p></div>; }
+function Select({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>; }
+function TextArea({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) { return <textarea value={value} onChange={(event) => onChange(event.target.value)} maxLength={500} rows={3} className="w-full resize-none rounded-lg border bg-white px-3 py-2 text-[13px] outline-none focus:border-brand" placeholder={placeholder} />; }
+function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium">{label}</span>{children}</label>; }
 function FormError({ message }: { message: string }) { return <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{message}</p>; }
-function FormActions({ saving, disabled, onClose }: { saving: boolean; disabled?: boolean; onClose: () => void }) {
-  return <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
-    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-    <Button type="submit" disabled={saving || disabled}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Saving…" : "Save"}</Button>
-  </div>;
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
-    <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-md flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-32px)]">
-      <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><h2 className="text-base font-semibold text-foreground">{title}</h2><button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-background sm:size-8" aria-label="Close"><X size={17} /></button></div>
-      <div className="overflow-y-auto p-4 sm:p-5">{children}</div>
-    </div>
-  </div>;
-}
+function FormActions({ saving, disabled, onClose }: { saving: boolean; disabled?: boolean; onClose: () => void }) { return <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving || disabled}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Saving…" : "Save"}</Button></div>; }
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) { return <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-foreground/40 p-3 backdrop-blur-[1px]" role="dialog" aria-modal="true" aria-label={title}><div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-md flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)]"><div className="flex items-center justify-between border-b px-5 py-4"><h2 className="text-base font-semibold">{title}</h2><button type="button" onClick={onClose} className="grid size-9 place-items-center rounded-lg text-muted hover:bg-background" aria-label="Close"><X size={17} /></button></div><div className="overflow-y-auto p-4 sm:p-5">{children}</div></div></div>; }
