@@ -112,7 +112,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
             </tbody>
           </table>
         </div>
-        <div className="grid grid-cols-2 gap-3 p-3 xl:hidden">{data?.items.map((product) => <ProductCard key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}</div>
+        <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 xl:hidden">{data?.items.map((product) => <ProductCard key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}</div>
         {!data?.items.length && <div className="px-5 py-12 text-center"><Package className="mx-auto text-subtle" size={24} /><p className="mt-3 text-sm font-semibold text-foreground">No products found</p><p className="mt-1 text-xs text-muted">Adjust the search or add a product.</p></div>}
         {data && data.total > 0 && <Pagination page={data.page} pageSize={data.pageSize} total={data.total} hasMore={data.hasMore} onPageChange={setPage} />}
       </section>
@@ -145,12 +145,13 @@ function ProductRow({ product, busy, onEdit, onToggleActive, onDelete }: RowProp
 }
 
 function ProductCard({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
-  return <article className="rounded-xl border bg-white p-4 shadow-[0_3px_12px_rgba(26,31,26,0.04)]">
-    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{pretty(product.category)}</p></div><div className="flex shrink-0 items-center gap-2"><StatusBadge isActive={product.isActive} /><ProductActions product={product} busy={busy} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} /></div></div>
-    <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs">
-      <div><dt className="text-muted">MRP</dt><dd className="mt-1 font-medium text-foreground">{money(product.unitPrice)}</dd></div>
-      <div><dt className="text-muted">Quantity</dt><dd className="mt-1"><StockCell stockOnHand={product.stockOnHand} /></dd></div>
+  return <article className="rounded-lg border bg-white p-4">
+    <div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="break-words text-sm font-semibold leading-5 text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{pretty(product.category)}</p></div><ProductActions product={product} busy={busy} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} /></div>
+    <dl className="mt-4 grid grid-cols-2 gap-4 border-t pt-3 text-xs">
+      <div><dt className="text-muted">MRP</dt><dd className="mt-1 text-sm font-semibold text-foreground">{money(product.unitPrice)}</dd></div>
+      <div><dt className="text-muted">Stock</dt><dd className="mt-1 text-sm"><StockCell stockOnHand={product.stockOnHand} /></dd></div>
     </dl>
+    <div className="mt-3"><StatusBadge isActive={product.isActive} /></div>
   </article>;
 }
 
