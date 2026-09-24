@@ -1,79 +1,119 @@
 "use client";
 
-import { Clock3, LogIn, LogOut } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CalendarDays, CheckCircle2, Clock3, FilePenLine, LoaderCircle, LogIn, LogOut, MapPin, X } from "lucide-react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { SuccessToast } from "@/components/ui/toast";
 
-type TodayRecord = { punchInAt: string | null; punchOutAt: string | null } | null;
-type MonthlyRecord = { date: string; punchInAt: string | null; punchOutAt: string | null };
-type Monthly = { period: { month: number; year: number }; daysPresent: number; records: MonthlyRecord[] };
+type DayStatus = "PRESENT" | "LATE" | "HALF_DAY" | "ABSENT" | "LEAVE" | "HOLIDAY" | "WEEKLY_OFF" | "NOT_PUNCHED";
+type TodayRecord = { punchInAt: string | null; punchOutAt: string | null; punchInVerified: boolean | null; punchOutVerified: boolean | null; status: DayStatus; workingHours: number | null; isLate: boolean; isEarlyCheckout: boolean };
+type MonthlyRecord = { date: string; punchInAt: string | null; punchOutAt: string | null; status: DayStatus; workingHours: number | null; isLate: boolean; isEarlyCheckout: boolean };
+type Monthly = { period: { month: number; year: number }; summary: { present: number; late: number; halfDay: number; absent: number; leave: number; holiday: number; weeklyOff: number; totalHours: number }; records: MonthlyRecord[] };
+type RequestItem = { id: string; status: "PENDING" | "APPROVED" | "REJECTED"; reason: string; date?: string; startDate?: string; endDate?: string };
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const time = (value: string) => new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit" }).format(new Date(value));
-const dateLabel = (value: string) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", weekday: "short" }).format(new Date(value));
-const hoursBetween = (inAt: string, outAt: string) => {
-  const ms = new Date(outAt).getTime() - new Date(inAt).getTime();
-  const hours = Math.floor(ms / 3600000);
-  const minutes = Math.round((ms % 3600000) / 60000);
-  return `${hours}h ${minutes}m`;
-};
+const time = (value: string) => new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" }).format(new Date(value));
+const dateLabel = (value: string) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", weekday: "short", timeZone: "UTC" }).format(new Date(value));
+const pretty = (value: string) => value.toLowerCase().split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? (Array.isArray((data as { message: unknown }).message) ? (data as { message: string[] }).message.join(" ") : String((data as { message: unknown }).message)) : fallback;
+const statusTone: Record<DayStatus, string> = { PRESENT: "bg-success-soft text-success", LATE: "bg-warning-soft text-warning", HALF_DAY: "bg-warning-soft text-warning", ABSENT: "bg-red-50 text-danger", LEAVE: "bg-brand-soft text-brand-dark", HOLIDAY: "bg-blue-50 text-blue-700", WEEKLY_OFF: "bg-gray-100 text-muted", NOT_PUNCHED: "bg-gray-100 text-muted" };
+
+function locate() {
+  return new Promise<{ latitude?: number; longitude?: number; message: string }>((resolve) => {
+    if (!navigator.geolocation) return resolve({ message: "Location is not available on this device." });
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude, message: "Location captured." }),
+      () => resolve({ message: "Location permission was not available. Attendance will still be recorded." }),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+    );
+  });
+}
 
 export function AttendanceModule() {
-  const [today, setToday] = useState<TodayRecord>(null);
+  const [today, setToday] = useState<TodayRecord | null>(null);
   const [monthly, setMonthly] = useState<Monthly | null>(null);
+  const [corrections, setCorrections] = useState<RequestItem[]>([]);
+  const [leaves, setLeaves] = useState<RequestItem[]>([]);
+  const [modal, setModal] = useState<"correction" | "leave" | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [locationMessage, setLocationMessage] = useState("");
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
   const load = async (cancelled?: () => boolean) => {
     try {
-      const [todayResponse, monthlyResponse] = await Promise.all([fetch("/api/attendance/today", { cache: "no-store" }), fetch("/api/attendance/monthly", { cache: "no-store" })]);
+      const responses = await Promise.all([fetch("/api/attendance/today", { cache: "no-store" }), fetch("/api/attendance/monthly", { cache: "no-store" }), fetch("/api/attendance/corrections/mine", { cache: "no-store" }), fetch("/api/attendance/leave/mine", { cache: "no-store" })]);
       if (cancelled?.()) return;
-      if (todayResponse.ok) setToday(await todayResponse.json());
-      if (monthlyResponse.ok) setMonthly(await monthlyResponse.json());
-      setError("");
-    } catch { if (!cancelled?.()) setError("Unable to load attendance data."); }
+      const data = await Promise.all(responses.map((response) => response.json().catch(() => null)));
+      const failed = responses.findIndex((response) => !response.ok);
+      if (failed >= 0) throw new Error(messageFrom(data[failed], "Unable to load attendance data."));
+      setToday(data[0] as TodayRecord); setMonthly(data[1] as Monthly); setCorrections(data[2] as RequestItem[]); setLeaves(data[3] as RequestItem[]); setError("");
+    } catch (cause) { if (!cancelled?.()) setError(cause instanceof Error ? cause.message : "Unable to load attendance data."); }
     finally { if (!cancelled?.()) setLoading(false); }
   };
-  useEffect(() => {
-    let cancelled = false;
-    (async () => { await load(() => cancelled); })();
-    return () => { cancelled = true; };
-  }, []);
+  useEffect(() => { let cancelled = false; const timer = window.setTimeout(() => { void load(() => cancelled); }, 0); return () => { cancelled = true; window.clearTimeout(timer); }; }, []);
 
   const punch = async (action: "punch-in" | "punch-out") => {
-    setBusy(true); setError("");
+    setBusy(true); setError(""); setLocationMessage("Locating…");
     try {
-      const response = await fetch(`/api/attendance/${action}`, { method: "POST" });
+      const location = await locate(); setLocationMessage(location.message);
+      const response = await fetch(`/api/attendance/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ latitude: location.latitude, longitude: location.longitude }) });
       const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error((data && typeof data === "object" && "message" in data) ? String(data.message) : "Unable to record attendance.");
-      await load();
+      if (!response.ok) throw new Error(messageFrom(data, "Unable to record attendance."));
+      await load(); setNotice(action === "punch-in" ? "Punch-in recorded." : "Punch-out recorded.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to record attendance."); }
     finally { setBusy(false); }
   };
 
-  if (loading) return <div className="space-y-3"><div className="h-32 animate-pulse rounded-xl bg-background" /></div>;
+  if (loading) return <div className="space-y-3"><div className="h-36 animate-pulse rounded-xl bg-background" /><div className="h-64 animate-pulse rounded-xl bg-background" /></div>;
 
   return <div className="space-y-5">
+    {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
-    <section className="rounded-xl border bg-white p-5 text-center shadow-[0_3px_12px_rgba(15,23,42,0.04)] sm:p-6">
-      <span className="mx-auto grid size-12 place-items-center rounded-xl bg-brand-soft text-brand"><Clock3 size={22} /></span>
-      {today?.punchInAt && !today?.punchOutAt && <p className="mt-3 text-sm text-muted">Punched in at <span className="font-semibold text-foreground">{time(today.punchInAt)}</span></p>}
-      {today?.punchInAt && today?.punchOutAt && <p className="mt-3 text-sm text-muted">Worked <span className="font-semibold text-foreground">{hoursBetween(today.punchInAt, today.punchOutAt)}</span> today ({time(today.punchInAt)} – {time(today.punchOutAt)})</p>}
-      {!today?.punchInAt && <p className="mt-3 text-sm text-muted">You have not punched in today.</p>}
-      <div className="mt-4 flex justify-center gap-2">
-        {!today?.punchInAt && <Button disabled={busy} onClick={() => punch("punch-in")}><LogIn size={16} />{busy ? "Punching in…" : "Punch in"}</Button>}
-        {today?.punchInAt && !today?.punchOutAt && <Button variant="secondary" disabled={busy} onClick={() => punch("punch-out")}><LogOut size={16} />{busy ? "Punching out…" : "Punch out"}</Button>}
-        {today?.punchInAt && today?.punchOutAt && <span className="inline-flex items-center gap-1.5 rounded-lg bg-success-soft px-3 py-2 text-xs font-semibold text-success">Day complete</span>}
+    <section className="rounded-xl border bg-white p-5 shadow-[0_3px_12px_rgba(15,23,42,0.04)] sm:p-6">
+      <div className="flex flex-col items-center text-center">
+        <span className="grid size-12 place-items-center rounded-xl bg-brand-soft text-brand"><Clock3 size={22} /></span>
+        <span className={`mt-3 rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusTone[today?.status ?? "NOT_PUNCHED"]}`}>{pretty(today?.status ?? "NOT_PUNCHED")}</span>
+        {today?.punchInAt && !today.punchOutAt && <p className="mt-2 text-sm text-muted">Punched in at <strong className="text-foreground">{time(today.punchInAt)}</strong></p>}
+        {today?.punchInAt && today.punchOutAt && <p className="mt-2 text-sm text-muted">Worked <strong className="text-foreground">{today.workingHours?.toFixed(2)} hours</strong> ({time(today.punchInAt)} – {time(today.punchOutAt)})</p>}
+        {!today?.punchInAt && <p className="mt-2 text-sm text-muted">You have not punched in today.</p>}
+        {locationMessage && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted"><MapPin size={13} />{locationMessage}</p>}
+        <div className="mt-4 flex justify-center gap-2">
+          {!today?.punchInAt && <Button disabled={busy} onClick={() => punch("punch-in")}><LogIn size={16} />{busy ? "Recording…" : "Punch in"}</Button>}
+          {today?.punchInAt && !today.punchOutAt && <Button variant="secondary" disabled={busy} onClick={() => punch("punch-out")}><LogOut size={16} />{busy ? "Recording…" : "Punch out"}</Button>}
+          {today?.punchInAt && today.punchOutAt && <span className="inline-flex items-center gap-1.5 rounded-lg bg-success-soft px-3 py-2 text-xs font-semibold text-success"><CheckCircle2 size={14} />Day complete</span>}
+        </div>
       </div>
+      <div className="mt-5 grid gap-2 border-t pt-4 sm:grid-cols-2"><Button variant="secondary" onClick={() => setModal("correction")}><FilePenLine size={15} />Request correction</Button><Button variant="secondary" onClick={() => setModal("leave")}><CalendarDays size={15} />Request leave</Button></div>
     </section>
 
     {monthly && <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
-      <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">{MONTHS[monthly.period.month - 1]} {monthly.period.year}</p><p className="mt-0.5 text-xs text-muted">{monthly.daysPresent} day{monthly.daysPresent === 1 ? "" : "s"} present</p></div>
-      {monthly.records.length ? <div className="divide-y">{monthly.records.map((record) => <div key={record.date} className="flex items-center justify-between px-4 py-3 sm:px-5">
-        <p className="text-sm text-foreground">{dateLabel(record.date)}</p>
-        <p className="text-xs text-muted">{record.punchInAt ? time(record.punchInAt) : "—"} – {record.punchOutAt ? time(record.punchOutAt) : "—"}{record.punchInAt && record.punchOutAt ? ` · ${hoursBetween(record.punchInAt, record.punchOutAt)}` : ""}</p>
-      </div>)}</div> : <div className="px-5 py-8 text-center text-xs text-muted">No attendance recorded yet this month.</div>}
+      <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">{MONTHS[monthly.period.month - 1]} {monthly.period.year}</p><p className="mt-0.5 text-xs text-muted">{monthly.summary.present} present · {monthly.summary.totalHours} hours · {monthly.summary.absent} absent</p></div>
+      {monthly.records.length ? <div className="divide-y">{monthly.records.map((record) => <div key={record.date} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div className="flex items-center gap-2"><p className="text-sm text-foreground">{dateLabel(record.date)}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusTone[record.status]}`}>{pretty(record.status)}</span></div><p className="text-xs text-muted">{record.punchInAt ? time(record.punchInAt) : "—"} – {record.punchOutAt ? time(record.punchOutAt) : "—"}{record.workingHours != null ? ` · ${record.workingHours.toFixed(2)}h` : ""}</p></div>)}</div> : <div className="px-5 py-8 text-center text-xs text-muted">No attendance entries yet this month.</div>}
     </section>}
+
+    <section className="grid gap-4 lg:grid-cols-2"><RequestList title="Correction requests" items={corrections} /><RequestList title="Leave requests" items={leaves} /></section>
+    {modal === "correction" && <CorrectionModal onClose={() => setModal(null)} onDone={async () => { setModal(null); await load(); setNotice("Correction request submitted."); }} />}
+    {modal === "leave" && <LeaveModal onClose={() => setModal(null)} onDone={async () => { setModal(null); await load(); setNotice("Leave request submitted."); }} />}
   </div>;
 }
+
+function RequestList({ title, items }: { title: string; items: RequestItem[] }) { return <section className="overflow-hidden rounded-xl border bg-white"><div className="border-b px-4 py-3"><h2 className="text-sm font-semibold text-foreground">{title}</h2></div>{items.length ? <div className="divide-y">{items.slice(0, 5).map((item) => <div key={item.id} className="flex items-start justify-between gap-3 px-4 py-3"><div><p className="text-xs font-medium text-foreground">{item.date ? dateLabel(item.date) : `${dateLabel(item.startDate!)} – ${dateLabel(item.endDate!)}`}</p><p className="mt-1 line-clamp-2 text-xs text-muted">{item.reason}</p></div><span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.status === "APPROVED" ? "bg-success-soft text-success" : item.status === "REJECTED" ? "bg-red-50 text-danger" : "bg-warning-soft text-warning"}`}>{pretty(item.status)}</span></div>)}</div> : <p className="px-4 py-6 text-center text-xs text-muted">No requests yet.</p>}</section>; }
+
+function CorrectionModal({ onClose, onDone }: { onClose: () => void; onDone: () => Promise<void> }) {
+  const [date, setDate] = useState(""); const [punchIn, setPunchIn] = useState(""); const [punchOut, setPunchOut] = useState(""); const [reason, setReason] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const submit = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setError(""); try { const response = await fetch("/api/attendance/corrections", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ date, requestedPunchIn: punchIn ? `${date}T${punchIn}:00+05:30` : undefined, requestedPunchOut: punchOut ? `${date}T${punchOut}:00+05:30` : undefined, reason }) }); const data = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(data, "Unable to submit correction.")); await onDone(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to submit correction."); setBusy(false); } };
+  return <Modal title="Request attendance correction" onClose={onClose}><form onSubmit={submit} className="space-y-4"><Field label="Date"><Input type="date" value={date} onChange={(event) => setDate(event.target.value)} required /></Field><div className="grid gap-3 sm:grid-cols-2"><Field label="Requested punch-in"><Input type="time" value={punchIn} onChange={(event) => setPunchIn(event.target.value)} /></Field><Field label="Requested punch-out"><Input type="time" value={punchOut} onChange={(event) => setPunchOut(event.target.value)} /></Field></div><Field label="Reason"><textarea value={reason} onChange={(event) => setReason(event.target.value)} required minLength={2} maxLength={500} rows={3} className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/10" /></Field>{error && <p className="text-xs text-danger">{error}</p>}<Actions busy={busy} onClose={onClose} /></form></Modal>;
+}
+
+function LeaveModal({ onClose, onDone }: { onClose: () => void; onDone: () => Promise<void> }) {
+  const [startDate, setStartDate] = useState(""); const [endDate, setEndDate] = useState(""); const [reason, setReason] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const submit = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setError(""); try { const response = await fetch("/api/attendance/leave", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ startDate, endDate, reason }) }); const data = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(data, "Unable to submit leave request.")); await onDone(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to submit leave request."); setBusy(false); } };
+  return <Modal title="Request leave" onClose={onClose}><form onSubmit={submit} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="From"><Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} required /></Field><Field label="To"><Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} min={startDate} required /></Field></div><Field label="Reason"><textarea value={reason} onChange={(event) => setReason(event.target.value)} required minLength={2} maxLength={500} rows={3} className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/10" /></Field>{error && <p className="text-xs text-danger">{error}</p>}<Actions busy={busy} onClose={onClose} /></form></Modal>;
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }
+function Actions({ busy, onClose }: { busy: boolean; onClose: () => void }) { return <div className="flex justify-end gap-2 border-t pt-4"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy && <LoaderCircle className="animate-spin" size={15} />}{busy ? "Submitting…" : "Submit"}</Button></div>; }
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) { return <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-3" role="dialog" aria-modal="true" aria-label={title}><div className="w-full max-w-lg rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)]"><div className="flex items-center justify-between border-b px-5 py-4"><h2 className="text-base font-semibold text-foreground">{title}</h2><button type="button" onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted hover:bg-background" aria-label="Close"><X size={17} /></button></div><div className="p-5">{children}</div></div></div>; }

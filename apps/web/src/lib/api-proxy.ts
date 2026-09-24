@@ -14,9 +14,9 @@ export async function proxyToApi(request: Request, upstreamPath: string, options
     const upstream = await fetch(url, {
       method: request.method,
       headers: { cookie: request.headers.get("cookie") ?? "", [PORTAL_HEADER]: portal, ...(hasBody ? { "content-type": request.headers.get("content-type") ?? "application/json" } : {}) },
-      body: hasBody ? await request.text() : undefined,
+      body: hasBody ? await request.arrayBuffer() : undefined,
       cache: "no-store",
     });
-    return new NextResponse(await upstream.text(), { status: upstream.status, headers: { "content-type": upstream.headers.get("content-type") ?? "application/json" } });
+    return new NextResponse(await upstream.arrayBuffer(), { status: upstream.status, headers: { "content-type": upstream.headers.get("content-type") ?? "application/json", ...(upstream.headers.get("content-disposition") ? { "content-disposition": upstream.headers.get("content-disposition")! } : {}) } });
   } catch { return NextResponse.json({ message: "Service is temporarily unavailable." }, { status: 503 }); }
 }

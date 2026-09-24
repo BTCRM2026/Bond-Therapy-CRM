@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowDown, ArrowUp, Calendar, CheckCircle2, Clock3, LoaderCircle, MapPin, Plus, RotateCcw, Star, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Calendar, Camera, CheckCircle2, Clock3, LoaderCircle, MapPin, Plus, RotateCcw, Star, Trash2, X } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { SuccessToast } from "@/components/ui/toast";
 
 type Salon = { id: string; salonName: string; city: string; area: string | null; potential: string | null; beat: { id: string; name: string } | null };
 type Activity = { id: string; checkInAt: string | null; checkOutAt: string | null; visitOutcome: string | null; status: string; note: string | null };
-type RouteStop = { id: string; clientId: string; sequence: number; plannedTime: string | null; status: "PLANNED" | "VISITED" | "UNABLE_TO_MEET" | "RESCHEDULED" | "REMOVED"; note: string | null; client: { id: string; salonName: string; city: string; area: string | null; primaryContact: string; potential: string | null }; activity: Activity | null };
+type RouteStop = { id: string; clientId: string; sequence: number; plannedTime: string | null; status: "PLANNED" | "VISITED" | "UNABLE_TO_MEET" | "RESCHEDULED" | "REMOVED"; note: string | null; client: { id: string; salonName: string; city: string; area: string | null; primaryContact: string; potential: string | null; latitude: string | null; longitude: string | null }; activity: Activity | null };
 type RouteData = { id: string | null; staffId: string; routeDate: string; status: "DRAFT" | "PLANNED" | "IN_PROGRESS" | "PARTIALLY_COMPLETED" | "COMPLETED" | "CANCELLED"; notes: string | null; stops: RouteStop[] };
 
 const OUTCOMES = [
@@ -38,6 +38,7 @@ export function RoutePlanner() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [visiting, setVisiting] = useState<RouteStop | null>(null);
+  const [starting, setStarting] = useState<RouteStop | null>(null);
   const [resolving, setResolving] = useState<{ stop: RouteStop; mode: "UNABLE_TO_MEET" | "RESCHEDULED" } | null>(null);
 
   const load = async () => {
@@ -71,15 +72,6 @@ export function RoutePlanner() {
       await load();
       setNotice(`Route for ${dayLabel(date)} confirmed.`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to submit this route."); }
-  };
-
-  const startVisit = async (date: string, stop: RouteStop) => {
-    try {
-      const response = await fetch(`/api/routes/${date}/stops/${stop.id}/start`, { method: "POST" });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(messageFrom(data, "Unable to start this visit."));
-      await load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to start this visit."); }
   };
 
   const resolveStop = async (date: string, stopId: string, status: "UNABLE_TO_MEET" | "RESCHEDULED", reason: string, rescheduleDate?: string) => {
@@ -117,8 +109,9 @@ export function RoutePlanner() {
 
     {route && (tab === "tomorrow"
       ? <RouteBuilder date={activeDate} route={route} salons={salons} onSave={saveStops} onSubmit={() => submitRoute(activeDate)} />
-      : <TodayRoute date={activeDate} route={route} salons={salons} onSave={saveStops} onStart={(stop) => startVisit(activeDate, stop)} onComplete={setVisiting} onResolve={(stop, mode) => setResolving({ stop, mode })} onRemove={(stopId) => removeStop(activeDate, stopId)} />)}
+      : <TodayRoute date={activeDate} route={route} salons={salons} onSave={saveStops} onStart={setStarting} onComplete={setVisiting} onResolve={(stop, mode) => setResolving({ stop, mode })} onRemove={(stopId) => removeStop(activeDate, stopId)} />)}
 
+    {starting && <StartVisitModal stop={starting} date={today} onClose={() => setStarting(null)} onDone={async () => { setStarting(null); await load(); setNotice("Visit check-in recorded."); }} />}
     {visiting && <CompleteVisitModal stop={visiting} date={today} onClose={() => setVisiting(null)} onDone={async () => { setVisiting(null); await load(); setNotice("Visit recorded."); }} />}
     {resolving && <ResolveStopModal stop={resolving.stop} mode={resolving.mode} onClose={() => setResolving(null)} onConfirm={(reason, rescheduleDate) => resolveStop(today, resolving.stop.id, resolving.mode, reason, rescheduleDate)} />}
   </div>;
@@ -260,6 +253,36 @@ function CompleteVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; 
       <FormActions saving={saving} onClose={onClose} label="Save visit" />
     </form>
   </Modal>;
+}
+
+function StartVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; date: string; onClose: () => void; onDone: () => Promise<void> }) {
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationStatus, setLocationStatus] = useState("Locating…");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!navigator.geolocation) { const timer = window.setTimeout(() => setLocationStatus("Location is not supported on this device."), 0); return () => window.clearTimeout(timer); }
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
+      setLocation({ latitude: coords.latitude, longitude: coords.longitude });
+      if (stop.client.latitude == null || stop.client.longitude == null) setLocationStatus("Salon location not set — GPS distance will be recorded without verification.");
+      else setLocationStatus("Location captured. The server will verify your distance from the salon.");
+    }, () => setLocationStatus("Allow location access to start this visit."), { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 });
+  }, [stop.client.latitude, stop.client.longitude]);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); if (!photo || !location) return; setSaving(true); setError("");
+    try {
+      const form = new FormData(); form.append("photo", photo); form.append("latitude", String(location.latitude)); form.append("longitude", String(location.longitude));
+      const response = await fetch(`/api/routes/${date}/stops/${stop.id}/start`, { method: "POST", body: form }); const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(messageFrom(data, "Unable to start this visit.")); await onDone();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to start this visit."); setSaving(false); }
+  };
+  return <Modal title="Start visit" subtitle={stop.client.salonName} onClose={onClose}><form onSubmit={submit} className="space-y-4">
+    <div className={`flex items-start gap-2 rounded-lg border p-3 text-xs ${location ? "border-success/20 bg-success-soft/50 text-success" : "border-warning/20 bg-warning-soft/50 text-warning"}`}><MapPin className="mt-0.5 shrink-0" size={15} /><span>{locationStatus}</span></div>
+    <label className="block cursor-pointer rounded-xl border border-dashed bg-background p-5 text-center hover:border-brand/40"><Camera className="mx-auto text-brand" size={24} /><span className="mt-2 block text-sm font-semibold text-foreground">{photo ? photo.name : "Capture check-in photo"}</span><span className="mt-1 block text-xs text-muted">Use the live camera at the salon entrance.</span><input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} /></label>
+    {error && <FormError message={error} />}
+    <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving || !photo || !location}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Starting…" : "Start visit"}</Button></div>
+  </form></Modal>;
 }
 
 function ResolveStopModal({ stop, mode, onClose, onConfirm }: { stop: RouteStop; mode: "UNABLE_TO_MEET" | "RESCHEDULED"; onClose: () => void; onConfirm: (reason: string, rescheduleDate?: string) => void }) {

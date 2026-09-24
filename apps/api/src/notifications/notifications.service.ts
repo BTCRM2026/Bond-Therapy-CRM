@@ -16,11 +16,37 @@ export class NotificationsService {
     const isManager = user.portal === 'STAFF' && user.roles.some((role) => role.key === 'SALES_MANAGER');
     const isSales = user.portal === 'STAFF' && user.roles.some((role) => salesRoles.has(role.key));
     if (isAdmin) {
-      await Promise.all([this.refreshExpiringAgreements(user), this.refreshLockedAccounts(user), this.refreshIncentivePendingApproval(user)]);
+      await Promise.all([this.refreshExpiringAgreements(user), this.refreshLockedAccounts(user), this.refreshIncentivePendingApproval(user), this.refreshAttendanceRequests(user)]);
     } else if (isSales) {
       const tasks = [this.refreshOverdueVisits(user)];
-      if (isManager) tasks.push(this.refreshIncentivePendingApproval(user));
+      if (isManager) tasks.push(this.refreshIncentivePendingApproval(user), this.refreshAttendanceRequests(user));
       await Promise.all(tasks);
+    }
+  }
+
+  private async refreshAttendanceRequests(user: SessionUser) {
+    const isAdmin = user.portal === 'ADMIN' && user.roles.some((role) => role.key === 'SUPER_ADMIN');
+    const team = isAdmin ? {} : { user: { managerId: user.id } };
+    const [corrections, leaves] = await Promise.all([
+      this.prisma.attendanceCorrectionRequest.count({ where: { status: 'PENDING', ...team } }),
+      this.prisma.leaveRequest.count({ where: { status: 'PENDING', ...team } }),
+    ]);
+    for (const item of [
+      { count: corrections, type: 'ATTENDANCE_CORRECTION_PENDING', title: 'Correction requests pending', label: 'attendance correction request' },
+      { count: leaves, type: 'LEAVE_REQUEST_PENDING', title: 'Leave requests pending', label: 'leave request' },
+    ]) {
+      if (!item.count) {
+        await this.prisma.notification.deleteMany({
+          where: { sourceKey: `${item.type.toLowerCase()}:${user.id}` },
+        });
+        continue;
+      }
+      const message = `${item.count} ${item.label}${item.count === 1 ? '' : 's'} waiting for review.`;
+      await this.prisma.notification.upsert({
+        where: { sourceKey: `${item.type.toLowerCase()}:${user.id}` },
+        create: { type: item.type, severity: 'INFO', title: item.title, message, sourceKey: `${item.type.toLowerCase()}:${user.id}`, portal: user.portal, recipientId: user.id },
+        update: { message, isRead: false },
+      });
     }
   }
 

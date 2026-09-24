@@ -1,4 +1,4 @@
-import { IsArray, IsEmail, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ClientActivityStatus, ClientActivityType, ClientCategory, ClientPotential, ClientStatus, CustomerSegment, DemoOutcome } from '@prisma/client';
 
@@ -32,6 +32,8 @@ export class ClientDto {
   @IsString() @MinLength(2) @MaxLength(100) city!: string;
   @IsOptional() @IsString() @MaxLength(10) pincode?: string;
   @IsOptional() @IsUrl({ require_protocol: true }) @MaxLength(500) googleMapsUrl?: string;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude?: number;
   @IsOptional() @IsInt() @Min(0) @Max(1000) chairCount?: number;
   @IsOptional() @IsInt() @Min(0) @Max(100000) staffCount?: number;
   @IsOptional() @IsInt() @Min(0) @Max(100000) stylistCount?: number;

@@ -472,6 +472,8 @@ type FormState = {
   city: string;
   pincode: string;
   googleMapsUrl: string;
+  latitude: string;
+  longitude: string;
   chairCount: string;
   staffCount: string;
   stylistCount: string;
@@ -505,6 +507,8 @@ const initialForm: FormState = {
   city: "",
   pincode: "",
   googleMapsUrl: "",
+  latitude: "",
+  longitude: "",
   chairCount: "",
   staffCount: "",
   stylistCount: "",
@@ -564,6 +568,8 @@ function ClientForm({
     const payload: Record<string, unknown> = {
       ...form,
       googleMapsUrl: form.googleMapsUrl || undefined,
+      latitude: form.latitude ? Number(form.latitude) : undefined,
+      longitude: form.longitude ? Number(form.longitude) : undefined,
       estimatedMonthlyBusiness: form.estimatedMonthlyBusiness
         ? Number(form.estimatedMonthlyBusiness)
         : undefined,
@@ -773,6 +779,12 @@ function ClientForm({
                     type="url"
                     placeholder="Add a maps link if available"
                   />
+                </Field>
+                <Field label="Latitude (optional)">
+                  <Input value={form.latitude} onChange={update("latitude")} type="number" inputMode="decimal" min="-90" max="90" step="any" placeholder="22.3072" />
+                </Field>
+                <Field label="Longitude (optional)">
+                  <Input value={form.longitude} onChange={update("longitude")} type="number" inputMode="decimal" min="-180" max="180" step="any" placeholder="73.1812" />
                 </Field>
               </section>
             )}

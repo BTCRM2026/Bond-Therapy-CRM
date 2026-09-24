@@ -8,9 +8,9 @@ export function SuccessToast({ message, onClose }: { message: string; onClose: (
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => setMounted(true));
     const timer = window.setTimeout(onClose, 4000);
-    return () => window.clearTimeout(timer);
+    return () => { window.cancelAnimationFrame(frame); window.clearTimeout(timer); };
   }, [message, onClose]);
 
   if (!mounted) return null;

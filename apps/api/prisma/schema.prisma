@@ -99,6 +99,12 @@ model User {
   incentiveRulesCreated    IncentiveRule[]       @relation("IncentiveRuleCreator")
   incentiveCalculations    IncentiveCalculation[] @relation("IncentiveCalcOwner")
   incentiveCalcsApproved   IncentiveCalculation[] @relation("IncentiveCalcApprover")
+  operationsSettingsUpdated OperationsSettings[] @relation("OperationsSettingsUpdater")
+  holidaysCreated          Holiday[]            @relation("HolidayCreator")
+  leaveRequests            LeaveRequest[]       @relation("LeaveOwner")
+  leaveReviewed            LeaveRequest[]       @relation("LeaveReviewer")
+  correctionRequests       AttendanceCorrectionRequest[] @relation("CorrectionOwner")
+  correctionsReviewed      AttendanceCorrectionRequest[] @relation("CorrectionReviewer")
 
   @@index([department])
   @@index([managerId])
@@ -305,6 +311,8 @@ model Client {
   city                      String
   pincode                   String?
   googleMapsUrl             String?
+  latitude                  Decimal?         @db.Decimal(9, 6)
+  longitude                 Decimal?         @db.Decimal(9, 6)
   chairCount                Int?
   staffCount                Int?
   stylistCount              Int?
@@ -389,11 +397,27 @@ model ClientActivity {
   createdBy         User                 @relation("ClientActivityCreator", fields: [createdById], references: [id], onDelete: Restrict)
   assignedTo        User?                @relation("ClientActivityAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   routeStop         RouteStop?           @relation(fields: [routeStopId], references: [id], onDelete: SetNull)
+  visitProof        VisitProof?
 
   @@index([clientId, createdAt])
   @@index([clientId, status, scheduledAt])
   @@index([assignedToId, type])
   @@index([createdById])
+}
+
+model VisitProof {
+  id               String         @id @default(cuid())
+  activityId       String         @unique
+  activity         ClientActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  checkInPhoto     Bytes
+  checkInPhotoMime String
+  checkInLatitude  Decimal        @db.Decimal(9, 6)
+  checkInLongitude Decimal        @db.Decimal(9, 6)
+  distanceMeters   Int?
+  gpsVerified      Boolean?
+  capturedAt       DateTime       @default(now())
+
+  @@index([gpsVerified, capturedAt])
 }
 
 enum LeadSource {
@@ -785,17 +809,97 @@ model IncentiveStatement {
 }
 
 model AttendanceRecord {
-  id         String    @id @default(cuid())
-  userId     String
-  user       User      @relation("AttendanceOwner", fields: [userId], references: [id], onDelete: Cascade)
-  date       DateTime  @db.Date
-  punchInAt  DateTime?
-  punchOutAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  userId             String
+  user               User      @relation("AttendanceOwner", fields: [userId], references: [id], onDelete: Cascade)
+  date               DateTime  @db.Date
+  punchInAt          DateTime?
+  punchOutAt         DateTime?
+  punchInLatitude    Decimal?  @db.Decimal(9, 6)
+  punchInLongitude   Decimal?  @db.Decimal(9, 6)
+  punchOutLatitude   Decimal?  @db.Decimal(9, 6)
+  punchOutLongitude  Decimal?  @db.Decimal(9, 6)
+  punchInVerified    Boolean?
+  punchOutVerified   Boolean?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@unique([userId, date])
   @@index([userId, date])
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model OperationsSettings {
+  id                    String   @id @default("default")
+  officeLatitude        Decimal? @db.Decimal(9, 6)
+  officeLongitude       Decimal? @db.Decimal(9, 6)
+  officeRadiusMeters    Int?
+  visitRadiusMeters     Int      @default(150)
+  lateThresholdMinutes  Int      @default(15)
+  halfDayThresholdHours Decimal  @default(4) @db.Decimal(4, 2)
+  weeklyOffDays         Json     @default("[0]")
+  updatedById           String?
+  updatedBy             User?    @relation("OperationsSettingsUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt             DateTime @updatedAt
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  date        DateTime @unique @db.Date
+  name        String
+  createdById String
+  createdBy   User     @relation("HolidayCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LeaveRequest {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation("LeaveOwner", fields: [userId], references: [id], onDelete: Cascade)
+  startDate    DateTime    @db.Date
+  endDate      DateTime    @db.Date
+  reason       String
+  status       LeaveStatus @default(PENDING)
+  reviewedById String?
+  reviewedBy   User?       @relation("LeaveReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  reviewNote   String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([userId, status])
+  @@index([startDate, endDate])
+}
+
+model AttendanceCorrectionRequest {
+  id                String           @id @default(cuid())
+  userId            String
+  user              User             @relation("CorrectionOwner", fields: [userId], references: [id], onDelete: Cascade)
+  date              DateTime         @db.Date
+  requestedPunchIn  DateTime?
+  requestedPunchOut DateTime?
+  reason            String
+  status            CorrectionStatus @default(PENDING)
+  reviewedById      String?
+  reviewedBy        User?            @relation("CorrectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt        DateTime?
+  reviewNote        String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([userId, status])
 }
 
 enum AgreementPartyType {

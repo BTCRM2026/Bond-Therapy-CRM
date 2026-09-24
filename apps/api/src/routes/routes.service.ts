@@ -3,12 +3,12 @@ import { Prisma } from '@prisma/client';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { CompleteVisitDto, SaveRouteDto, StopStatusDto } from './dto.js';
+import type { AdminVisitsDto, CompleteVisitDto, SaveRouteDto, StartVisitDto, StopStatusDto } from './dto.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const stopInclude = {
-  client: { select: { id: true, salonName: true, city: true, area: true, primaryContact: true, potential: true } },
-  activity: true,
+  client: { select: { id: true, salonName: true, city: true, area: true, primaryContact: true, potential: true, latitude: true, longitude: true } },
+  activity: { include: { visitProof: { select: { distanceMeters: true, gpsVerified: true, capturedAt: true } } } },
 } satisfies Prisma.RouteStopInclude;
 const routeInclude = { stops: { orderBy: { sequence: 'asc' }, include: stopInclude } } satisfies Prisma.RouteInclude;
 
@@ -31,6 +31,14 @@ export class RoutesService {
     const date = new Date(`${value}T00:00:00.000Z`);
     if (Number.isNaN(date.getTime())) throw new BadRequestException('Invalid date.');
     return date;
+  }
+
+  private haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number) {
+    const toRad = (degrees: number) => degrees * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   }
 
   async assignedSalons(actor: SessionUser) {
@@ -137,7 +145,7 @@ export class RoutesService {
     return this.getRoute(actor, dateStr);
   }
 
-  async startVisit(actor: SessionUser, dateStr: string, stopId: string) {
+  async startVisit(actor: SessionUser, dateStr: string, stopId: string, dto: StartVisitDto, file: { buffer: Buffer; mimetype: string; size: number }, ipAddress?: string) {
     this.ensureAccess(actor);
     const { route } = await this.findOwnedRoute(actor, dateStr);
     if (!route) throw new NotFoundException('Route not found.');
@@ -145,10 +153,77 @@ export class RoutesService {
     if (!stop) throw new NotFoundException('Route stop not found.');
     if (stop.status !== 'PLANNED') throw new BadRequestException('This stop is no longer active.');
 
-    if (stop.activity) return stop.activity;
-    const activity = await this.prisma.clientActivity.create({ data: { clientId: stop.clientId, type: 'VISIT', status: 'OPEN', createdById: actor.id, routeStopId: stop.id, checkInAt: new Date() } });
-    if (route.status === 'DRAFT' || route.status === 'PLANNED') await this.prisma.route.update({ where: { id: route.id }, data: { status: 'IN_PROGRESS' } });
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) throw new BadRequestException('Capture a JPG, PNG, or WebP photo.');
+    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Photo must be 5 MB or smaller.');
+    const settings = await this.prisma.operationsSettings.findUnique({ where: { id: 'default' }, select: { visitRadiusMeters: true } });
+    const hasSalonLocation = stop.client.latitude != null && stop.client.longitude != null;
+    const distanceMeters = hasSalonLocation ? this.haversineMeters(Number(stop.client.latitude), Number(stop.client.longitude), dto.latitude, dto.longitude) : null;
+    const gpsVerified = distanceMeters == null ? null : distanceMeters <= (settings?.visitRadiusMeters ?? 150);
+    const activity = await this.prisma.$transaction(async (tx) => {
+      const visit = stop.activity ?? await tx.clientActivity.create({ data: { clientId: stop.clientId, type: 'VISIT', status: 'OPEN', createdById: actor.id, routeStopId: stop.id, checkInAt: new Date() } });
+      await tx.visitProof.upsert({
+        where: { activityId: visit.id },
+        create: { activityId: visit.id, checkInPhoto: file.buffer, checkInPhotoMime: file.mimetype, checkInLatitude: dto.latitude, checkInLongitude: dto.longitude, distanceMeters, gpsVerified },
+        update: { checkInPhoto: file.buffer, checkInPhotoMime: file.mimetype, checkInLatitude: dto.latitude, checkInLongitude: dto.longitude, distanceMeters, gpsVerified, capturedAt: new Date() },
+      });
+      if (route.status === 'DRAFT' || route.status === 'PLANNED') await tx.route.update({ where: { id: route.id }, data: { status: 'IN_PROGRESS' } });
+      return visit;
+    });
+    await this.recordAudit(actor, 'ROUTE_VISIT_START', stopId, { distanceMeters, gpsVerified, mimeType: file.mimetype }, ipAddress);
     return activity;
+  }
+
+  async visitPhoto(actor: SessionUser, stopId: string) {
+    this.ensureAccess(actor);
+    const stop = await this.prisma.routeStop.findFirst({
+      where: { id: stopId, ...(this.isAdmin(actor) ? {} : { route: { staffId: actor.id } }) },
+      select: { activity: { select: { visitProof: true } } },
+    });
+    const proof = stop?.activity?.visitProof;
+    if (!proof) throw new NotFoundException('Visit photo not found.');
+    return { buffer: Buffer.from(proof.checkInPhoto), mime: proof.checkInPhotoMime };
+  }
+
+  async adminVisits(actor: SessionUser, query: AdminVisitsDto) {
+    if (!this.isAdmin(actor)) throw new ForbiddenException('Field activity oversight is restricted to Super Admin.');
+    const routeDate = query.date ? this.parseDate(query.date) : undefined;
+    const gpsVerified = query.gps === 'verified' ? true : query.gps === 'outside' ? false : query.gps === 'skipped' ? null : undefined;
+    const clientFilter = query.search || query.territory ? { client: { ...(query.search ? { salonName: { contains: query.search } } : {}), ...(query.territory ? { territory: query.territory } : {}) } } : {};
+    const where: Prisma.RouteStopWhereInput = {
+      activity: { isNot: null },
+      ...(routeDate ? { route: { routeDate, ...(query.staffId ? { staffId: query.staffId } : {}) } } : query.staffId ? { route: { staffId: query.staffId } } : {}),
+      ...(query.status ? { status: query.status as Prisma.EnumRouteStopStatusFilter } : {}),
+      ...clientFilter,
+      ...(gpsVerified !== undefined ? { activity: { visitProof: { gpsVerified } } } : {}),
+    };
+    const [items, staff, territoryRows] = await Promise.all([
+      this.prisma.routeStop.findMany({ where, include: { route: { include: { staff: { select: { id: true, name: true } } } }, client: { select: { id: true, salonName: true, city: true, area: true, territory: true } }, activity: { include: { visitProof: { select: { distanceMeters: true, gpsVerified: true, capturedAt: true } } } } }, orderBy: { activity: { checkInAt: 'desc' } }, take: 200 }),
+      this.prisma.user.findMany({ where: { status: 'ACTIVE', roles: { some: { role: { key: { in: [...salesRoles] } } } } }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      this.prisma.client.findMany({ where: { territory: { not: null } }, select: { territory: true }, distinct: ['territory'], orderBy: { territory: 'asc' } }),
+    ]);
+    return {
+      summary: {
+        total: items.length,
+        completed: items.filter((item) => item.status === 'VISITED').length,
+        pending: items.filter((item) => item.status === 'PLANNED').length,
+        gpsVerified: items.filter((item) => item.activity?.visitProof?.gpsVerified === true).length,
+        photoCaptured: items.filter((item) => Boolean(item.activity?.visitProof)).length,
+        productive: items.filter((item) => item.activity?.visitOutcome === 'PRODUCTIVE').length,
+        ordersGenerated: items.filter((item) => item.activity?.visitOutcome === 'ORDER_GENERATED').length,
+      },
+      items,
+      filters: { staff, territories: territoryRows.map((row) => row.territory).filter(Boolean) },
+    };
+  }
+
+  async visitEvidence(actor: SessionUser, stopId: string) {
+    if (!this.isAdmin(actor)) throw new ForbiddenException('Field activity evidence is restricted to Super Admin.');
+    const stop = await this.prisma.routeStop.findUnique({
+      where: { id: stopId },
+      include: { route: { include: { staff: { select: { id: true, name: true } } } }, client: true, activity: { include: { visitProof: { select: { distanceMeters: true, gpsVerified: true, capturedAt: true, checkInLatitude: true, checkInLongitude: true, checkInPhotoMime: true } } } } },
+    });
+    if (!stop?.activity) throw new NotFoundException('Visit evidence not found.');
+    return stop;
   }
 
   async completeVisit(actor: SessionUser, dateStr: string, stopId: string, dto: CompleteVisitDto, ipAddress?: string) {
@@ -158,7 +233,8 @@ export class RoutesService {
     const stop = route.stops.find((item) => item.id === stopId);
     if (!stop) throw new NotFoundException('Route stop not found.');
 
-    const activity = stop.activity ?? await this.prisma.clientActivity.create({ data: { clientId: stop.clientId, type: 'VISIT', status: 'OPEN', createdById: actor.id, routeStopId: stop.id, checkInAt: new Date() } });
+    if (!stop.activity?.visitProof) throw new BadRequestException('Start the visit with GPS and a check-in photo before completing it.');
+    const activity = stop.activity;
     const updated = await this.prisma.clientActivity.update({
       where: { id: activity.id },
       data: {
