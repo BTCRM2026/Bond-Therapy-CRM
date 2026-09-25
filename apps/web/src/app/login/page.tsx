@@ -8,8 +8,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const label = portalLabel(portal);
   const passwordChanged = (await searchParams).passwordChanged === "1";
   return (
-    <main className="flex h-svh items-center justify-center overflow-hidden bg-background p-3 sm:p-5 lg:p-8">
-      <section className="grid h-[calc(100svh-24px)] min-h-0 w-full max-w-[600px] overflow-hidden rounded-xl border bg-white shadow-[0_24px_60px_rgba(23,32,51,0.10),0_4px_16px_rgba(23,32,51,0.05)] sm:h-[calc(100svh-40px)] sm:max-h-[760px] lg:h-[calc(100svh-64px)] lg:max-h-[720px] lg:min-h-[620px] lg:max-w-[1120px] lg:grid-cols-[0.92fr_1.08fr] lg:gap-4 lg:p-4">
+    <main
+      className="flex h-svh items-center justify-center overflow-hidden bg-cover bg-center p-3 sm:p-5 lg:p-8"
+      style={{ backgroundImage: "linear-gradient(rgba(247,244,239,.74),rgba(247,244,239,.82)),url('/brand/login-portal-products.png')" }}
+    >
+      <section className="grid h-[calc(100svh-24px)] min-h-0 w-full max-w-[600px] overflow-hidden rounded-xl border border-white/70 bg-white/95 shadow-[0_24px_60px_rgba(23,32,51,0.12),0_4px_16px_rgba(23,32,51,0.06)] backdrop-blur-sm sm:h-[calc(100svh-40px)] sm:max-h-[760px] lg:h-[calc(100svh-64px)] lg:max-h-[720px] lg:min-h-[620px] lg:max-w-[1120px] lg:grid-cols-[0.92fr_1.08fr] lg:gap-4 lg:p-4">
         <div
           className="relative hidden overflow-hidden rounded-lg bg-cover bg-center p-8 lg:flex lg:flex-col lg:justify-between"
           style={{ backgroundImage: "url('/brand/login-product.jpeg')" }}

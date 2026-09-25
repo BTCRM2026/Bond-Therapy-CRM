@@ -16,7 +16,7 @@ export function SuccessToast({ message, onClose }: { message: string; onClose: (
   if (!mounted) return null;
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-x-3 top-3 z-[100] flex justify-end sm:inset-x-auto sm:right-5 sm:top-5">
+    <div className="pointer-events-none fixed inset-x-3 bottom-[calc(16px+env(safe-area-inset-bottom))] z-[100] flex justify-center sm:inset-x-0 sm:bottom-6">
       <div className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border border-success/20 bg-white px-4 py-3 shadow-[0_12px_32px_rgba(23,35,31,0.14)]" role="status" aria-live="polite">
         <CheckCircle2 className="mt-0.5 shrink-0 text-success" size={18} aria-hidden="true" />
         <p className="min-w-0 flex-1 text-[13px] font-medium leading-5 text-foreground">{message}</p>
