@@ -1,9 +1,12 @@
 "use client";
 
-import { AlertTriangle, ArrowDown, ArrowUp, Calendar, Camera, CheckCircle2, Clock3, LoaderCircle, MapPin, Plus, RotateCcw, Star, Trash2, X } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ArrowDown, ArrowUp, Calendar, Camera, CheckCircle2, Clock3, LoaderCircle, MapPin, Plus, RotateCcw, Star, Trash2 } from "lucide-react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Field, FormError } from "@/components/ui/field";
+import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { SuccessToast } from "@/components/ui/toast";
 
 type Salon = { id: string; salonName: string; city: string; area: string | null; potential: string | null; beat: { id: string; name: string } | null };
@@ -135,7 +138,7 @@ function RouteBuilder({ date, route, salons, onSave, onSubmit }: { date: string;
   const save = async () => { setSaving(true); try { await onSave(date, picks); } finally { setSaving(false); } };
   const dirty = JSON.stringify(picks) !== JSON.stringify(initial);
 
-  return <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+  return <section className="crm-surface overflow-hidden">
     <div className="flex items-center justify-between gap-3 border-b px-4 py-3.5 sm:px-5">
       <div><h2 className="text-sm font-semibold text-foreground">{dayLabel(date)}</h2><p className="mt-0.5 text-xs text-muted">{picks.length} salon{picks.length === 1 ? "" : "s"} planned</p></div>
       <RouteStatusBadge status={route.status} />
@@ -174,7 +177,7 @@ function TodayRoute({ date, route, salons, onSave, onStart, onComplete, onResolv
   const available = salons.filter((salon) => !stops.some((stop) => stop.clientId === salon.id));
   const addToday = async (clientId: string) => { setPicking(false); await onSave(date, [...stops.map((stop) => ({ clientId: stop.clientId, plannedTime: stop.plannedTime ? new Date(stop.plannedTime).toTimeString().slice(0, 5) : "" })), { clientId, plannedTime: "" }]); };
 
-  return <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+  return <section className="crm-surface overflow-hidden">
     <div className="flex items-center justify-between gap-3 border-b px-4 py-3.5 sm:px-5">
       <div><h2 className="text-sm font-semibold text-foreground">{dayLabel(date)}</h2><p className="mt-0.5 text-xs text-muted">{stops.filter((s) => s.status === "VISITED").length} of {stops.length} visited</p></div>
       <RouteStatusBadge status={route.status} />
@@ -212,7 +215,7 @@ function TodayStopRow({ stop, onStart, onComplete, onUnableToMeet, onReschedule,
 }
 
 function RouteStatusBadge({ status }: { status: RouteData["status"] }) {
-  const tone: Record<RouteData["status"], string> = { DRAFT: "bg-gray-100 text-muted", PLANNED: "bg-brand-soft text-brand-dark", IN_PROGRESS: "bg-warning-soft text-warning", PARTIALLY_COMPLETED: "bg-warning-soft text-warning", COMPLETED: "bg-success-soft text-success", CANCELLED: "bg-red-50 text-danger" };
+  const tone: Record<RouteData["status"], string> = { DRAFT: "bg-background text-muted", PLANNED: "bg-brand-soft text-brand-dark", IN_PROGRESS: "bg-warning-soft text-warning", PARTIALLY_COMPLETED: "bg-warning-soft text-warning", COMPLETED: "bg-success-soft text-success", CANCELLED: "bg-red-50 text-danger" };
   const label: Record<RouteData["status"], string> = { DRAFT: "Draft", PLANNED: "Confirmed", IN_PROGRESS: "In progress", PARTIALLY_COMPLETED: "Partially completed", COMPLETED: "Completed", CANCELLED: "Cancelled" };
   return <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone[status]}`}>{label[status]}</span>;
 }
@@ -222,7 +225,7 @@ function StopStatusBadge({ stop }: { stop: RouteStop }) {
   if (stop.status === "UNABLE_TO_MEET") return <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-danger">Unable to meet</span>;
   if (stop.status === "RESCHEDULED") return <span className="inline-flex rounded-full bg-warning-soft px-2 py-0.5 text-[10px] font-semibold text-warning">Rescheduled</span>;
   if (stop.activity?.checkInAt) return <span className="inline-flex rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand-dark">In progress</span>;
-  return <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-muted">Pending</span>;
+  return <span className="inline-flex rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold text-muted">Pending</span>;
 }
 
 function CompleteVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; date: string; onClose: () => void; onDone: () => Promise<void> }) {
@@ -319,22 +322,4 @@ function ResolveStopModal({ stop, mode, onClose, onConfirm }: { stop: RouteStop;
       <FormActions saving={saving} onClose={onClose} label="Confirm" />
     </form>
   </Modal>;
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }
-function FormError({ message }: { message: string }) { return <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{message}</p>; }
-function FormActions({ saving, onClose, label }: { saving: boolean; onClose: () => void; label: string }) {
-  return <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
-    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-    <Button type="submit" disabled={saving}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Saving…" : label}</Button>
-  </div>;
-}
-
-function Modal({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: ReactNode }) {
-  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
-    <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-md flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-32px)]">
-      <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><div><h2 className="text-base font-semibold text-foreground">{title}</h2><p className="mt-1 text-xs text-muted">{subtitle}</p></div><button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-background sm:size-8" aria-label="Close"><X size={17} /></button></div>
-      <div className="overflow-y-auto p-4 sm:p-5">{children}</div>
-    </div>
-  </div>;
 }

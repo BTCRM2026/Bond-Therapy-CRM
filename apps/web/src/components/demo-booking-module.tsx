@@ -58,13 +58,13 @@ export function DemoBookingModule() {
     {headerSlot && createPortal(<Button onClick={() => setFormOpen(true)}><Plus size={16} /><span className="hidden sm:inline">Book demo</span><span className="sr-only sm:hidden">Book demo</span></Button>, headerSlot)}
     <div className="space-y-5">
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
-      <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+      <section className="crm-surface overflow-hidden">
         <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">Upcoming demos</p><p className="mt-0.5 text-xs text-muted">{upcoming.length} scheduled</p></div>
         {loading && !demos ? <div className="space-y-3 p-4"><div className="h-20 animate-pulse rounded-lg bg-background" /></div>
           : upcoming.length ? <div className="divide-y">{upcoming.map((demo) => <DemoRow key={demo.id} demo={demo} onLogOutcome={() => setOutcomeTarget(demo)} />)}</div>
           : <div className="px-5 py-10 text-center"><CalendarPlus className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">No demos booked</p><p className="mt-1 text-xs text-muted">Book a Demo Team slot for a salon.</p><Button className="mt-4" onClick={() => setFormOpen(true)}><Plus size={15} />Book demo</Button></div>}
       </section>
-      {past.length > 0 && <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+      {past.length > 0 && <section className="crm-surface overflow-hidden">
         <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">Past demos</p><p className="mt-0.5 text-xs text-muted">{past.length} completed</p></div>
         <div className="divide-y">{past.map((demo) => <DemoRow key={demo.id} demo={demo} onLogOutcome={() => setOutcomeTarget(demo)} />)}</div>
       </section>}

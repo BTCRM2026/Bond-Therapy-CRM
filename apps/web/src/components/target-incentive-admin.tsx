@@ -1,9 +1,13 @@
 "use client";
 
-import { LoaderCircle, Pencil, Plus, Target, Trash2, X } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { LoaderCircle, Pencil, Plus, Target, Trash2 } from "lucide-react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Field, FormError } from "@/components/ui/field";
+import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 import { SuccessToast } from "@/components/ui/toast";
 
 type DistributionType = "EQUAL" | "SEASONAL";
@@ -73,7 +77,7 @@ export function TargetIncentiveAdmin() {
 
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
 
-    <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+    <section className="crm-surface overflow-hidden">
       <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">Annual targets & incentives</p><p className="mt-0.5 text-xs text-muted">Set one annual sales target per staff member; the CRM distributes it across every period view.</p></div>
       {!rows?.length ? <div className="px-5 py-14 text-center"><Target className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">No sales staff found</p></div>
         : <div className="divide-y">{rows.map((row) => <div key={row.staffId} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -142,7 +146,7 @@ function PlanEditor({ row, onClose, onSaved }: { row: StaffRow; onClose: () => v
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save this annual target."); setSaving(false); }
   };
 
-  return <Modal title={plan ? "Edit annual target" : "Assign annual target"} subtitle={row.name} onClose={onClose}>
+  return <Modal title={plan ? "Edit annual target" : "Assign annual target"} subtitle={row.name} onClose={onClose} maxWidth="max-w-lg">
     <form onSubmit={submit} className="space-y-5">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Target year *"><Input type="number" min="2020" max="2100" value={targetYear} onChange={(e) => setTargetYear(Number(e.target.value))} required /></Field>
@@ -214,32 +218,11 @@ function PlanEditor({ row, onClose, onSaved }: { row: StaffRow; onClose: () => v
 
 function ConfirmDeactivate({ label, onClose, onConfirm }: { label: string; onClose: () => void; onConfirm: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
-  return <Modal title="Remove annual target" onClose={onClose}>
+  return <Modal title="Remove annual target" onClose={onClose} maxWidth="max-w-lg">
     <p className="text-sm text-foreground">Remove the annual target and incentive rule for <span className="font-semibold">{label}</span>? Past performance history is kept.</p>
     <div className="mt-5 flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
       <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
       <button type="button" disabled={busy} onClick={async () => { setBusy(true); await onConfirm(); }} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-danger px-4 text-[13px] font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50 sm:h-10">{busy && <LoaderCircle className="animate-spin" size={16} />}{busy ? "Removing…" : "Remove"}</button>
     </div>
   </Modal>;
-}
-
-function Select({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
-  return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
-}
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }
-function FormError({ message }: { message: string }) { return <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{message}</p>; }
-function FormActions({ saving, disabled, onClose }: { saving: boolean; disabled?: boolean; onClose: () => void }) {
-  return <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
-    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-    <Button type="submit" disabled={saving || disabled}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Saving…" : "Save"}</Button>
-  </div>;
-}
-
-function Modal({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {
-  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
-    <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-lg flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-32px)]">
-      <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><div><h2 className="text-base font-semibold text-foreground">{title}</h2>{subtitle && <p className="mt-1 text-xs text-muted">{subtitle}</p>}</div><button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-background sm:size-8" aria-label="Close"><X size={17} /></button></div>
-      <div className="overflow-y-auto p-4 sm:p-5">{children}</div>
-    </div>
-  </div>;
 }

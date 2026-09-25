@@ -104,7 +104,7 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
         <label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={17} /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order number or salon name" aria-label="Search orders" /></label>
         <FilterMenu value={group} onSelect={setGroup} options={GROUPS.map((item) => ({ key: item.key, label: item.label, count: counts(item.statuses) }))} />
       </div>
-      <section className="rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+      <section className="crm-surface">
         <div className="flex items-center justify-between gap-3 rounded-t-xl border-b px-4 py-3 sm:px-5">
           <div className="min-w-0"><p className="text-sm font-semibold text-foreground">{active.label}</p><p className="mt-0.5 text-xs text-muted">{filtered.length} record{filtered.length === 1 ? "" : "s"} · click a row to review</p></div>
           {filtered.length > 0 && <div className="flex shrink-0 items-center gap-2 text-xs text-muted">

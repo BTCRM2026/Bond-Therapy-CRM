@@ -37,7 +37,7 @@ export function PerformanceModule() {
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
       {data.metrics.map((metric) => <MetricCard key={metric.metric} metric={metric} />)}
     </div>
-    {data.productMix.length > 0 && <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+    {data.productMix.length > 0 && <section className="crm-surface overflow-hidden">
       <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">Product mix</p><p className="mt-0.5 text-xs text-muted">Top sellers this period</p></div>
       <div className="divide-y">{data.productMix.map((row) => <div key={row.productId} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
         <div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{row.name}</p><p className="mt-0.5 text-xs text-muted">{row.quantity} unit{row.quantity === 1 ? "" : "s"}</p></div>

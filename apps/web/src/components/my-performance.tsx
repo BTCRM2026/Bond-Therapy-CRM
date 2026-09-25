@@ -108,7 +108,7 @@ function PeriodIndexSelector({ period, year, index, seasons, onYearChange, onInd
 }
 
 function EmptyState({ title, message }: { title: string; message: string }) {
-  return <div className="rounded-xl border bg-white px-5 py-14 text-center shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+  return <div className="crm-surface px-5 py-14 text-center">
     <Target className="mx-auto text-subtle" size={26} />
     <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
     <p className="mt-1 text-xs text-muted">{message}</p>

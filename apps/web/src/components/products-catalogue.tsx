@@ -46,7 +46,7 @@ export function ProductsCatalogue({ initial }: { initial: ProductListResponse | 
   }, [search, category, page, pageSize]);
 
   return <div className="space-y-4">
-    <section className="relative rounded-xl border bg-white shadow-[0_3px_12px_rgba(26,31,26,0.04)]">
+    <section className="crm-surface relative">
       <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="relative block w-full sm:max-w-sm"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} /><Input className="pl-9" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search products" aria-label="Search products" /></label>
         <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">

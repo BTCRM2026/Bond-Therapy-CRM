@@ -2,9 +2,10 @@
 
 import { ArrowRightCircle, ChevronLeft, ChevronRight, MessageCircle, Phone, Plus, Search, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 type Lead = {
@@ -63,7 +64,7 @@ export function LeadsModule({ initial }: { initial: LeadListResponse | null }) {
         ))}
       </div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
-      <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+      <section className="crm-surface overflow-hidden">
         <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5"><div><p className="text-sm font-semibold text-foreground">Pipeline</p><p className="mt-0.5 text-xs text-muted">{data?.total ?? 0} lead{data?.total === 1 ? "" : "s"}</p></div></div>
         {loading && !data ? <div className="space-y-3 p-4"><div className="h-20 animate-pulse rounded-lg bg-background" /><div className="h-20 animate-pulse rounded-lg bg-background" /></div> : data?.items.length ? <>
           <div className="hidden xl:block">
@@ -92,7 +93,7 @@ export function LeadsModule({ initial }: { initial: LeadListResponse | null }) {
 }
 
 function LeadStatus({ value }: { value: string }) {
-  const tone = value === "CONVERTED" ? "bg-success-soft text-success" : value === "LOST" ? "bg-gray-100 text-muted" : value === "QUALIFIED" ? "bg-brand-soft text-brand" : "bg-warning-soft text-warning";
+  const tone = value === "CONVERTED" ? "bg-success-soft text-success" : value === "LOST" ? "bg-background text-muted" : value === "QUALIFIED" ? "bg-brand-soft text-brand" : "bg-warning-soft text-warning";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone}`}>{pretty(value)}</span>;
 }
 
@@ -181,5 +182,4 @@ function LeadForm({ lead, onClose, onSaved }: { lead?: Lead; onClose: () => void
   </div>;
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }
 function Select({ value, onChange, options }: { value: string; onChange: (event: ChangeEvent<HTMLSelectElement>) => void; options: string[][] }) { return <select value={value} onChange={onChange} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{options.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>; }

@@ -54,7 +54,7 @@ export function FollowUpsModule({ initial }: { initial: Activity[] | null }) {
       <button type="button" onClick={() => setScope("overdue")} className={`h-10 rounded-lg border px-4 text-xs font-semibold transition-colors ${scope === "overdue" ? "border-brand bg-brand text-white" : "text-muted hover:bg-brand-soft/60"}`}>Overdue</button>
     </div>
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
-    <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+    <section className="crm-surface overflow-hidden">
       {loading ? <div className="space-y-3 p-4"><div className="h-20 animate-pulse rounded-lg bg-background" /><div className="h-20 animate-pulse rounded-lg bg-background" /></div>
         : items.length ? <div className="divide-y">{items.map((activity) => {
           const Icon = TYPE_ICON[activity.type] ?? Flag;

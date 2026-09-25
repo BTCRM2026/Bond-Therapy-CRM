@@ -67,7 +67,7 @@ export function SalesDashboardWidgets() {
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-brand transition-all" style={{ width: `${progress}%` }} /></div>
     </section>}
 
-    {data.leaderboard && <section className="rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+    {data.leaderboard && <section className="crm-surface">
       <div className="flex items-center gap-3 border-b px-5 py-4"><span className="grid size-9 place-items-center rounded-lg bg-brand-soft text-brand"><Trophy size={17} /></span><div><h3 className="text-sm font-semibold text-foreground">Team this month</h3><p className="mt-0.5 text-xs text-muted">Ranked by revenue booked</p></div></div>
       <div className="divide-y">{data.leaderboard.map((member, index) => <div key={member.id} className="flex items-center gap-3 px-5 py-3.5">
         <span className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold ${index === 0 ? "bg-warning-soft text-warning" : "bg-background text-muted"}`}>{index + 1}</span>

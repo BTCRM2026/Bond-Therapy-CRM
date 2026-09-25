@@ -69,7 +69,7 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
     { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
   ] : staffGroups(roleKey);
   return (
-    <nav className="mt-7 min-h-0 flex-1 space-y-7 overflow-y-auto pr-1 text-sm [scrollbar-color:var(--subtle)_transparent] [scrollbar-width:thin]" aria-label="Portal navigation">
+    <nav className="mt-[18px] min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 text-sm [scrollbar-color:var(--subtle)_transparent] [scrollbar-width:thin]" aria-label="Portal navigation">
       {groups.map((group) => (
         <div key={group.label}>
           <p className="mb-2.5 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-subtle">{group.label}</p>
@@ -84,13 +84,13 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
                   href={href}
                   onClick={onNavigate}
                   className={cn(
-                    "flex h-12 items-center gap-2.5 rounded-[10px] px-3 text-sm font-medium transition-colors duration-150",
+                    "flex h-10 items-center gap-2.5 rounded-[7px] px-2 text-xs font-medium transition-colors duration-150",
                     active
                       ? "bg-brand-soft font-semibold text-brand-dark"
                       : "text-muted hover:bg-brand-soft/50 hover:text-brand-dark",
                   )}
                 >
-                  <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg transition-colors", active ? "bg-brand text-white" : "text-muted")}>
+                  <span className={cn("grid size-[30px] shrink-0 place-items-center rounded-md transition-colors", active ? "bg-brand text-white" : "text-muted")}>
                     <Icon size={18} strokeWidth={1.8} />
                   </span>
                   {label}

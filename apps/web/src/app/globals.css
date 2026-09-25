@@ -61,35 +61,35 @@ body {
 button, input { font: inherit; }
 
 .crm-shell {
-  --background: #f2f5ee;
+  --background: #f5f6f6;
   --sidebar: #ffffff;
   --surface: #ffffff;
-  --foreground: #1a1f1a;
-  --muted: #64705f;
-  --subtle: #98a390;
-  --border: #dfe6d8;
-  --brand: #24402f;
-  --brand-dark: #182c20;
-  --brand-soft: #e3ebdc;
-  --accent: #24402f;
-  --accent-soft: #e3ebdc;
+  --foreground: #202326;
+  --muted: #697076;
+  --subtle: #9da3a8;
+  --border: #e1e4e6;
+  --brand: #34393d;
+  --brand-dark: #202427;
+  --brand-soft: #eceeef;
+  --accent: #34393d;
+  --accent-soft: #eceeef;
   --info: #0284c7;
   --info-soft: #e0f2fe;
   --magenta: #b45309;
   --magenta-soft: #fef3c7;
-  --warning: #d97706;
-  --warning-soft: #fef3c7;
-  --danger: #dc2626;
-  --success: #2f7d4f;
-  --success-soft: #e1f1e4;
-  --button-shadow: 0 1px 2px rgba(26, 31, 26, 0.1), 0 1px 1px rgba(26, 31, 26, 0.04);
+  --warning: #b66a25;
+  --warning-soft: #fff3df;
+  --danger: #b64b43;
+  --success: #2f7d58;
+  --success-soft: #e5f3eb;
+  --button-shadow: none;
   color: var(--foreground);
-  font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  font-family: "Source Sans 3 Variable", "Source Sans 3", "Segoe UI", sans-serif;
 }
 
 .crm-shell ::selection {
-  background: #e3ebdc;
-  color: #1a1f1a;
+  background: #dde1e3;
+  color: #202326;
 }
 
 .crm-shell input,
@@ -106,13 +106,13 @@ button, input { font: inherit; }
 
 .crm-shell .crm-surface {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 10px;
   background: var(--surface);
-  box-shadow: 0 1px 2px rgba(26, 31, 26, 0.04), 0 3px 10px rgba(26, 31, 26, 0.035);
+  box-shadow: 0 1px 2px rgba(29, 39, 48, 0.025);
 }
 
 .crm-shell :where(section, article)[class*="rounded-xl"][class*="bg-white"] {
-  box-shadow: 0 1px 2px rgba(26, 31, 26, 0.04), 0 3px 10px rgba(26, 31, 26, 0.035);
+  box-shadow: 0 1px 2px rgba(29, 39, 48, 0.025);
 }
 
 .crm-shell :where(input, select, textarea):focus-visible {
@@ -127,55 +127,4 @@ button, input { font: inherit; }
 
 .crm-shell table tbody tr {
   transition: background-color 150ms ease;
-}
-
-/* Admin product workspace trial: compact reference structure with Bond Therapy tokens. */
-.crm-shell.product-reference-shell {
-  --background: #f5f6f6;
-  --sidebar: #ffffff;
-  --surface: #ffffff;
-  --foreground: #202326;
-  --muted: #697076;
-  --subtle: #9da3a8;
-  --border: #e1e4e6;
-  --brand: #34393d;
-  --brand-dark: #202427;
-  --brand-soft: #eceeef;
-  --accent: #34393d;
-  --accent-soft: #eceeef;
-  --warning: #b66a25;
-  --warning-soft: #fff3df;
-  --danger: #b64b43;
-  --success: #2f7d58;
-  --success-soft: #e5f3eb;
-  --button-shadow: none;
-  font-family: "Source Sans 3 Variable", "Source Sans 3", "Segoe UI", sans-serif;
-}
-
-.product-reference-shell ::selection {
-  background: #dde1e3;
-  color: #202326;
-}
-
-.product-reference-shell nav {
-  margin-top: 18px;
-  gap: 20px;
-}
-
-.product-reference-shell nav a {
-  height: 40px;
-  border-radius: 7px;
-  padding-inline: 8px;
-  font-size: 12px;
-}
-
-.product-reference-shell nav a > span {
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
-}
-
-.product-reference-shell .crm-surface,
-.product-reference-shell :where(section, article)[class*="rounded-xl"][class*="bg-white"] {
-  box-shadow: none;
 }

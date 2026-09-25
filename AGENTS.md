@@ -26,22 +26,23 @@ Avoid excessive gradients, shadows, bright/multicolor palettes, oversized cards,
 
 ## Color tokens
 
-- Authenticated CRM background: soft mineral gray, `#F3F6F5`.
+- Authenticated CRM background: soft neutral gray, `#F5F6F6`.
 - Surface/card and sidebar: pure white, `#FFFFFF`.
-- Primary text: deep charcoal-green, `#17231F`.
-- Secondary text: muted mineral gray, `#64736E`.
-- Tertiary/disabled text: `#93A19C`.
-- Border: subtle mineral gray, `#DFE6E3`.
-- Primary action color: restrained petrol green, `#0D5C52`; dark interaction state: `#08483F`; soft selected state: `#E7F2EF`.
+- Primary text: near-black charcoal, `#202326`.
+- Secondary text: muted neutral gray, `#697076`.
+- Tertiary/disabled text: `#9DA3A8`.
+- Border: subtle neutral gray, `#E1E4E6`.
+- Primary action color: restrained charcoal-gray, `#34393D`; dark interaction state: `#202427`; soft selected state: `#ECEEEF`.
 - Warm amber may be used sparingly for warning and supporting accents. Avoid generic indigo/purple “AI dashboard” palettes in authenticated CRM screens.
-- Status colors: muted green for success, muted amber/orange for warning, muted red for error, and muted blue/cyan for information.
+- Status colors: muted green for success (`#2F7D58`), muted amber/orange for warning (`#B66A25`), muted red for error (`#B64B43`), and muted blue/cyan for information.
+- Buttons carry no drop shadow (`--button-shadow: none`); cards use a single, very subtle shadow (`0 1px 2px rgba(29,39,48,0.025)`), not the heavier elevation used elsewhere in web design.
 - Use semantic colors only to communicate status, action, selection, or focus.
-- The overall interface must remain predominantly white, mineral gray, deep charcoal, and restrained petrol green.
+- The overall interface must remain predominantly white, neutral gray, near-black charcoal, and restrained charcoal-gray as the accent — a quiet, monochrome-first palette, not a colorful one.
 - These authenticated CRM tokens are intentionally scoped away from the login page. Do not change the approved login page styling unless explicitly requested.
 
 ## Typography
 
-- Use Manrope consistently throughout authenticated CRM portals. Keep Inter on the approved login experience.
+- Use Source Sans 3 consistently throughout authenticated CRM portals. Keep Inter on the approved login experience.
 - Page title: 24-28px, weight 600.
 - Section heading: 16-18px, weight 600.
 - Card heading: 14-16px, weight 600.
@@ -187,4 +188,4 @@ For every page or change, follow this order:
 
 ## Completion checklist
 
-A page is not complete until it feels like the same Bond Therapy CRM product as every other module. Confirm that it has a soft neutral background, mostly white surfaces, compact Manrope typography in authenticated portals, subtle borders, restrained brand color, consistent buttons and inputs, efficient spacing, easy scanning, simple cards, responsive behavior, and no unnecessary decoration.
+A page is not complete until it feels like the same Bond Therapy CRM product as every other module. Confirm that it has a soft neutral background, mostly white surfaces, compact Source Sans 3 typography in authenticated portals, subtle borders, restrained brand color, consistent buttons and inputs, efficient spacing, easy scanning, simple cards, responsive behavior, and no unnecessary decoration.

@@ -18,12 +18,12 @@ import Link from "next/link";
 import {
   type ChangeEvent,
   type FormEvent,
-  type ReactNode,
   useEffect,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 type Client = {
@@ -198,7 +198,7 @@ export function ClientsModule({
             {error}
           </div>
         )}
-        <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+        <section className="crm-surface overflow-hidden">
           <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5">
             <div>
               <p className="text-sm font-semibold text-foreground">
@@ -431,7 +431,7 @@ function ClientCard({ client }: { client: Client }) {
 function Status({ value }: { value: string }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${value === "ACTIVE" ? "bg-success-soft text-success" : value === "INACTIVE" ? "bg-gray-100 text-muted" : "bg-warning-soft text-warning"}`}
+      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${value === "ACTIVE" ? "bg-success-soft text-success" : value === "INACTIVE" ? "bg-background text-muted" : "bg-warning-soft text-warning"}`}
     >
       {pretty(value)}
     </span>
@@ -621,7 +621,7 @@ function ClientForm({
       aria-modal="true"
       aria-label="Add client"
     >
-      <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-2xl flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(26,31,26,0.18)] sm:max-h-[calc(100dvh-48px)]">
+      <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-2xl flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-48px)]">
         <div className="flex items-center justify-between border-b px-4 py-4 sm:px-5">
           <div>
             <h2 className="text-base font-semibold text-foreground">
@@ -963,14 +963,6 @@ function ClientForm({
         </form>
       </div>
     </div>
-  );
-}
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-xs font-medium text-foreground">{label}</span>
-      {children}
-    </label>
   );
 }
 function Select({

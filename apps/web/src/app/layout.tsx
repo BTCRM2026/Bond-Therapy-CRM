@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "@fontsource-variable/inter";
-import "@fontsource-variable/plus-jakarta-sans";
 import "@fontsource-variable/source-sans-3";
 import "./globals.css";
 

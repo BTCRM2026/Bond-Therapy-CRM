@@ -47,7 +47,7 @@ export function TerritoryModule() {
     </div>
 
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-      <section className="overflow-hidden rounded-xl border bg-white">
+      <section className="crm-surface overflow-hidden">
         <div className="border-b px-4 py-3 sm:px-5"><h2 className="text-sm font-semibold text-foreground">My geographical responsibility</h2><p className="mt-0.5 text-xs text-muted">Read-only territory allocation managed by Admin</p></div>
         {data.active.length ? <div className="divide-y">{data.active.map((item) => <article key={item.id} className="px-4 py-4 sm:px-5">
           <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-semibold text-foreground">{item.territory.name}</p><p className="mt-1 text-xs text-muted">{item.territory.state.name} → {item.territory.region.name} → {item.territory.area.city.name} → {item.territory.name}</p></div><span className="shrink-0 rounded-full bg-success-soft px-2.5 py-1 text-[11px] font-semibold text-success">Active</span></div>
@@ -62,7 +62,7 @@ export function TerritoryModule() {
       </aside>
     </div>
 
-    {data.assignments.length > data.active.length && <section className="overflow-hidden rounded-xl border bg-white"><div className="flex items-center gap-2 border-b px-4 py-3 sm:px-5"><History size={16} className="text-muted" /><h2 className="text-sm font-semibold text-foreground">Allocation history</h2></div><div className="divide-y">{data.assignments.filter((item) => item.endDate).map((item) => <div key={item.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="text-sm font-medium text-foreground">{item.territory.name}</p><p className="text-xs text-muted">{item.territory.area.name} · {item.territory.area.city.name}</p></div><p className="text-xs text-muted">{date(item.startDate)} – {date(item.endDate!)}</p></div>)}</div></section>}
+    {data.assignments.length > data.active.length && <section className="crm-surface overflow-hidden"><div className="flex items-center gap-2 border-b px-4 py-3 sm:px-5"><History size={16} className="text-muted" /><h2 className="text-sm font-semibold text-foreground">Allocation history</h2></div><div className="divide-y">{data.assignments.filter((item) => item.endDate).map((item) => <div key={item.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="text-sm font-medium text-foreground">{item.territory.name}</p><p className="text-xs text-muted">{item.territory.area.name} · {item.territory.area.city.name}</p></div><p className="text-xs text-muted">{date(item.startDate)} – {date(item.endDate!)}</p></div>)}</div></section>}
   </div>;
 }
 

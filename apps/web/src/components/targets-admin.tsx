@@ -1,11 +1,15 @@
 "use client";
 
-import { IndianRupee, LoaderCircle, Pencil, Plus, Trash2, TrendingUp, X } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { IndianRupee, LoaderCircle, Pencil, Plus, Trash2, TrendingUp } from "lucide-react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { Field, FormError } from "@/components/ui/field";
+import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
 import { KpiCard } from "@/components/ui/kpi-card";
+import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 import { SuccessToast } from "@/components/ui/toast";
 
 type ScopeOption = { id: string; name: string };
@@ -101,7 +105,7 @@ export function TargetsAdmin() {
       <KpiCard icon={TrendingUp} label="Lead conversion" value={overview.conversionRatePercent != null ? `${overview.conversionRatePercent}%` : "—"} detail={`${overview.leadsConverted} of ${overview.leadsCreated} leads`} />
     </div>}
 
-    <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+    <section className="crm-surface overflow-hidden">
       <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">Targets · {MONTHS[month - 1]} {year}</p></div>
       {!targets?.length ? <div className="px-5 py-14 text-center"><TrendingUp className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">No targets set for this period</p></div>
         : <div className="divide-y">{targets.map((target) => <div key={target.id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
@@ -113,7 +117,7 @@ export function TargetsAdmin() {
         </div>)}</div>}
     </section>
 
-    {overview && overview.productMix.length > 0 && <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+    {overview && overview.productMix.length > 0 && <section className="crm-surface overflow-hidden">
       <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">Product mix</p><p className="mt-0.5 text-xs text-muted">Company-wide top sellers this period</p></div>
       <div className="divide-y">{overview.productMix.map((row) => <div key={row.productId} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5"><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{row.name}</p><p className="mt-0.5 text-xs text-muted">{row.quantity} unit{row.quantity === 1 ? "" : "s"}</p></div><p className="shrink-0 text-sm font-semibold text-foreground">{money(row.revenue)}</p></div>)}</div>
     </section>}
@@ -170,25 +174,4 @@ function ConfirmDelete({ label, onClose, onConfirm }: { label: string; onClose: 
       <button type="button" disabled={deleting} onClick={async () => { setDeleting(true); await onConfirm(); }} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-danger px-4 text-[13px] font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50 sm:h-10">{deleting && <LoaderCircle className="animate-spin" size={16} />}{deleting ? "Deleting…" : "Delete"}</button>
     </div>
   </Modal>;
-}
-
-function Select({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
-  return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
-}
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }
-function FormError({ message }: { message: string }) { return <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{message}</p>; }
-function FormActions({ saving, disabled, onClose }: { saving: boolean; disabled?: boolean; onClose: () => void }) {
-  return <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
-    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-    <Button type="submit" disabled={saving || disabled}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Saving…" : "Save"}</Button>
-  </div>;
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
-    <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-md flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-32px)]">
-      <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><h2 className="text-base font-semibold text-foreground">{title}</h2><button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-background sm:size-8" aria-label="Close"><X size={17} /></button></div>
-      <div className="overflow-y-auto p-4 sm:p-5">{children}</div>
-    </div>
-  </div>;
 }

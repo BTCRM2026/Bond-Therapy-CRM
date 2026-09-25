@@ -1,10 +1,11 @@
 "use client";
 
 import { ArrowDown, ArrowUp, LoaderCircle, MoreHorizontal, Package, Pencil, Plus, Search, SlidersHorizontal, Trash2, UserCheck, UserX, X } from "lucide-react";
-import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { CompactPagination } from "@/components/ui/compact-pagination";
+import { Field } from "@/components/ui/field";
 import { FilterMenu } from "@/components/ui/filter-menu";
 import { Input } from "@/components/ui/input";
 import { SuccessToast } from "@/components/ui/toast";
@@ -105,16 +106,16 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
   return (
     <div className="text-foreground">
       {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
-      {headerSlot && createPortal(<Button className="rounded-md bg-[#24282b] text-white shadow-none hover:bg-[#111315]" onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add new product</span><span className="sr-only sm:hidden">Add product</span></Button>, headerSlot)}
+      {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add new product</span><span className="sr-only sm:hidden">Add product</span></Button>, headerSlot)}
 
-      <section className="mb-4 grid grid-cols-2 overflow-hidden rounded-[10px] border bg-white lg:grid-cols-4" aria-label="Product overview">
+      <section className="crm-surface mb-4 grid grid-cols-2 overflow-hidden lg:grid-cols-4" aria-label="Product overview">
         <ProductMetric label="Total products" value={stats?.totalProducts ?? "—"} detail="Complete catalogue" active={!hasFilters} onClick={clearFilters} />
         <ProductMetric label="Inventory value" value={stats ? money(stats.inventoryValue) : "—"} detail="MRP × available stock" />
         <ProductMetric label="Low stock" value={stats?.lowStock ?? "—"} detail="10 units or fewer" warning active={stockStatus === "LOW"} onClick={() => { setStockStatus("LOW"); setPage(1); }} />
         <ProductMetric label="Out of stock" value={stats?.outOfStock ?? "—"} detail="Needs restocking" danger active={stockStatus === "OUT"} onClick={() => { setStockStatus("OUT"); setPage(1); }} />
       </section>
 
-      <section className="relative overflow-hidden rounded-[10px] border bg-white shadow-[0_1px_2px_rgba(29,39,48,0.025)]">
+      <section className="crm-surface relative overflow-hidden">
         <div className="border-b p-3 sm:p-4">
           <div className="flex flex-col gap-2 min-[1360px]:flex-row min-[1360px]:items-center">
             <div className="flex min-w-0 flex-1 flex-col gap-2 min-[1360px]:flex-row min-[1360px]:items-center">
@@ -147,7 +148,7 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
 
         <div className="hidden max-h-[calc(100vh-290px)] overflow-auto lg:block">
           <table className="w-full min-w-[840px] text-left text-sm [&_td:not(:first-child)]:text-center [&_th:not(:first-child)]:text-center">
-            <thead className="sticky top-0 z-10 border-b bg-[#f7f9fa] text-[12px] font-semibold text-muted"><tr><th className="px-5 py-3"><SortButton label="Product" column="name" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3">Category</th><th className="px-4 py-3"><SortButton label="MRP" column="unitPrice" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3"><SortButton label="Inventory" column="stockOnHand" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3">Stock status</th><th className="px-4 py-3">Catalogue</th><th className="px-5 py-3">Actions</th></tr></thead>
+            <thead className="sticky top-0 z-10 border-b bg-background text-[12px] font-semibold text-muted"><tr><th className="px-5 py-3"><SortButton label="Product" column="name" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3">Category</th><th className="px-4 py-3"><SortButton label="MRP" column="unitPrice" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3"><SortButton label="Inventory" column="stockOnHand" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3">Stock status</th><th className="px-4 py-3">Catalogue</th><th className="px-5 py-3">Actions</th></tr></thead>
             <tbody className="divide-y">
               {data?.items.map((product) => <ProductRow key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}
             </tbody>
@@ -161,7 +162,6 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
     </div>
   );
 }
-
 function ProductMetric({ label, value, detail, warning = false, danger = false, active = false, onClick }: { label: string; value: string | number; detail: string; warning?: boolean; danger?: boolean; active?: boolean; onClick?: () => void }) {
   const content = <><p className="text-xs font-medium text-muted">{label}</p><p className="mt-1 truncate text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-[27px]">{value}</p><p className={`mt-1 truncate text-xs ${danger ? "text-danger" : warning ? "text-warning" : "text-subtle"}`}>{detail}</p></>;
   const className = `min-w-0 border-b border-r p-4 text-left transition-colors [&:nth-child(2n)]:border-r-0 [&:nth-child(n+3)]:border-b-0 lg:border-b-0 lg:border-r lg:p-5 lg:[&:nth-child(2n)]:border-r lg:[&:last-child]:border-r-0 ${active ? "bg-brand-soft/75" : "bg-white"} ${onClick ? "cursor-pointer hover:bg-brand-soft/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand" : ""}`;
@@ -169,7 +169,7 @@ function ProductMetric({ label, value, detail, warning = false, danger = false, 
 }
 
 function StatusBadge({ isActive }: { isActive: boolean }) {
-  return <span className={`inline-flex rounded px-2 py-1 text-[10px] font-semibold ${isActive ? "bg-success-soft text-success" : "bg-[#f0f2f3] text-muted"}`}>{isActive ? "Active" : "Inactive"}</span>;
+  return <span className={`inline-flex rounded px-2 py-1 text-[10px] font-semibold ${isActive ? "bg-success-soft text-success" : "bg-background text-muted"}`}>{isActive ? "Active" : "Inactive"}</span>;
 }
 function AvailabilityBadge({ stockOnHand }: { stockOnHand: number }) {
   if (stockOnHand <= 0) return <span className="inline-flex rounded bg-red-50 px-2 py-1 text-[10px] font-semibold text-danger">Out of stock</span>;
@@ -313,5 +313,3 @@ function AdjustStockForm({ product, currentStock, onClose, onAdjusted }: { produ
     </div>
   </div>;
 }
-
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }

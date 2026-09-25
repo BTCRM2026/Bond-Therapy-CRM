@@ -115,7 +115,7 @@ export function ProfileSettings({ initialProfile, canChangePassword }: { initial
 
   return (
     <div className={canChangePassword ? "grid max-w-5xl gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]" : "max-w-3xl"}>
-      <section className="rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+      <section className="crm-surface">
         <div className="flex items-center gap-3 border-b px-5 py-4">
           <span className="grid size-10 place-items-center rounded-lg bg-brand-soft text-brand"><UserRound size={18} /></span>
           <div><h2 className="text-sm font-semibold text-foreground">Profile details</h2><p className="mt-0.5 text-xs text-muted">Information connected to your account</p></div>
@@ -183,7 +183,7 @@ export function ProfileSettings({ initialProfile, canChangePassword }: { initial
         </form>
       </section>
 
-      {canChangePassword && <section className="h-fit rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+      {canChangePassword && <section className="h-fit crm-surface">
         <div className="flex items-center gap-3 border-b px-5 py-4">
           <span className="grid size-10 place-items-center rounded-lg bg-brand-soft text-brand"><KeyRound size={18} /></span>
           <div><h2 className="text-sm font-semibold text-foreground">Change password</h2><p className="mt-0.5 text-xs text-muted">You will sign in again after changing it</p></div>

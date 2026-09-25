@@ -60,7 +60,7 @@ export function IncentivesModule({ isManager, currentUserId }: { isManager: bool
       <KpiCard icon={IndianRupee} label="Paid" value={money(totals.paid)} tone="success" />
     </div>
 
-    <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+    <section className="crm-surface overflow-hidden">
       <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">My incentives</p></div>
       {!mine.length ? <div className="px-5 py-10 text-center"><IndianRupee className="mx-auto text-subtle" size={24} /><p className="mt-3 text-sm font-semibold text-foreground">No incentives calculated yet</p><p className="mt-1 text-xs text-muted">These are generated automatically from your invoices and collections.</p></div>
         : <div className="divide-y">{mine.map((row) => <div key={row.id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
@@ -73,7 +73,7 @@ export function IncentivesModule({ isManager, currentUserId }: { isManager: bool
         </div>)}</div>}
     </section>
 
-    {isManager && <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+    {isManager && <section className="crm-surface overflow-hidden">
       <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">Team approvals</p><p className="mt-0.5 text-xs text-muted">{team.length} pending</p></div>
       {!team.length ? <p className="px-5 py-8 text-center text-xs text-muted">Nothing waiting on you.</p> : <div className="divide-y">{team.map((row) => <div key={row.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="min-w-0"><p className="text-sm font-semibold text-foreground">{row.user.name}</p><p className="mt-0.5 text-xs text-muted">{row.ruleName} v{row.ruleVersionNumber} · {row.sourceReference} · {money(row.incentiveAmount)}</p></div>

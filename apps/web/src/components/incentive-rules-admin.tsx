@@ -1,11 +1,15 @@
 "use client";
 
-import { CheckCircle2, IndianRupee, LoaderCircle, Play, Plus, X, XCircle } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, IndianRupee, Play, Plus, XCircle } from "lucide-react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { Field, FormError } from "@/components/ui/field";
+import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
 import { KpiCard } from "@/components/ui/kpi-card";
+import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 import { SuccessToast } from "@/components/ui/toast";
 
 type SourceType = "INVOICE" | "PAYMENT" | "ORDER";
@@ -19,7 +23,7 @@ type Calculation = { id: string; userId: string; user: { id: string; name: strin
 const money = (value: number) => `₹${value.toLocaleString("en-IN")}`;
 const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? String((data as { message: unknown }).message) : fallback;
 const ROLE_OPTIONS = [{ value: "SALES_EXECUTIVE", label: "Sales Executive" }, { value: "SALES_MANAGER", label: "Sales Manager" }];
-const STATUS_TONE: Record<CalcStatus, string> = { CALCULATED: "bg-gray-100 text-muted", PENDING_APPROVAL: "bg-warning-soft text-warning", APPROVED: "bg-brand-soft text-brand-dark", REJECTED: "bg-red-50 text-danger", PAID: "bg-success-soft text-success" };
+const STATUS_TONE: Record<CalcStatus, string> = { CALCULATED: "bg-background text-muted", PENDING_APPROVAL: "bg-warning-soft text-warning", APPROVED: "bg-brand-soft text-brand-dark", REJECTED: "bg-red-50 text-danger", PAID: "bg-success-soft text-success" };
 const STATUS_LABEL: Record<CalcStatus, string> = { CALCULATED: "Calculated", PENDING_APPROVAL: "Pending approval", APPROVED: "Approved", REJECTED: "Rejected", PAID: "Paid" };
 
 function versionSummary(version: Version) {
@@ -27,7 +31,6 @@ function versionSummary(version: Version) {
   if (version.calcType === "FIXED") return `${money(version.fixedAmount ?? 0)} fixed per ${version.sourceType.toLowerCase()}`;
   return `${version.slabs?.length ?? 0} slab${version.slabs?.length === 1 ? "" : "s"}`;
 }
-
 export function IncentiveRulesAdmin() {
   const [tab, setTab] = useState<"rules" | "approvals">("rules");
   const [rules, setRules] = useState<Rule[] | null>(null);
@@ -102,8 +105,8 @@ export function IncentiveRulesAdmin() {
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
 
     {tab === "rules" && <div className="space-y-4">
-      {!rules?.length ? <div className="rounded-xl border bg-white px-5 py-14 text-center shadow-[0_3px_12px_rgba(15,23,42,0.04)]"><IndianRupee className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">No incentive rules yet</p></div>
-        : rules.map((rule) => <section key={rule.id} className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+      {!rules?.length ? <div className="crm-surface px-5 py-14 text-center"><IndianRupee className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">No incentive rules yet</p></div>
+        : rules.map((rule) => <section key={rule.id} className="crm-surface overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3.5 sm:px-5">
             <div><p className="text-sm font-semibold text-foreground">{rule.name}</p>{rule.description && <p className="mt-0.5 text-xs text-muted">{rule.description}</p>}</div>
             <Button variant="secondary" className="h-9 shrink-0 px-3 text-xs" onClick={() => setNewVersionFor(rule)}><Plus size={13} />New version</Button>
@@ -111,7 +114,7 @@ export function IncentiveRulesAdmin() {
           {!rule.versions.length ? <p className="px-4 py-6 text-center text-xs text-muted sm:px-5">No versions yet</p> : <div className="divide-y">{rule.versions.map((version) => <div key={version.id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
             <div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">v{version.versionNumber} · {versionSummary(version)}</p><p className="mt-0.5 truncate text-xs text-muted">{new Date(version.effectiveFrom).toLocaleDateString("en-IN")} – {version.effectiveUntil ? new Date(version.effectiveUntil).toLocaleDateString("en-IN") : "ongoing"} · {version.requiresApproval ? "Needs approval" : "Auto-approved"}</p></div>
             <div className="flex shrink-0 items-center gap-2">
-              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${version.status === "ACTIVE" ? "bg-success-soft text-success" : version.status === "DRAFT" ? "bg-gray-100 text-muted" : "bg-red-50 text-danger"}`}>{version.status[0] + version.status.slice(1).toLowerCase()}</span>
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${version.status === "ACTIVE" ? "bg-success-soft text-success" : version.status === "DRAFT" ? "bg-background text-muted" : "bg-red-50 text-danger"}`}>{version.status[0] + version.status.slice(1).toLowerCase()}</span>
               {version.status === "ACTIVE" && <Button variant="secondary" className="h-8 px-2.5 text-xs" onClick={() => setRunning(version)}><Play size={12} />Run</Button>}
             </div>
           </div>)}</div>}
@@ -127,7 +130,7 @@ export function IncentiveRulesAdmin() {
       <div className="flex gap-1 overflow-x-auto rounded-lg border bg-white p-1">
         {(["PENDING_APPROVAL", "APPROVED", "REJECTED", "PAID", "ALL"] as const).map((status) => <button key={status} type="button" onClick={() => setStatusFilter(status)} className={`shrink-0 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${statusFilter === status ? "bg-brand-soft text-brand-dark" : "text-muted hover:bg-background"}`}>{status === "ALL" ? "All" : STATUS_LABEL[status]}</button>)}
       </div>
-      <section className="overflow-hidden rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
+      <section className="crm-surface overflow-hidden">
         {!filteredCalcs.length ? <div className="px-5 py-14 text-center"><IndianRupee className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">Nothing here</p></div>
           : <div className="divide-y">{filteredCalcs.map((row) => <div key={row.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="min-w-0">
@@ -258,25 +261,4 @@ function RejectModal({ calc, onClose, onConfirm }: { calc: Calculation; onClose:
       <FormActions saving={saving} onClose={onClose} label="Reject" />
     </form>
   </Modal>;
-}
-
-function Select({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
-  return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
-}
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">{label}</span>{children}</label>; }
-function FormError({ message }: { message: string }) { return <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{message}</p>; }
-function FormActions({ saving, disabled, onClose, label }: { saving: boolean; disabled?: boolean; onClose: () => void; label: string }) {
-  return <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
-    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-    <Button type="submit" disabled={saving || disabled}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Saving…" : label}</Button>
-  </div>;
-}
-
-function Modal({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {
-  return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/40 p-3 backdrop-blur-[1px] sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
-    <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-md flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-32px)]">
-      <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4"><div><h2 className="text-base font-semibold text-foreground">{title}</h2>{subtitle && <p className="mt-1 text-xs text-muted">{subtitle}</p>}</div><button type="button" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-background sm:size-8" aria-label="Close"><X size={17} /></button></div>
-      <div className="overflow-y-auto p-4 sm:p-5">{children}</div>
-    </div>
-  </div>;
 }
