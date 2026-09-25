@@ -1,12 +1,12 @@
 "use client";
 
-import { Camera, Check, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, MapPin, PackageCheck, PackageOpen, Route, Search, Truck, X } from "lucide-react";
+import { Camera, Check, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, MapPin, PackageCheck, Route, Search, Truck, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { OrderStatus, type Order, type OrderListResponse } from "@/components/orders-module";
 import { Button } from "@/components/ui/button";
 import { FilterMenu } from "@/components/ui/filter-menu";
 import { Input } from "@/components/ui/input";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 import { PageSizeMenu } from "@/components/ui/page-size-menu";
 
 const money = (value: string | number) => `₹${Number(value).toLocaleString("en-IN")}`;
@@ -56,7 +56,7 @@ export function DispatchModule({ initial }: { initial: OrderListResponse | null 
   };
   const upload = async (order: Order, kind: "arrival" | "delivery", file?: File) => { if (!file) return; setBusyId(order.id); setError(""); try { const form = new FormData(); form.set("photo", file); const response = await fetch(`/api/orders/${order.id}/delivery-proof/${kind}`, { method: "POST", body: form }); const json = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(json, "Unable to upload the photo.")); await load(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to upload the photo."); } finally { setBusyId(""); } };
 
-  return <div className="space-y-4"><div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><KpiCard icon={ClipboardCheck} label="Awaiting stock" value={counts(["INVOICE_GENERATED"])} /><KpiCard icon={PackageOpen} label="In fulfilment" value={counts(["STOCK_RESERVED", "PICKING", "PACKED"])} tone="warning" /><KpiCard icon={PackageCheck} label="Ready" value={counts(["READY_FOR_DISPATCH", "CONFIRMED"])} tone="success" /><KpiCard icon={Truck} label="In transit" value={counts(["OUT_FOR_DELIVERY", "ARRIVED_AT_CUSTOMER", "DISPATCHED"])} /></div>
+  return <div className="space-y-4"><KpiStrip columns={4}><KpiCell label="Awaiting stock" value={counts(["INVOICE_GENERATED"])} /><KpiCell label="In fulfilment" value={counts(["STOCK_RESERVED", "PICKING", "PACKED"])} tone="warning" /><KpiCell label="Ready" value={counts(["READY_FOR_DISPATCH", "CONFIRMED"])} tone="success" /><KpiCell label="In transit" value={counts(["OUT_FOR_DELIVERY", "ARRIVED_AT_CUSTOMER", "DISPATCHED"])} /></KpiStrip>
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger">{error}</div>}
     <div className="flex gap-2">
       <label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={17} /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order number or salon name" aria-label="Search orders" /></label>

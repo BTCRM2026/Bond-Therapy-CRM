@@ -69,7 +69,7 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
     { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
   ] : staffGroups(roleKey);
   return (
-    <nav className="mt-[18px] min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 text-sm [scrollbar-color:var(--subtle)_transparent] [scrollbar-width:thin]" aria-label="Portal navigation">
+    <nav className="mt-[18px] min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden pr-1 text-sm [scrollbar-color:var(--subtle)_transparent] [scrollbar-width:thin]" aria-label="Portal navigation">
       {groups.map((group) => (
         <div key={group.label}>
           <p className="mb-2.5 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-subtle">{group.label}</p>

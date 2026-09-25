@@ -1,13 +1,14 @@
 "use client";
 
-import { Building2, CalendarDays, CircleOff, MapPin, Pencil, Plus, Route, Search, ShieldCheck, UserRound } from "lucide-react";
+import { CalendarDays, CircleOff, MapPin, Pencil, Plus, Search } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Field, FormError } from "@/components/ui/field";
+import { FilterMenu } from "@/components/ui/filter-menu";
 import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { SuccessToast } from "@/components/ui/toast";
@@ -61,16 +62,16 @@ export function TerritoryAdmin() {
   useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, []);
 
   const headerAction = tab === "structure" ? { label: `Add ${LEVELS.find((item) => item.key === level)?.singular}`, run: () => setEditor({ kind: level }) } : null;
-  if (loading) return <div className="space-y-4"><div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-xl bg-white" />)}</div><div className="h-72 animate-pulse rounded-xl bg-white" /></div>;
+  if (loading) return <div className="space-y-4"><div className="h-[108px] animate-pulse rounded-[10px] bg-white" /><div className="h-72 animate-pulse rounded-xl bg-white" /></div>;
 
   return <div className="space-y-5">
     {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
     {headerSlot && headerAction && createPortal(<Button onClick={headerAction.run} aria-label={headerAction.label}><Plus size={16} /><span className="hidden sm:inline">{headerAction.label}</span></Button>, headerSlot)}
     {error && <FormError message={error} />}
     {data && <>
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><KpiCard icon={ShieldCheck} label="States" value={data.overview.states} detail="Operational states" /><KpiCard icon={Building2} label="Cities" value={data.overview.cities} detail="Service cities" /><KpiCard icon={Route} label="Territories" value={data.overview.territories} detail="Sales territories" /><KpiCard icon={UserRound} label="Assigned staff" value={data.overview.assignedStaff} detail="Active allocations" tone="success" /></div>
+      <KpiStrip columns={4}><KpiCell label="States" value={data.overview.states} detail="Operational states" /><KpiCell label="Cities" value={data.overview.cities} detail="Service cities" /><KpiCell label="Territories" value={data.overview.territories} detail="Sales territories" /><KpiCell label="Assigned staff" value={data.overview.assignedStaff} detail="Active allocations" tone="success" /></KpiStrip>
       <nav className="flex gap-1 overflow-x-auto rounded-lg border bg-white p-1" aria-label="Territory sections">{TABS.map((item) => <button key={item.key} type="button" onClick={() => setTab(item.key)} className={`shrink-0 rounded-md px-3 py-2 text-xs font-semibold ${tab === item.key ? "bg-brand-soft text-brand-dark" : "text-muted hover:bg-background"}`}>{item.label}</button>)}</nav>
-      {tab !== "routes" && <div className="flex flex-col gap-2 sm:flex-row sm:justify-between"><div className="relative w-full sm:max-w-sm"><Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "staff" || tab === "history" ? "Search staff or territory" : "Search geography"} className="pl-9" /></div><select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="h-10 rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand"><option value="all">All statuses</option><option value="active">Active / assigned</option><option value="inactive">Inactive / unassigned</option></select></div>}
+      {tab !== "routes" && <div className="flex flex-col gap-2 sm:flex-row sm:justify-between"><div className="relative w-full sm:max-w-sm"><Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "staff" || tab === "history" ? "Search staff or territory" : "Search geography"} className="pl-9" /></div><FilterMenu value={status} showLabelOnMobile ariaLabel="Filter territory records by status" onSelect={setStatus} options={[{ key: "all", label: "All statuses" }, { key: "active", label: "Active / assigned" }, { key: "inactive", label: "Inactive / unassigned" }]} /></div>}
       {tab === "staff" && <StaffAssignments staff={staff} assignments={data.assignments} query={query} status={status} onAssign={(person, current) => setAllocating({ staff: person, current })} onEnd={setEnding} />}
       {tab === "structure" && <Structure data={data} level={level} setLevel={setLevel} query={query} status={status} onEdit={(kind, id) => setEditor({ kind, id })} />}
       {tab === "history" && <AllocationList assignments={data.assignments} query={query} status={status} onEnd={setEnding} />}

@@ -8,6 +8,7 @@ import { CompactPagination } from "@/components/ui/compact-pagination";
 import { Field } from "@/components/ui/field";
 import { FilterMenu } from "@/components/ui/filter-menu";
 import { Input } from "@/components/ui/input";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 import { SuccessToast } from "@/components/ui/toast";
 
 type Product = { id: string; sku?: string; name: string; category: string; unitPrice: string; hsnCode?: string | null; gstRate?: string | null; stockOnHand: number; isActive: boolean };
@@ -108,12 +109,12 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
       {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
       {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add new product</span><span className="sr-only sm:hidden">Add product</span></Button>, headerSlot)}
 
-      <section className="crm-surface mb-4 grid grid-cols-2 overflow-hidden lg:grid-cols-4" aria-label="Product overview">
-        <ProductMetric label="Total products" value={stats?.totalProducts ?? "—"} detail="Complete catalogue" active={!hasFilters} onClick={clearFilters} />
-        <ProductMetric label="Inventory value" value={stats ? money(stats.inventoryValue) : "—"} detail="MRP × available stock" />
-        <ProductMetric label="Low stock" value={stats?.lowStock ?? "—"} detail="10 units or fewer" warning active={stockStatus === "LOW"} onClick={() => { setStockStatus("LOW"); setPage(1); }} />
-        <ProductMetric label="Out of stock" value={stats?.outOfStock ?? "—"} detail="Needs restocking" danger active={stockStatus === "OUT"} onClick={() => { setStockStatus("OUT"); setPage(1); }} />
-      </section>
+      <KpiStrip className="mb-4" columns={4}>
+        <KpiCell label="Total products" value={stats?.totalProducts ?? "—"} detail="Complete catalogue" active={!hasFilters} onClick={clearFilters} />
+        <KpiCell label="Inventory value" value={stats ? money(stats.inventoryValue) : "—"} detail="MRP × available stock" />
+        <KpiCell label="Low stock" value={stats?.lowStock ?? "—"} detail="10 units or fewer" tone="warning" active={stockStatus === "LOW"} onClick={() => { setStockStatus("LOW"); setPage(1); }} />
+        <KpiCell label="Out of stock" value={stats?.outOfStock ?? "—"} detail="Needs restocking" tone="danger" active={stockStatus === "OUT"} onClick={() => { setStockStatus("OUT"); setPage(1); }} />
+      </KpiStrip>
 
       <section className="crm-surface relative overflow-hidden">
         <div className="border-b p-3 sm:p-4">
@@ -162,12 +163,6 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
     </div>
   );
 }
-function ProductMetric({ label, value, detail, warning = false, danger = false, active = false, onClick }: { label: string; value: string | number; detail: string; warning?: boolean; danger?: boolean; active?: boolean; onClick?: () => void }) {
-  const content = <><p className="text-xs font-medium text-muted">{label}</p><p className="mt-1 truncate text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-[27px]">{value}</p><p className={`mt-1 truncate text-xs ${danger ? "text-danger" : warning ? "text-warning" : "text-subtle"}`}>{detail}</p></>;
-  const className = `min-w-0 border-b border-r p-4 text-left transition-colors [&:nth-child(2n)]:border-r-0 [&:nth-child(n+3)]:border-b-0 lg:border-b-0 lg:border-r lg:p-5 lg:[&:nth-child(2n)]:border-r lg:[&:last-child]:border-r-0 ${active ? "bg-brand-soft/75" : "bg-white"} ${onClick ? "cursor-pointer hover:bg-brand-soft/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand" : ""}`;
-  return onClick ? <button type="button" className={className} onClick={onClick} aria-pressed={active}>{content}</button> : <div className={className}>{content}</div>;
-}
-
 function StatusBadge({ isActive }: { isActive: boolean }) {
   return <span className={`inline-flex rounded px-2 py-1 text-[10px] font-semibold ${isActive ? "bg-success-soft text-success" : "bg-background text-muted"}`}>{isActive ? "Active" : "Inactive"}</span>;
 }

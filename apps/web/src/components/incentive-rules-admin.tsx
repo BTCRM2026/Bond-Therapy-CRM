@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FormError } from "@/components/ui/field";
 import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { SuccessToast } from "@/components/ui/toast";
@@ -122,11 +122,11 @@ export function IncentiveRulesAdmin() {
     </div>}
 
     {tab === "approvals" && <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <KpiCard icon={IndianRupee} label="Pending" value={money(totals.pending)} tone="warning" />
-        <KpiCard icon={IndianRupee} label="Approved (unpaid)" value={money(totals.approved)} tone="brand" />
-        <KpiCard icon={IndianRupee} label="Paid" value={money(totals.paid)} tone="success" />
-      </div>
+      <KpiStrip columns={3}>
+        <KpiCell label="Pending" value={money(totals.pending)} tone="warning" />
+        <KpiCell label="Approved (unpaid)" value={money(totals.approved)} tone="brand" />
+        <KpiCell label="Paid" value={money(totals.paid)} tone="success" />
+      </KpiStrip>
       <div className="flex gap-1 overflow-x-auto rounded-lg border bg-white p-1">
         {(["PENDING_APPROVAL", "APPROVED", "REJECTED", "PAID", "ALL"] as const).map((status) => <button key={status} type="button" onClick={() => setStatusFilter(status)} className={`shrink-0 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${statusFilter === status ? "bg-brand-soft text-brand-dark" : "text-muted hover:bg-background"}`}>{status === "ALL" ? "All" : STATUS_LABEL[status]}</button>)}
       </div>

@@ -50,10 +50,10 @@ export function PerformanceModule() {
 function MetricCard({ metric }: { metric: Metric }) {
   const label = METRIC_LABELS[metric.metric] ?? metric.metric;
   const percent = metric.target && metric.target > 0 ? Math.min(100, Math.round((metric.achieved / metric.target) * 100)) : null;
-  return <div className="crm-surface p-3 sm:p-5">
-    <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.08em] text-muted sm:text-[11px] sm:tracking-[0.1em]">{label}</p>
+  return <div className="crm-surface p-4 sm:p-5">
+    <p className="text-xs font-medium text-muted">{label}</p>
     <div className="mt-2 flex items-baseline gap-1.5">
-      <p className="min-w-0 truncate text-xl font-bold tracking-[-0.02em] text-foreground sm:text-2xl">{format(metric.metric, metric.achieved)}</p>
+      <p className="min-w-0 truncate text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-[27px]">{format(metric.metric, metric.achieved)}</p>
       {metric.target != null && <p className="hidden text-sm text-muted sm:block">/ {format(metric.metric, metric.target)}</p>}
     </div>
     {percent != null ? <>

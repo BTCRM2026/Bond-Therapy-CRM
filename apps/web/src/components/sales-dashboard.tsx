@@ -1,9 +1,9 @@
 "use client";
 
-import { CalendarClock, CheckCircle2, Clock3, IndianRupee, ListChecks, LogIn, MapPin, Navigation, ShoppingBag, Target, TrendingUp, Trophy, UserPlus } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock3, IndianRupee, LogIn, MapPin, Navigation, Target, TrendingUp, Trophy, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 
 type DashboardData = {
   period: { month: number; year: number };
@@ -39,7 +39,7 @@ export function SalesDashboardWidgets() {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><div className="h-[108px] animate-pulse rounded-xl bg-white" /><div className="h-[108px] animate-pulse rounded-xl bg-white" /><div className="h-[108px] animate-pulse rounded-xl bg-white" /><div className="h-[108px] animate-pulse rounded-xl bg-white" /></div>;
+  if (loading) return <div className="h-[108px] animate-pulse rounded-[10px] bg-white" />;
   if (!data) return null;
 
   const progress = data.target ? Math.min(100, Math.round((data.achieved / data.target) * 100)) : null;
@@ -55,12 +55,12 @@ export function SalesDashboardWidgets() {
       <CheckCircle2 size={18} className="shrink-0 text-subtle group-hover:text-brand" />
     </Link>}
 
-    <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Sales overview">
-      <KpiCard icon={IndianRupee} label="Revenue achieved" value={money(data.achieved)} detail={`${MONTHS[data.period.month - 1]} ${data.period.year}`} tone="success" />
-      <Link href="/dashboard/orders" className="group"><KpiCard icon={ShoppingBag} label="Orders booked" value={data.orderCount} detail="Confirmed this month" className="h-full group-hover:-translate-y-0.5 group-hover:border-brand/30" /></Link>
-      <Link href="/dashboard/leads" className="group"><KpiCard icon={UserPlus} label="Open leads" value={data.openLeads} detail="Awaiting conversion" tone="warning" className="h-full group-hover:-translate-y-0.5 group-hover:border-brand/30" /></Link>
-      <Link href="/dashboard/follow-ups" className="group"><KpiCard icon={ListChecks} label="Overdue follow-ups" value={data.overdueFollowUps} detail={data.overdueFollowUps ? "Needs attention" : "Nothing overdue"} tone={data.overdueFollowUps ? "danger" : "neutral"} className="h-full group-hover:-translate-y-0.5 group-hover:border-brand/30" /></Link>
-    </section>
+    <KpiStrip columns={4}>
+      <KpiCell label="Revenue achieved" value={money(data.achieved)} detail={`${MONTHS[data.period.month - 1]} ${data.period.year}`} tone="success" />
+      <Link href="/dashboard/orders" className="contents"><KpiCell label="Orders booked" value={data.orderCount} detail="Confirmed this month" className="cursor-pointer hover:bg-brand-soft/45" /></Link>
+      <Link href="/dashboard/leads" className="contents"><KpiCell label="Open leads" value={data.openLeads} detail="Awaiting conversion" tone="warning" className="cursor-pointer hover:bg-brand-soft/45" /></Link>
+      <Link href="/dashboard/follow-ups" className="contents"><KpiCell label="Overdue follow-ups" value={data.overdueFollowUps} detail={data.overdueFollowUps ? "Needs attention" : "Nothing overdue"} tone={data.overdueFollowUps ? "danger" : "neutral"} className="cursor-pointer hover:bg-brand-soft/45" /></Link>
+    </KpiStrip>
 
     {progress != null && <section className="crm-surface p-5">
       <div className="flex items-center justify-between gap-4"><div><h2 className="text-sm font-semibold text-foreground">Monthly target</h2><p className="mt-1 text-xs text-muted">{money(data.achieved)} of {money(data.target ?? 0)}</p></div><span className="text-lg font-semibold text-brand-dark">{progress}%</span></div>

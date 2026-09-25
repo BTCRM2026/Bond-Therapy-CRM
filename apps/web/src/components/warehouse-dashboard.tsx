@@ -1,9 +1,9 @@
 "use client";
 
-import { AlertTriangle, PackageCheck, PackagePlus, Truck } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 
 type DashboardData = {
   pendingDispatch: number;
@@ -28,16 +28,16 @@ export function WarehouseDashboardWidgets() {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /><div className="h-24 animate-pulse rounded-xl bg-background" /></div>;
+  if (loading) return <div className="h-24 animate-pulse rounded-[10px] bg-background" />;
   if (!data) return null;
 
   return <div className="space-y-5">
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      <Link href="/dashboard/dispatch" className="group"><KpiCard icon={Truck} label="Pending dispatch" value={data.pendingDispatch} detail="Ready to dispatch" className="h-full group-hover:-translate-y-0.5 group-hover:border-brand/30" /></Link>
-      <KpiCard icon={PackageCheck} label="Dispatched today" value={data.dispatchedToday} detail="Orders moved" tone="success" />
-      <KpiCard icon={PackagePlus} label="Received today" value={data.receivedToday} detail="Units received" />
-      <Link href="/dashboard/inventory" className="group"><KpiCard icon={AlertTriangle} label="Stock alerts" value={data.lowStockCount} detail="Low or out of stock" tone={data.lowStockCount ? "warning" : "neutral"} className="h-full group-hover:-translate-y-0.5 group-hover:border-brand/30" /></Link>
-    </div>
+    <KpiStrip columns={4}>
+      <Link href="/dashboard/dispatch" className="contents"><KpiCell label="Pending dispatch" value={data.pendingDispatch} detail="Ready to dispatch" className="cursor-pointer hover:bg-brand-soft/45" /></Link>
+      <KpiCell label="Dispatched today" value={data.dispatchedToday} detail="Orders moved" tone="success" />
+      <KpiCell label="Received today" value={data.receivedToday} detail="Units received" />
+      <Link href="/dashboard/inventory" className="contents"><KpiCell label="Stock alerts" value={data.lowStockCount} detail="Low or out of stock" tone={data.lowStockCount ? "warning" : "neutral"} className="cursor-pointer hover:bg-brand-soft/45" /></Link>
+    </KpiStrip>
 
     {data.lowStockItems.length > 0 && <section className="crm-surface">
       <div className="flex items-center gap-3 border-b px-5 py-4"><span className="grid size-9 place-items-center rounded-lg bg-warning-soft text-warning"><AlertTriangle size={17} /></span><div><h3 className="text-sm font-semibold text-foreground">Needs attention</h3><p className="mt-0.5 text-xs text-muted">Lowest stock first</p></div></div>

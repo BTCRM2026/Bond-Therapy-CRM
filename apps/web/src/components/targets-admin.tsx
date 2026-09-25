@@ -1,13 +1,14 @@
 "use client";
 
-import { IndianRupee, LoaderCircle, Pencil, Plus, Trash2, TrendingUp } from "lucide-react";
+import { LoaderCircle, Pencil, Plus, Trash2, TrendingUp } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Field, FormError } from "@/components/ui/field";
+import { FilterMenu } from "@/components/ui/filter-menu";
 import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { SuccessToast } from "@/components/ui/toast";
@@ -93,17 +94,17 @@ export function TargetsAdmin() {
     {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
     {headerSlot && createPortal(<Button onClick={() => setEditing({ mode: "create" })}><Plus size={16} />Add target</Button>, headerSlot)}
 
-    <div className="flex items-center gap-2">
-      <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="h-10 rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10">{MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select>
-      <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="h-10 rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10">{[year - 1, year, year + 1].map((y) => <option key={y} value={y}>{y}</option>)}</select>
+    <div className="flex flex-wrap items-center gap-2">
+      <FilterMenu value={String(month)} showLabelOnMobile ariaLabel="Filter targets by month" onSelect={(value) => setMonth(Number(value))} options={MONTHS.map((label, index) => ({ key: String(index + 1), label }))} />
+      <FilterMenu value={String(year)} showLabelOnMobile ariaLabel="Filter targets by year" onSelect={(value) => setYear(Number(value))} options={[year - 1, year, year + 1].map((value) => ({ key: String(value), label: String(value) }))} />
     </div>
 
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
 
-    {overview && <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      {METRICS.map((metric) => <KpiCard key={metric} icon={CURRENCY_METRICS.has(metric) ? IndianRupee : TrendingUp} label={METRIC_LABELS[metric]} value={format(metric, overview.metrics[metric] ?? 0)} />)}
-      <KpiCard icon={TrendingUp} label="Lead conversion" value={overview.conversionRatePercent != null ? `${overview.conversionRatePercent}%` : "—"} detail={`${overview.leadsConverted} of ${overview.leadsCreated} leads`} />
-    </div>}
+    {overview && <KpiStrip columns={4}>
+      {METRICS.map((metric) => <KpiCell key={metric} label={METRIC_LABELS[metric]} value={format(metric, overview.metrics[metric] ?? 0)} />)}
+      <KpiCell label="Lead conversion" value={overview.conversionRatePercent != null ? `${overview.conversionRatePercent}%` : "—"} detail={`${overview.leadsConverted} of ${overview.leadsCreated} leads`} />
+    </KpiStrip>}
 
     <section className="crm-surface overflow-hidden">
       <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">Targets · {MONTHS[month - 1]} {year}</p></div>

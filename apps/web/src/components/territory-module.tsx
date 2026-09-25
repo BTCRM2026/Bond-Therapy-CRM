@@ -1,9 +1,9 @@
 "use client";
 
-import { CalendarDays, History, Map, MapPin, Route, ShieldCheck } from "lucide-react";
+import { CalendarDays, History, MapPin, Route, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 
 type Assignment = {
   id: string; startDate: string; endDate: string | null; reason: string | null;
@@ -39,12 +39,12 @@ export function TerritoryModule() {
   if (!data) return <div className="space-y-3"><div className="h-24 animate-pulse rounded-xl bg-white" /><div className="h-56 animate-pulse rounded-xl bg-white" /></div>;
 
   return <div className="space-y-5">
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      <KpiCard icon={Map} label="Regions" value={summary.regions} detail="Active responsibility" />
-      <KpiCard icon={MapPin} label="States" value={summary.states} detail="Assigned coverage" />
-      <KpiCard icon={Route} label="Cities" value={summary.cities} detail="Assigned coverage" />
-      <KpiCard icon={ShieldCheck} label="Areas / Territories" value={`${summary.areas} / ${data.active.length}`} detail="Current allocation" tone="brand" />
-    </div>
+    <KpiStrip columns={4}>
+      <KpiCell label="Regions" value={summary.regions} detail="Active responsibility" />
+      <KpiCell label="States" value={summary.states} detail="Assigned coverage" />
+      <KpiCell label="Cities" value={summary.cities} detail="Assigned coverage" />
+      <KpiCell label="Areas / Territories" value={`${summary.areas} / ${data.active.length}`} detail="Current allocation" tone="brand" />
+    </KpiStrip>
 
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
       <section className="crm-surface overflow-hidden">

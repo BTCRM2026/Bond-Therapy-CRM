@@ -11,7 +11,7 @@ export function SidebarUserMenu({ userName, roleName }: { userName: string; role
 
   return (
     <div className="mt-4 border-t pt-4">
-      <div className={cn("overflow-hidden rounded-2xl border border-brand/20 bg-white transition-shadow duration-150", open && "shadow-[0_8px_20px_rgba(26,31,26,0.08)]")}>
+      <div className={cn("overflow-hidden rounded-lg border bg-white transition-shadow duration-150", open && "shadow-[0_8px_20px_rgba(29,39,48,0.08)]")}>
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
@@ -19,7 +19,7 @@ export function SidebarUserMenu({ userName, roleName }: { userName: string; role
           aria-expanded={open}
           aria-label={`${open ? "Close" : "Open"} account menu for ${userName}`}
         >
-          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand text-xs font-semibold text-white">{initials}</span>
+          <span className="grid size-10 shrink-0 place-items-center rounded-md bg-brand text-xs font-semibold text-white">{initials}</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs font-semibold text-foreground">{userName}</span>
             <span className="mt-0.5 block truncate text-[11px] text-muted">{roleName}</span>

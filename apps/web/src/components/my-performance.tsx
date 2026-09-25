@@ -2,6 +2,7 @@
 
 import { IndianRupee, Target } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { FilterMenu } from "@/components/ui/filter-menu";
 
 type PeriodType = "MONTHLY" | "QUARTERLY" | "HALF_YEARLY" | "YEARLY" | "SEASONAL";
 type Season = { name: string; weightagePercent: number; startDate: string; endDate: string };
@@ -62,9 +63,9 @@ export function MyPerformance() {
 
     {data && data.hasPlan && data.available && <>
       <section className="crm-surface p-4 sm:p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{PERIOD_LABELS[data.period.period]} target</p>
-        <div className="mt-2 flex items-baseline gap-1.5">
-          <p className="text-2xl font-bold tracking-[-0.02em] text-foreground">{money(data.actual)}</p>
+        <p className="text-xs font-medium text-muted">{PERIOD_LABELS[data.period.period]} target</p>
+        <div className="mt-1 flex items-baseline gap-1.5">
+          <p className="text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-[27px]">{money(data.actual)}</p>
           <p className="text-sm text-muted">/ {money(data.target)}</p>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-brand transition-[width] duration-300" style={{ width: `${Math.min(100, data.achievementPercent)}%` }} /></div>
@@ -75,11 +76,11 @@ export function MyPerformance() {
       </section>
 
       <section className="crm-surface p-4 sm:p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Incentive</p>
+        <p className="text-xs font-medium text-muted">Incentive</p>
         {data.incentive ? <>
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-1 flex items-center gap-2">
             <IndianRupee size={20} className={data.incentive.eligible ? "text-success" : "text-subtle"} />
-            <p className="text-2xl font-bold tracking-[-0.02em] text-foreground">{money(data.incentive.incentiveAmount)}</p>
+            <p className="text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-[27px]">{money(data.incentive.incentiveAmount)}</p>
           </div>
           <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${data.incentive.eligible ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}>{data.incentive.eligible ? "Eligible" : "Not yet eligible"}</span>
           {!data.incentive.eligible && <p className="mt-2 text-xs text-muted">Reach the minimum achievement threshold to unlock your incentive for this period.</p>}
@@ -97,13 +98,12 @@ function PeriodTabs({ period, onChange, seasonal }: { period: PeriodType; onChan
 }
 
 function PeriodIndexSelector({ period, year, index, seasons, onYearChange, onIndexChange }: { period: PeriodType; year: number; index: number | undefined; seasons: Season[] | null; onYearChange: (year: number) => void; onIndexChange: (index: number | undefined) => void }) {
-  const selectClass = "h-10 rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10";
   return <div className="flex flex-wrap items-center gap-2">
-    <select value={year} onChange={(e) => onYearChange(Number(e.target.value))} className={selectClass}>{[year - 1, year, year + 1].map((y) => <option key={y} value={y}>{y}</option>)}</select>
-    {period === "MONTHLY" && <select value={index ?? ""} onChange={(e) => onIndexChange(e.target.value ? Number(e.target.value) : undefined)} className={selectClass}><option value="">Current month</option>{MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select>}
-    {period === "QUARTERLY" && <select value={index ?? ""} onChange={(e) => onIndexChange(e.target.value ? Number(e.target.value) : undefined)} className={selectClass}><option value="">Current quarter</option>{[1, 2, 3, 4].map((q) => <option key={q} value={q}>Q{q}</option>)}</select>}
-    {period === "HALF_YEARLY" && <select value={index ?? ""} onChange={(e) => onIndexChange(e.target.value ? Number(e.target.value) : undefined)} className={selectClass}><option value="">Current half</option><option value={1}>H1 (Jan–Jun)</option><option value={2}>H2 (Jul–Dec)</option></select>}
-    {period === "SEASONAL" && seasons && <select value={index ?? ""} onChange={(e) => onIndexChange(e.target.value ? Number(e.target.value) : undefined)} className={selectClass}><option value="">Select season</option>{seasons.map((season, i) => <option key={season.name} value={i + 1}>{season.name}</option>)}</select>}
+    <FilterMenu value={String(year)} showLabelOnMobile ariaLabel="Filter performance by year" onSelect={(value) => onYearChange(Number(value))} options={[year - 1, year, year + 1].map((value) => ({ key: String(value), label: String(value) }))} />
+    {period === "MONTHLY" && <FilterMenu value={index == null ? "" : String(index)} showLabelOnMobile ariaLabel="Filter performance by month" onSelect={(value) => onIndexChange(value ? Number(value) : undefined)} options={[{ key: "", label: "Current month" }, ...MONTHS.map((label, i) => ({ key: String(i + 1), label }))]} />}
+    {period === "QUARTERLY" && <FilterMenu value={index == null ? "" : String(index)} showLabelOnMobile ariaLabel="Filter performance by quarter" onSelect={(value) => onIndexChange(value ? Number(value) : undefined)} options={[{ key: "", label: "Current quarter" }, ...[1, 2, 3, 4].map((value) => ({ key: String(value), label: `Q${value}` }))]} />}
+    {period === "HALF_YEARLY" && <FilterMenu value={index == null ? "" : String(index)} showLabelOnMobile ariaLabel="Filter performance by half year" onSelect={(value) => onIndexChange(value ? Number(value) : undefined)} options={[{ key: "", label: "Current half" }, { key: "1", label: "H1 (Jan–Jun)" }, { key: "2", label: "H2 (Jul–Dec)" }]} />}
+    {period === "SEASONAL" && seasons && <FilterMenu value={index == null ? "" : String(index)} showLabelOnMobile ariaLabel="Filter performance by season" onSelect={(value) => onIndexChange(value ? Number(value) : undefined)} options={[{ key: "", label: "Select season" }, ...seasons.map((season, i) => ({ key: String(i + 1), label: season.name }))]} />}
   </div>;
 }
 

@@ -1,12 +1,12 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, FileCheck2, FileText, Minus, Package, Plus, RotateCcw, Search, Send, ShoppingCart, X, XCircle } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Clock3, FileCheck2, FileText, Minus, Package, Plus, RotateCcw, Search, Send, ShoppingCart, X, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { FilterMenu } from "@/components/ui/filter-menu";
 import { Input } from "@/components/ui/input";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 import { PageSizeMenu } from "@/components/ui/page-size-menu";
 
 const APPROVED_ONWARD = ["APPROVED", "INVOICE_GENERATED", "STOCK_RESERVED", "PICKING", "PACKED", "READY_FOR_DISPATCH", "OUT_FOR_DELIVERY", "ARRIVED_AT_CUSTOMER", "CONFIRMED", "DISPATCHED", "DELIVERED"];
@@ -94,12 +94,12 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
     {headerSlot && isSales && createPortal(<Button onClick={() => { setEditing(null); setBookingOpen(true); }}><Plus size={16} /><span className="hidden sm:inline">New draft</span><span className="sr-only sm:hidden">New draft</span></Button>, headerSlot)}
     <div className="space-y-4">
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <KpiCard icon={FileText} label="Total orders" value={data?.items.length ?? 0} detail="All visible orders" />
-        <KpiCard icon={Clock3} label="Needs review" value={counts(GROUPS[2].statuses)} detail="Needs Accounts action" tone="warning" />
-        <KpiCard icon={FileCheck2} label="Approved" value={counts(APPROVED_ONWARD)} detail="Approved through delivery" tone="success" />
-        <KpiCard icon={CircleDollarSign} label="Order value" value={money(data?.items.reduce((sum, order) => sum + Number(order.totalAmount), 0) ?? 0)} detail="Across all visible orders" />
-      </div>
+      <KpiStrip columns={4}>
+        <KpiCell label="Total orders" value={data?.items.length ?? 0} detail="All visible orders" />
+        <KpiCell label="Needs review" value={counts(GROUPS[2].statuses)} detail="Needs Accounts action" tone="warning" />
+        <KpiCell label="Approved" value={counts(APPROVED_ONWARD)} detail="Approved through delivery" tone="success" />
+        <KpiCell label="Order value" value={money(data?.items.reduce((sum, order) => sum + Number(order.totalAmount), 0) ?? 0)} detail="Across all visible orders" />
+      </KpiStrip>
       <div className="flex gap-2">
         <label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={17} /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order number or salon name" aria-label="Search orders" /></label>
         <FilterMenu value={group} onSelect={setGroup} options={GROUPS.map((item) => ({ key: item.key, label: item.label, count: counts(item.statuses) }))} />

@@ -24,6 +24,7 @@ import {
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import { FilterMenu } from "@/components/ui/filter-menu";
 import { Input } from "@/components/ui/input";
 
 type Client = {
@@ -154,35 +155,8 @@ export function ClientsModule({
               aria-label="Search clients"
             />
           </label>
-          <select
-            value={status}
-            onChange={(event) => {
-              setStatus(event.target.value);
-              setPage(1);
-            }}
-            className="h-11 rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10"
-            aria-label="Filter by status"
-          >
-            <option value="">All statuses</option>
-            <option value="PROSPECT">Prospect</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
-          <select
-            value={category}
-            onChange={(event) => {
-              setCategory(event.target.value);
-              setPage(1);
-            }}
-            className="h-11 rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10"
-            aria-label="Filter by category"
-          >
-            <option value="">All categories</option>
-            <option value="SALON">Salon</option>
-            <option value="SPA">Spa</option>
-            <option value="STUDIO">Studio</option>
-            <option value="ACADEMY">Academy</option>
-          </select>
+          <FilterMenu value={status} fullWidth showLabelOnMobile ariaLabel="Filter clients by status" onSelect={(value) => { setStatus(value); setPage(1); }} options={[{ key: "", label: "All statuses" }, { key: "PROSPECT", label: "Prospect" }, { key: "ACTIVE", label: "Active" }, { key: "INACTIVE", label: "Inactive" }]} />
+          <FilterMenu value={category} fullWidth showLabelOnMobile ariaLabel="Filter clients by category" onSelect={(value) => { setCategory(value); setPage(1); }} options={[{ key: "", label: "All categories" }, { key: "SALON", label: "Salon" }, { key: "SPA", label: "Spa" }, { key: "STUDIO", label: "Studio" }, { key: "ACADEMY", label: "Academy" }]} />
           {(search || status || category) && (
             <Button variant="secondary" onClick={clearFilters}>
               <X size={15} />

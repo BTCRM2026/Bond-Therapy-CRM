@@ -1,12 +1,13 @@
 "use client";
 
-import { KeyRound, LoaderCircle, MoreHorizontal, Pencil, Plus, Search, ShieldCheck, Trash2, UserCheck, UserRoundCheck, UsersRound, UserX } from "lucide-react";
+import { KeyRound, LoaderCircle, MoreHorizontal, Pencil, Plus, Search, Trash2, UserCheck, UsersRound, UserX } from "lucide-react";
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import { FilterMenu } from "@/components/ui/filter-menu";
 import { Input } from "@/components/ui/input";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 import { Modal } from "@/components/ui/modal";
 import { SuccessToast } from "@/components/ui/toast";
 
@@ -107,11 +108,11 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
       {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
       {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add staff</span><span className="sr-only sm:hidden">Add staff</span></Button>, headerSlot)}
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <KpiCard icon={UsersRound} label="Managed accounts" value={directory?.users.length ?? 0} />
-        <KpiCard icon={UserRoundCheck} label="Active accounts" value={active} />
-        <KpiCard icon={ShieldCheck} label="Approved roles" value={directory?.roles.length ?? 0} />
-      </div>
+      <KpiStrip className="mb-5" columns={3}>
+        <KpiCell label="Managed accounts" value={directory?.users.length ?? 0} />
+        <KpiCell label="Active accounts" value={active} />
+        <KpiCell label="Approved roles" value={directory?.roles.length ?? 0} />
+      </KpiStrip>
 
       <section className="relative crm-surface">
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -119,10 +120,7 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search name, employee code, login ID or email" aria-label="Search staff" />
           </label>
-          <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="h-11 rounded-lg border bg-white px-3 text-[13px] text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10" aria-label="Filter by role">
-            <option value="ALL">All roles</option>
-            {directory?.roles.map((role) => <option key={role.key} value={role.key}>{role.name}</option>)}
-          </select>
+          <FilterMenu value={roleFilter} showLabelOnMobile ariaLabel="Filter staff by role" onSelect={setRoleFilter} options={[{ key: "ALL", label: "All roles" }, ...(directory?.roles.map((role) => ({ key: role.key, label: role.name })) ?? [])]} />
         </div>
 
         {error && <div className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger sm:mx-5" role="alert">{error}</div>}

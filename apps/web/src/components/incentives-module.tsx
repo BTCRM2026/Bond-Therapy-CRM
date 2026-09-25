@@ -3,14 +3,14 @@
 import { CheckCircle2, IndianRupee, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 
 type CalcStatus = "CALCULATED" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "PAID";
 type Calculation = { id: string; userId: string; user: { id: string; name: string }; ruleName: string; ruleVersionNumber: number; sourceType: string; sourceReference: string; sourceDate: string; eligibleAmount: number; incentiveAmount: number; status: CalcStatus; approvedBy: { id: string; name: string } | null; rejectedReason: string | null; paidAt: string | null };
 
 const money = (value: number) => `₹${value.toLocaleString("en-IN")}`;
 const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? String((data as { message: unknown }).message) : fallback;
-const STATUS_TONE: Record<CalcStatus, string> = { CALCULATED: "bg-gray-100 text-muted", PENDING_APPROVAL: "bg-warning-soft text-warning", APPROVED: "bg-brand-soft text-brand-dark", REJECTED: "bg-red-50 text-danger", PAID: "bg-success-soft text-success" };
+const STATUS_TONE: Record<CalcStatus, string> = { CALCULATED: "bg-background text-muted", PENDING_APPROVAL: "bg-warning-soft text-warning", APPROVED: "bg-brand-soft text-brand-dark", REJECTED: "bg-red-50 text-danger", PAID: "bg-success-soft text-success" };
 const STATUS_LABEL: Record<CalcStatus, string> = { CALCULATED: "Calculated", PENDING_APPROVAL: "Pending approval", APPROVED: "Approved", REJECTED: "Rejected", PAID: "Paid" };
 
 export function IncentivesModule({ isManager, currentUserId }: { isManager: boolean; currentUserId: string }) {
@@ -54,11 +54,11 @@ export function IncentivesModule({ isManager, currentUserId }: { isManager: bool
   return <div className="space-y-5">
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
 
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <KpiCard icon={IndianRupee} label="Pending approval" value={money(totals.pending)} tone="warning" />
-      <KpiCard icon={IndianRupee} label="Approved" value={money(totals.approved)} tone="brand" />
-      <KpiCard icon={IndianRupee} label="Paid" value={money(totals.paid)} tone="success" />
-    </div>
+    <KpiStrip columns={3}>
+      <KpiCell label="Pending approval" value={money(totals.pending)} tone="warning" />
+      <KpiCell label="Approved" value={money(totals.approved)} tone="brand" />
+      <KpiCell label="Paid" value={money(totals.paid)} tone="success" />
+    </KpiStrip>
 
     <section className="crm-surface overflow-hidden">
       <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">My incentives</p></div>
