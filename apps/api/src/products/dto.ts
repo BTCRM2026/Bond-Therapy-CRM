@@ -1,10 +1,14 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { ProductCategory, StockMovementType } from '@prisma/client';
 
 export class ListProductsDto {
   @IsOptional() @IsString() @MaxLength(120) search?: string;
   @IsOptional() @IsEnum(ProductCategory) category?: ProductCategory;
+  @IsOptional() @IsIn(['LOW', 'OUT']) stockStatus?: 'LOW' | 'OUT';
+  @IsOptional() @IsIn(['ACTIVE', 'INACTIVE']) catalogueStatus?: 'ACTIVE' | 'INACTIVE';
+  @IsOptional() @IsIn(['name', 'unitPrice', 'stockOnHand']) sortBy: 'name' | 'unitPrice' | 'stockOnHand' = 'name';
+  @IsOptional() @IsIn(['asc', 'desc']) sortDirection: 'asc' | 'desc' = 'asc';
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) pageSize = 100;
 }

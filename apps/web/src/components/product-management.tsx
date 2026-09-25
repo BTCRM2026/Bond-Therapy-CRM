@@ -1,21 +1,25 @@
 "use client";
 
-import { AlertTriangle, IndianRupee, LoaderCircle, MoreHorizontal, Package, PackageCheck, PackageX, Pencil, Plus, Search, SlidersHorizontal, Trash2, UserCheck, UserX, X } from "lucide-react";
+import { ArrowDown, ArrowUp, LoaderCircle, MoreHorizontal, Package, Pencil, Plus, Search, SlidersHorizontal, Trash2, UserCheck, UserX, X } from "lucide-react";
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { CompactPagination } from "@/components/ui/compact-pagination";
 import { FilterMenu } from "@/components/ui/filter-menu";
 import { Input } from "@/components/ui/input";
-import { KpiCard } from "@/components/ui/kpi-card";
 import { SuccessToast } from "@/components/ui/toast";
 
-type Product = { id: string; name: string; category: string; unitPrice: string; hsnCode?: string | null; gstRate?: string | null; stockOnHand: number; isActive: boolean };
+type Product = { id: string; sku?: string; name: string; category: string; unitPrice: string; hsnCode?: string | null; gstRate?: string | null; stockOnHand: number; isActive: boolean };
 export type ProductListResponse = { items: Product[]; page: number; pageSize: number; total: number; hasMore: boolean };
 type ProductStats = { totalProducts: number; inStock: number; lowStock: number; outOfStock: number; inventoryValue: number };
 
 const CATEGORIES = [["SHAMPOO", "Shampoo"], ["CONDITIONER", "Conditioner"], ["MASK", "Mask"], ["TREATMENT", "Treatment"], ["KIT", "Kit"], ["COLOR", "Color"], ["DEVELOPER", "Developer"], ["STYLING", "Styling"], ["OIL_SERUM", "Oil / Serum"], ["LIQUID", "Liquid"], ["TOOLS", "Tools"], ["OTHER", "Other"]] as const;
 const CATEGORY_FILTERS = [["ALL", "All categories"], ...CATEGORIES] as const;
+const STOCK_FILTERS = [["ALL", "All stock"], ["LOW", "Low stock"], ["OUT", "Out of stock"]] as const;
+const CATALOGUE_FILTERS = [["ALL", "All products"], ["ACTIVE", "Active"], ["INACTIVE", "Inactive"]] as const;
+type StockFilter = typeof STOCK_FILTERS[number][0];
+type CatalogueFilter = typeof CATALOGUE_FILTERS[number][0];
+type SortKey = "name" | "unitPrice" | "stockOnHand";
 const pretty = (value: string) => value.toLowerCase().split("_").map((part) => part[0].toUpperCase() + part.slice(1)).join(" / ");
 const money = (value: string | number) => `₹${Number(value).toLocaleString("en-IN")}`;
 const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? (Array.isArray((data as { message: unknown }).message) ? (data as { message: string[] }).message.join(" ") : String((data as { message: unknown }).message)) : fallback;
@@ -25,6 +29,10 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
   const [stats, setStats] = useState<ProductStats | null>(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("ALL");
+  const [stockStatus, setStockStatus] = useState<StockFilter>("ALL");
+  const [catalogueStatus, setCatalogueStatus] = useState<CatalogueFilter>("ALL");
+  const [sortBy, setSortBy] = useState<SortKey>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(initial?.page ?? 1);
   const [pageSize, setPageSize] = useState(10);
   const [editor, setEditor] = useState<{ mode: "create" | "edit"; product?: Product } | null>(null);
@@ -39,6 +47,10 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (search.trim()) params.set("search", search.trim());
     if (category !== "ALL") params.set("category", category);
+    if (stockStatus !== "ALL") params.set("stockStatus", stockStatus);
+    if (catalogueStatus !== "ALL") params.set("catalogueStatus", catalogueStatus);
+    params.set("sortBy", sortBy);
+    params.set("sortDirection", sortDirection);
     const response = await fetch(`/api/products?${params}`, { cache: "no-store" });
     const json = await response.json().catch(() => null);
     if (!response.ok) throw new Error(messageFrom(json, "Unable to refresh products."));
@@ -54,7 +66,16 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
 
   useEffect(() => { const timer = setTimeout(() => { void reloadStats().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load product statistics.")); }, 0); return () => clearTimeout(timer); }, []);
 
-  useEffect(() => { const timer = setTimeout(() => { void reload().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load products.")); }, 250); return () => clearTimeout(timer); }, [search, category, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const timer = setTimeout(() => { void reload().catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load products.")); }, 250); return () => clearTimeout(timer); }, [search, category, stockStatus, catalogueStatus, sortBy, sortDirection, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setSort = (key: SortKey) => {
+    setPage(1);
+    if (sortBy === key) setSortDirection((value) => value === "asc" ? "desc" : "asc");
+    else { setSortBy(key); setSortDirection("asc"); }
+  };
+
+  const clearFilters = () => { setSearch(""); setCategory("ALL"); setStockStatus("ALL"); setCatalogueStatus("ALL"); setPage(1); };
+  const hasFilters = Boolean(search.trim()) || category !== "ALL" || stockStatus !== "ALL" || catalogueStatus !== "ALL";
 
   const toggleActive = async (product: Product) => {
     setBusyId(product.id); setError(""); setNotice("");
@@ -82,79 +103,105 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
   };
 
   return (
-    <>
+    <div className="text-foreground">
       {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
-      {headerSlot && createPortal(<Button onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add product</span><span className="sr-only sm:hidden">Add product</span></Button>, headerSlot)}
+      {headerSlot && createPortal(<Button className="rounded-md bg-[#24282b] text-white shadow-none hover:bg-[#111315]" onClick={() => setEditor({ mode: "create" })}><Plus size={16} /><span className="hidden sm:inline">Add new product</span><span className="sr-only sm:hidden">Add product</span></Button>, headerSlot)}
 
-      <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-5">
-        <KpiCard icon={Package} label="Total products" value={stats?.totalProducts ?? "—"} detail="Active catalogue" />
-        <KpiCard icon={PackageCheck} label="In stock" value={stats?.inStock ?? "—"} detail="Above reorder level" tone="success" />
-        <KpiCard icon={AlertTriangle} label="Low stock" value={stats?.lowStock ?? "—"} detail="Reorder soon" tone="warning" />
-        <KpiCard icon={PackageX} label="Out of stock" value={stats?.outOfStock ?? "—"} detail="Needs restocking" tone="danger" />
-        <KpiCard icon={IndianRupee} label="Inventory value" value={stats ? money(stats.inventoryValue) : "—"} detail="MRP × stock" tone="brand" />
-      </div>
+      <section className="mb-4 grid grid-cols-2 overflow-hidden rounded-[10px] border bg-white lg:grid-cols-4" aria-label="Product overview">
+        <ProductMetric label="Total products" value={stats?.totalProducts ?? "—"} detail="Complete catalogue" active={!hasFilters} onClick={clearFilters} />
+        <ProductMetric label="Inventory value" value={stats ? money(stats.inventoryValue) : "—"} detail="MRP × available stock" />
+        <ProductMetric label="Low stock" value={stats?.lowStock ?? "—"} detail="10 units or fewer" warning active={stockStatus === "LOW"} onClick={() => { setStockStatus("LOW"); setPage(1); }} />
+        <ProductMetric label="Out of stock" value={stats?.outOfStock ?? "—"} detail="Needs restocking" danger active={stockStatus === "OUT"} onClick={() => { setStockStatus("OUT"); setPage(1); }} />
+      </section>
 
-      <section className="relative rounded-xl border bg-white shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
-        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
-          <label className="relative block w-full sm:max-w-sm">
+      <section className="relative overflow-hidden rounded-[10px] border bg-white shadow-[0_1px_2px_rgba(29,39,48,0.025)]">
+        <div className="border-b p-3 sm:p-4">
+          <div className="flex flex-col gap-2 min-[1360px]:flex-row min-[1360px]:items-center">
+            <div className="flex min-w-0 flex-1 flex-col gap-2 min-[1360px]:flex-row min-[1360px]:items-center">
+              <label className="relative block w-full min-[1360px]:min-w-[220px] min-[1360px]:flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} />
-            <Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="pl-9" placeholder="Search products" aria-label="Search products" />
-          </label>
-          <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
-            <FilterMenu value={category} showLabelOnMobile onSelect={(value) => { setCategory(value); setPage(1); }} options={CATEGORY_FILTERS.map(([key, label]) => ({ key, label }))} />
-            {data && data.total > 0 && <CompactPagination page={data.page} pageSize={data.pageSize} total={data.total} hasMore={data.hasMore} onPageChange={setPage} onPageSizeChange={(value) => { setPage(1); setPageSize(value); }} />}
+                <Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="h-10 rounded-lg pl-9 text-[13px]" placeholder="Search name or SKU" aria-label="Search products" />
+              </label>
+              <div className="flex w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&>div]:min-w-[150px] sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 sm:[&>div]:min-w-0 sm:[&>div>button]:w-full min-[1360px]:flex min-[1360px]:w-auto min-[1360px]:shrink-0 min-[1360px]:[&>div]:w-auto min-[1360px]:[&>div>button]:w-auto">
+                <FilterMenu value={category} showLabelOnMobile onSelect={(value) => { setCategory(value); setPage(1); }} options={CATEGORY_FILTERS.map(([key, label]) => ({ key, label }))} />
+                <FilterMenu value={stockStatus} showLabelOnMobile onSelect={(value) => { setStockStatus(value); setPage(1); }} options={STOCK_FILTERS.map(([key, label]) => ({ key, label }))} />
+                <FilterMenu value={catalogueStatus} showLabelOnMobile onSelect={(value) => { setCatalogueStatus(value); setPage(1); }} options={CATALOGUE_FILTERS.map(([key, label]) => ({ key, label }))} />
+              </div>
+            </div>
+            <div className="flex w-full items-center sm:w-auto sm:self-end min-[1360px]:shrink-0 min-[1360px]:self-auto">
+              {data && data.total > 0 && <CompactPagination page={data.page} pageSize={data.pageSize} total={data.total} hasMore={data.hasMore} onPageChange={setPage} onPageSizeChange={(value) => { setPage(1); setPageSize(value); }} />}
+            </div>
           </div>
+          {hasFilters && <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3">
+            <span className="mr-1 text-[11px] font-medium text-muted">Applied:</span>
+            {search.trim() && <FilterChip label={`Search: ${search.trim()}`} onRemove={() => setSearch("")} />}
+            {category !== "ALL" && <FilterChip label={CATEGORY_FILTERS.find(([key]) => key === category)?.[1] ?? category} onRemove={() => setCategory("ALL")} />}
+            {stockStatus !== "ALL" && <FilterChip label={STOCK_FILTERS.find(([key]) => key === stockStatus)?.[1] ?? stockStatus} onRemove={() => setStockStatus("ALL")} />}
+            {catalogueStatus !== "ALL" && <FilterChip label={CATALOGUE_FILTERS.find(([key]) => key === catalogueStatus)?.[1] ?? catalogueStatus} onRemove={() => setCatalogueStatus("ALL")} />}
+            <button type="button" className="ml-1 text-[11px] font-semibold text-brand hover:text-brand-dark" onClick={clearFilters}>Clear all</button>
+          </div>
+          }
         </div>
 
         {error && <div className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger sm:mx-5" role="alert">{error}</div>}
 
-        <div className="hidden overflow-visible xl:block">
-          <table className="w-full min-w-[820px] text-left text-[13px]">
-            <thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><tr><th className="px-5 py-3">Product</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">MRP</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
+        <div className="hidden max-h-[calc(100vh-290px)] overflow-auto lg:block">
+          <table className="w-full min-w-[840px] text-left text-sm [&_td:not(:first-child)]:text-center [&_th:not(:first-child)]:text-center">
+            <thead className="sticky top-0 z-10 border-b bg-[#f7f9fa] text-[12px] font-semibold text-muted"><tr><th className="px-5 py-3"><SortButton label="Product" column="name" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3">Category</th><th className="px-4 py-3"><SortButton label="MRP" column="unitPrice" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3"><SortButton label="Inventory" column="stockOnHand" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3">Stock status</th><th className="px-4 py-3">Catalogue</th><th className="px-5 py-3">Actions</th></tr></thead>
             <tbody className="divide-y">
               {data?.items.map((product) => <ProductRow key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}
             </tbody>
           </table>
         </div>
-        <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 xl:hidden">{data?.items.map((product) => <ProductCard key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}</div>
+        <div className="grid grid-cols-1 gap-2 p-2.5 sm:grid-cols-2 lg:hidden">{data?.items.map((product) => <ProductCard key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}</div>
         {!data?.items.length && <div className="px-5 py-12 text-center"><Package className="mx-auto text-subtle" size={24} /><p className="mt-3 text-sm font-semibold text-foreground">No products found</p><p className="mt-1 text-xs text-muted">Adjust the search or add a product.</p></div>}
       </section>
 
       {editor && <ProductEditor mode={editor.mode} product={editor.product} onClose={() => setEditor(null)} onSaved={async (message) => { setEditor(null); await Promise.all([reload(), reloadStats()]); setError(""); setNotice(message); }} onStockAdjusted={() => { void Promise.all([reload(), reloadStats()]); }} />}
-    </>
+    </div>
   );
 }
 
+function ProductMetric({ label, value, detail, warning = false, danger = false, active = false, onClick }: { label: string; value: string | number; detail: string; warning?: boolean; danger?: boolean; active?: boolean; onClick?: () => void }) {
+  const content = <><p className="text-xs font-medium text-muted">{label}</p><p className="mt-1 truncate text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-[27px]">{value}</p><p className={`mt-1 truncate text-xs ${danger ? "text-danger" : warning ? "text-warning" : "text-subtle"}`}>{detail}</p></>;
+  const className = `min-w-0 border-b border-r p-4 text-left transition-colors [&:nth-child(2n)]:border-r-0 [&:nth-child(n+3)]:border-b-0 lg:border-b-0 lg:border-r lg:p-5 lg:[&:nth-child(2n)]:border-r lg:[&:last-child]:border-r-0 ${active ? "bg-brand-soft/75" : "bg-white"} ${onClick ? "cursor-pointer hover:bg-brand-soft/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand" : ""}`;
+  return onClick ? <button type="button" className={className} onClick={onClick} aria-pressed={active}>{content}</button> : <div className={className}>{content}</div>;
+}
+
 function StatusBadge({ isActive }: { isActive: boolean }) {
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${isActive ? "bg-success-soft text-success" : "bg-gray-100 text-muted"}`}>{isActive ? "Active" : "Inactive"}</span>;
+  return <span className={`inline-flex rounded px-2 py-1 text-[10px] font-semibold ${isActive ? "bg-success-soft text-success" : "bg-[#f0f2f3] text-muted"}`}>{isActive ? "Active" : "Inactive"}</span>;
+}
+function AvailabilityBadge({ stockOnHand }: { stockOnHand: number }) {
+  if (stockOnHand <= 0) return <span className="inline-flex rounded bg-red-50 px-2 py-1 text-[10px] font-semibold text-danger">Out of stock</span>;
+  if (stockOnHand <= 10) return <span className="inline-flex rounded bg-warning-soft px-2 py-1 text-[10px] font-semibold text-warning">Low stock</span>;
+  return <span className="inline-flex rounded bg-success-soft px-2 py-1 text-[10px] font-semibold text-success">In stock</span>;
 }
 function StockCell({ stockOnHand }: { stockOnHand: number }) {
-  if (stockOnHand <= 0) return <span className="font-medium text-danger">Out of stock</span>;
-  if (stockOnHand <= 10) return <span className="font-medium text-warning">{stockOnHand} left</span>;
-  return <span className="font-medium text-foreground">{stockOnHand}</span>;
+  return <span className={`font-semibold tabular-nums ${stockOnHand <= 0 ? "text-danger" : stockOnHand <= 10 ? "text-warning" : "text-foreground"}`}>{stockOnHand}</span>;
 }
 
 type RowProps = { product: Product; busy: boolean; onEdit: () => void; onToggleActive: () => void; onDelete: () => void };
 
 function ProductRow({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
-  return <tr className="transition-colors hover:bg-brand-soft/40">
-    <td className="px-5 py-4"><p className="font-semibold text-foreground">{product.name}</p></td>
-    <td className="px-4 py-4 text-muted">{pretty(product.category)}</td>
-    <td className="px-4 py-4 text-muted">{money(product.unitPrice)}</td>
-    <td className="px-4 py-4"><StockCell stockOnHand={product.stockOnHand} /></td>
-    <td className="px-4 py-4"><StatusBadge isActive={product.isActive} /></td>
-    <td className="px-5 py-4"><div className="flex justify-end gap-2"><IconAction icon={Pencil} label="Edit product" onClick={onEdit} /><IconAction icon={product.isActive ? UserX : UserCheck} label={product.isActive ? "Deactivate" : "Activate"} onClick={onToggleActive} busy={busy} /><IconAction icon={Trash2} label="Delete product" onClick={onDelete} busy={busy} danger /></div></td>
+  return <tr className="transition-colors hover:bg-brand-soft/30">
+    <td className={`border-l-2 px-5 py-3 ${product.stockOnHand <= 10 ? "border-l-warning" : "border-l-transparent"}`}><div><p className="font-semibold leading-5 text-foreground">{product.name}</p>{product.sku && <p className="mt-0.5 text-[11px] text-subtle">{product.sku}</p>}</div></td>
+    <td className="px-4 py-3 text-muted">{pretty(product.category)}</td>
+    <td className="px-4 py-3 font-semibold tabular-nums text-foreground">{money(product.unitPrice)}</td>
+    <td className="px-4 py-3"><StockCell stockOnHand={product.stockOnHand} /></td>
+    <td className="px-4 py-3"><AvailabilityBadge stockOnHand={product.stockOnHand} /></td>
+    <td className="px-4 py-3"><StatusBadge isActive={product.isActive} /></td>
+    <td className="px-5 py-3"><div className="flex justify-center"><ProductActions product={product} busy={busy} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} /></div></td>
   </tr>;
 }
 
 function ProductCard({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
-  return <article className="rounded-lg border bg-white p-4">
-    <div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="break-words text-sm font-semibold leading-5 text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted">{pretty(product.category)}</p></div><ProductActions product={product} busy={busy} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} /></div>
+  return <article className={`rounded-lg border bg-white p-3 ${product.stockOnHand <= 10 ? "border-l-2 border-l-warning" : ""}`}>
+    <div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="break-words text-sm font-semibold leading-5 text-foreground">{product.name}</p>{product.sku && <p className="mt-0.5 text-[10px] text-subtle">{product.sku}</p>}<p className="mt-1 text-xs text-muted">{pretty(product.category)}</p></div><ProductActions product={product} busy={busy} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} /></div>
     <dl className="mt-4 grid grid-cols-2 gap-4 border-t pt-3 text-xs">
       <div><dt className="text-muted">MRP</dt><dd className="mt-1 text-sm font-semibold text-foreground">{money(product.unitPrice)}</dd></div>
-      <div><dt className="text-muted">Stock</dt><dd className="mt-1 text-sm"><StockCell stockOnHand={product.stockOnHand} /></dd></div>
+      <div><dt className="text-muted">Quantity</dt><dd className="mt-1 text-sm font-semibold text-foreground">{product.stockOnHand}</dd></div>
     </dl>
-    <div className="mt-3"><StatusBadge isActive={product.isActive} /></div>
+    <div className="mt-3 flex items-center gap-2"><AvailabilityBadge stockOnHand={product.stockOnHand} /><StatusBadge isActive={product.isActive} /></div>
   </article>;
 }
 
@@ -177,8 +224,11 @@ function MenuAction({ icon: Icon, label, danger = false, onClick }: { icon: type
   return <button type="button" onClick={onClick} className={`flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-xs font-medium transition-colors ${danger ? "text-danger hover:bg-red-50" : "text-muted hover:bg-background hover:text-foreground"}`}><Icon size={15} />{label}</button>;
 }
 
-function IconAction({ icon: Icon, label, onClick, busy = false, danger = false }: { icon: typeof Pencil; label: string; onClick: () => void; busy?: boolean; danger?: boolean }) {
-  return <button type="button" disabled={busy} onClick={onClick} className={`grid size-9 place-items-center rounded-lg border bg-white transition-colors disabled:opacity-50 ${danger ? "text-danger hover:border-red-200 hover:bg-red-50" : "text-muted hover:border-brand/25 hover:bg-brand-soft hover:text-brand"}`} aria-label={label}>{busy ? <LoaderCircle className="animate-spin" size={15} /> : <Icon size={15} />}</button>;
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) { return <span className="inline-flex h-7 items-center gap-1 rounded-md bg-brand-soft px-2 text-[11px] font-semibold text-brand-dark">{label}<button type="button" onClick={onRemove} className="grid size-4 place-items-center rounded hover:bg-white/70" aria-label={`Remove ${label} filter`}><X size={11} /></button></span>; }
+
+function SortButton({ label, column, sortBy, direction, onSort }: { label: string; column: SortKey; sortBy: SortKey; direction: "asc" | "desc"; onSort: (column: SortKey) => void }) {
+  const active = sortBy === column;
+  return <button type="button" onClick={() => onSort(column)} className={`inline-flex items-center gap-1.5 hover:text-foreground ${active ? "text-brand-dark" : "text-muted"}`}>{label}{active ? direction === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} /> : null}</button>;
 }
 
 type FormState = { name: string; category: string; unitPrice: string; stockOnHand: string; hsnCode: string; gstRate: string };

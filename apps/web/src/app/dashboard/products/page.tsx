@@ -33,6 +33,7 @@ export default async function ProductsPage() {
       headerSubtitle={isAdmin ? "Manage the shared product catalogue" : "Catalogue and live stock"}
       portal={session.portal}
       canManageStaff={isAdmin && session.permissions.includes("admin.staff.manage")}
+      visualTheme={isAdmin ? "product-reference" : "default"}
     >
       {isAdmin ? <ProductManagement initial={initial} /> : <ProductsCatalogue initial={initial} />}
     </DashboardShell>

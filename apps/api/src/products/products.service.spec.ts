@@ -18,4 +18,21 @@ describe('ProductsService search', () => {
       where: { AND: [{ OR: expect.arrayContaining([{ name: { contains: 'Argan Oil' } }]) }] },
     }));
   });
+
+  it('applies stock, catalogue and sorting filters before pagination', async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const prisma = {
+      product: { findMany, count: vi.fn().mockResolvedValue(0) },
+      $transaction: vi.fn(async (queries: Promise<unknown>[]) => Promise.all(queries)),
+    };
+    const service = new ProductsService(prisma as unknown as PrismaService);
+    const actor = { id: 'admin-1', portal: 'ADMIN', roles: [{ key: 'SUPER_ADMIN' }] } as never;
+
+    await service.list(actor, { page: 1, pageSize: 10, stockStatus: 'LOW', catalogueStatus: 'ACTIVE', sortBy: 'stockOnHand', sortDirection: 'desc' } as never);
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { AND: [{ stockOnHand: { gt: 0, lte: 10 } }, { isActive: true }] },
+      orderBy: { stockOnHand: 'desc' },
+    }));
+  });
 });
