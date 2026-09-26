@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import type { ListTargetsDto, TargetDto } from './dto.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
-const fulfilmentStatuses = ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] as const;
+const fulfilmentStatuses = ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED', 'FORWARDED_TO_DISTRIBUTOR', 'DISTRIBUTOR_FULFILLED'] as const;
 const productiveOutcomes = ['PRODUCTIVE', 'ORDER_GENERATED', 'QUOTATION_REQUIRED'] as const;
 
 @Injectable()

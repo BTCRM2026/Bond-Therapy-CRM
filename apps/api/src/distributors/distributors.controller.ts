@@ -9,7 +9,7 @@ import { PortalType } from '@prisma/client';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import type { SessionUser } from '../common/session.util.js';
 import { DistributorsService } from './distributors.service.js';
-import { CreateDistributorDto, UpdateDistributorDto } from './dto.js';
+import { CreateDistributorDto, CreateDistributorUserDto, UpdateDistributorDto, UpdateDistributorUserStatusDto } from './dto.js';
 
 @Controller('distributors')
 @UseGuards(SessionGuard, PortalGuard, RolesGuard)
@@ -31,5 +31,20 @@ export class DistributorsController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateDistributorDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
     return this.distributors.update(id, dto, actor, req.ip);
+  }
+
+  @Get(':id/users')
+  listUsers(@Param('id') id: string) {
+    return this.distributors.listUsers(id);
+  }
+
+  @Post(':id/users')
+  createUser(@Param('id') id: string, @Body() dto: CreateDistributorUserDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
+    return this.distributors.createUser(id, dto, actor, req.ip);
+  }
+
+  @Patch(':id/users/:userId/status')
+  updateUserStatus(@Param('id') id: string, @Param('userId') userId: string, @Body() dto: UpdateDistributorUserStatusDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
+    return this.distributors.updateUserStatus(id, userId, dto, actor, req.ip);
   }
 }

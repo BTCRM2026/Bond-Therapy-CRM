@@ -110,9 +110,15 @@ model User {
   clientLocationsSet       Client[]             @relation("ClientLocationSetter")
   annualTargetPlansAsStaff AnnualTargetPlan[]   @relation("AnnualTargetPlanStaff")
   annualTargetPlansCreated AnnualTargetPlan[]   @relation("AnnualTargetPlanCreator")
+  distributorId            String?
+  distributorStaffOf       Distributor?         @relation("DistributorStaff", fields: [distributorId], references: [id], onDelete: SetNull)
+  replenishmentRequestsMade    ReplenishmentRequest[] @relation("ReplenishmentRequester")
+  replenishmentRequestsReviewed ReplenishmentRequest[] @relation("ReplenishmentReviewer")
+  distributorStockMovementsRecorded DistributorStockMovement[] @relation("DistributorStockMovementRecorder")
 
   @@index([department])
   @@index([managerId])
+  @@index([distributorId])
 }
 
 model StaffProfile {
@@ -244,9 +250,95 @@ model Distributor {
   updatedAt             DateTime          @updatedAt
   agreements            Agreement[]
   clients               Client[]
+  staff                 User[]                     @relation("DistributorStaff")
+  stock                 DistributorStock[]
+  stockMovements        DistributorStockMovement[]
+  replenishmentRequests ReplenishmentRequest[]
 
   @@index([assignedSalespersonId])
   @@index([status])
+}
+
+model DistributorStock {
+  id             String      @id @default(cuid())
+  distributorId  String
+  distributor    Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityOnHand Int         @default(0)
+  updatedAt      DateTime    @updatedAt
+
+  @@unique([distributorId, productId])
+  @@index([productId])
+}
+
+enum DistributorStockMovementType {
+  RECEIVED_FROM_HQ
+  SOLD_TO_SALON
+  ADJUSTMENT
+  RETURNED
+  DAMAGED
+}
+
+model DistributorStockMovement {
+  id                     String                        @id @default(cuid())
+  distributorId          String
+  distributor            Distributor                   @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  productId              String
+  product                Product                        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type                   DistributorStockMovementType
+  quantityChange         Int
+  reason                 String?
+  orderId                String?
+  order                  Order?                         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  replenishmentRequestId String?
+  replenishmentRequest   ReplenishmentRequest?           @relation(fields: [replenishmentRequestId], references: [id], onDelete: SetNull)
+  recordedById           String
+  recordedBy             User                           @relation("DistributorStockMovementRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  createdAt              DateTime                       @default(now())
+
+  @@index([distributorId, productId])
+  @@index([orderId])
+  @@index([replenishmentRequestId])
+}
+
+enum ReplenishmentStatus {
+  REQUESTED
+  APPROVED
+  FULFILLED
+  REJECTED
+}
+
+model ReplenishmentRequest {
+  id             String                     @id @default(cuid())
+  requestNumber  String                     @unique
+  distributorId  String
+  distributor    Distributor                @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  status         ReplenishmentStatus        @default(REQUESTED)
+  notes          String?
+  requestedById  String
+  requestedBy    User                       @relation("ReplenishmentRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedById   String?
+  reviewedBy     User?                      @relation("ReplenishmentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  fulfilledAt    DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  items          ReplenishmentItem[]
+  stockMovements DistributorStockMovement[]
+
+  @@index([distributorId, status])
+}
+
+model ReplenishmentItem {
+  id        String               @id @default(cuid())
+  requestId String
+  request   ReplenishmentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity  Int
+
+  @@index([requestId])
+  @@index([productId])
 }
 
 enum ClientCategory {
@@ -513,6 +605,9 @@ model Product {
   orderItems   OrderItem[]
   invoiceItems InvoiceItem[]
   movements    StockMovement[]
+  distributorStock          DistributorStock[]
+  distributorStockMovements DistributorStockMovement[]
+  replenishmentItems        ReplenishmentItem[]
 
   @@index([isActive])
   @@index([category])
@@ -536,6 +631,8 @@ enum OrderStatus {
   DISPATCHED
   DELIVERED
   CANCELLED
+  FORWARDED_TO_DISTRIBUTOR
+  DISTRIBUTOR_FULFILLED
 }
 
 enum DeliveryMode {
@@ -582,11 +679,14 @@ model Order {
   outForDeliveryAt     DateTime?
   arrivedAt            DateTime?
   deliveredAt          DateTime?
+  forwardedToDistributorAt DateTime?
+  distributorFulfilledAt   DateTime?
   version              Int             @default(1)
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   items                OrderItem[]
   stockMovements       StockMovement[]
+  distributorStockMovements DistributorStockMovement[]
   invoice              Invoice?
   deliveryProof        DeliveryProof?
 

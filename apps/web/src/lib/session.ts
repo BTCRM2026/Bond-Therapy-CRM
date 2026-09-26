@@ -56,3 +56,20 @@ export async function requireSession(expectedPortal?: PortalType): Promise<Sessi
 export function requireAdminSession() {
   return requireSession("ADMIN");
 }
+
+export async function requireDistributorSession(): Promise<SessionUser> {
+  const cookieStore = await cookies();
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/auth/session`, {
+      headers: { cookie: cookieStore.toString(), [PORTAL_HEADER]: "DISTRIBUTOR" },
+      cache: "no-store",
+    });
+  } catch {
+    redirect("/distributor/login");
+  }
+  if (!response.ok) redirect("/distributor/login");
+  const user = (await response.json()) as SessionUser;
+  if (user.portal !== "DISTRIBUTOR") redirect("/distributor/login");
+  return user;
+}

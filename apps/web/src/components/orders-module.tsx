@@ -35,7 +35,7 @@ function actionHint(order: Order, isAccounts: boolean): { label: string; tone: "
 }
 
 export function OrderStatus({ value }: { value: string }) {
-  const tone = ["APPROVED", "INVOICE_GENERATED", "DELIVERED"].includes(value) ? "bg-success-soft text-success" : ["REJECTED", "CANCELLED"].includes(value) ? "bg-red-50 text-danger" : ["UNDER_REVIEW", "DISPATCHED"].includes(value) ? "bg-brand-soft text-brand" : ["SUBMITTED", "RETURNED_FOR_CORRECTION"].includes(value) ? "bg-warning-soft text-warning" : "bg-gray-100 text-muted";
+  const tone = ["APPROVED", "INVOICE_GENERATED", "DELIVERED", "DISTRIBUTOR_FULFILLED"].includes(value) ? "bg-success-soft text-success" : ["REJECTED", "CANCELLED"].includes(value) ? "bg-red-50 text-danger" : ["UNDER_REVIEW", "DISPATCHED", "FORWARDED_TO_DISTRIBUTOR"].includes(value) ? "bg-brand-soft text-brand" : ["SUBMITTED", "RETURNED_FOR_CORRECTION"].includes(value) ? "bg-warning-soft text-warning" : "bg-gray-100 text-muted";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone}`}>{pretty(value)}</span>;
 }
 

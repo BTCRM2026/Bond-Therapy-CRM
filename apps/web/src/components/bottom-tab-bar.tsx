@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Building2, LayoutDashboard, ListChecks, Package, Settings, Truck, UserPlus, UsersRound } from "lucide-react";
+import { AlertTriangle, Building2, LayoutDashboard, ListChecks, Package, Settings, ShoppingCart, Truck, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
@@ -20,6 +20,13 @@ export function BottomTabBar({ portal = "ADMIN", roleKey, canManageStaff = false
         ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/products", label: "Products", icon: Package, exact: false }] : []),
         { href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true },
       ]
+    : portal === "DISTRIBUTOR"
+      ? [
+          { href: "/distributor/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
+          { href: "/distributor/orders", label: "Orders", icon: ShoppingCart, exact: false },
+          { href: "/distributor/stock", label: "Stock", icon: Package, exact: false },
+          { href: "/distributor/replenishment", label: "Restock", icon: Truck, exact: false },
+        ]
     : isSales
       ? [
           { href: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },

@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, LoaderCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -18,6 +18,8 @@ type FormValues = z.infer<typeof schema>;
 
 export function LoginForm() {
   const router = useRouter();
+  const pathname = usePathname();
+  const isDistributor = pathname?.startsWith("/distributor") ?? false;
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState("");
   const {
@@ -28,7 +30,7 @@ export function LoginForm() {
 
   const onSubmit = async (values: FormValues) => {
     setServerError("");
-    const response = await fetch("/api/auth/login", {
+    const response = await fetch(isDistributor ? "/api/distributor/auth/login" : "/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(values),

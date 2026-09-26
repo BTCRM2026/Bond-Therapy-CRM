@@ -90,6 +90,12 @@ for (const [key, name, permissionKey, priority] of staffRoles) {
   });
 }
 
+const distributorRole = await prisma.role.upsert({
+  where: { key: 'DISTRIBUTOR_STAFF' },
+  update: { name: 'Distributor', portal: 'DISTRIBUTOR', dashboardPath: '/distributor/dashboard', priority: 60, isActive: true },
+  create: { key: 'DISTRIBUTOR_STAFF', name: 'Distributor', description: 'Regional distributor stock and fulfillment', portal: 'DISTRIBUTOR', dashboardPath: '/distributor/dashboard', priority: 60 },
+});
+
 const loginId = process.env.ADMIN_LOGIN_ID?.trim().toLowerCase();
 const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const password = process.env.ADMIN_PASSWORD;
@@ -129,6 +135,29 @@ if (staffLoginId && staffEmail && staffPassword) {
     create: { userId: user.id, roleId: staffRole.id },
   });
   console.log(`Bootstrap staff user ready: ${staffLoginId} (${staffRoleKey})`);
+}
+
+const distributorLoginId = process.env.DISTRIBUTOR_LOGIN_ID?.trim().toLowerCase();
+const distributorEmail = process.env.DISTRIBUTOR_EMAIL?.trim().toLowerCase();
+const distributorPassword = process.env.DISTRIBUTOR_PASSWORD;
+
+if (distributorLoginId && distributorEmail && distributorPassword) {
+  const distributor = await prisma.distributor.upsert({
+    where: { id: 'bootstrap-distributor' },
+    update: { status: 'ACTIVE' },
+    create: { id: 'bootstrap-distributor', businessName: 'Vadodara Regional Distributor', contactName: 'Local Distributor', territory: 'Vadodara', status: 'ACTIVE' },
+  });
+  const user = await prisma.user.upsert({
+    where: { email: distributorEmail },
+    update: { status: 'ACTIVE', distributorId: distributor.id },
+    create: { loginId: distributorLoginId, email: distributorEmail, name: 'Local Distributor User', passwordHash: hashPassword(distributorPassword), distributorId: distributor.id },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: user.id, roleId: distributorRole.id } },
+    update: {},
+    create: { userId: user.id, roleId: distributorRole.id },
+  });
+  console.log(`Bootstrap distributor user ready: ${distributorLoginId}`);
 }
 
 }

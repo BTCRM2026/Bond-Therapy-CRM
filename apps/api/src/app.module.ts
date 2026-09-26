@@ -22,6 +22,8 @@ import { RoutesModule } from './routes/routes.module.js';
 import { TargetsModule } from './targets/targets.module.js';
 import { IncentiveRulesModule } from './incentive-rules/incentive-rules.module.js';
 import { TargetIncentiveModule } from './target-incentive/target-incentive.module.js';
+import { DistributorStockModule } from './distributor-stock/distributor-stock.module.js';
+import { ReplenishmentModule } from './replenishment/replenishment.module.js';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { TargetIncentiveModule } from './target-incentive/target-incentive.modul
     TargetsModule,
     IncentiveRulesModule,
     TargetIncentiveModule,
+    DistributorStockModule,
+    ReplenishmentModule,
   ],
   controllers: [AppController],
 })

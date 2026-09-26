@@ -76,7 +76,7 @@ export function ProfileSettings({ initialProfile, canChangePassword }: { initial
     setProfileMessage("");
     setProfileError("");
     try {
-      const response = await fetch("/api/profile", {
+      const response = await fetch(initialProfile.portal === "DISTRIBUTOR" ? "/api/distributor/auth/profile" : "/api/profile", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(values),

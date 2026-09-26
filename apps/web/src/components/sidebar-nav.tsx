@@ -60,6 +60,16 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/target-incentive", label: "Target & Incentive", icon: Award, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/attendance", label: "Attendance", icon: Clock3, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/field-activity", label: "Field Activity", icon: Activity, exact: false }] : []),
+    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/distributors", label: "Distributors", icon: Truck, exact: false }] : []),
+  ];
+  const distributorGroups = () => [
+    { label: "Overview", items: [{ href: "/distributor/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }] },
+    { label: "Fulfillment", items: [
+      { href: "/distributor/orders", label: "Orders", icon: ShoppingCart, exact: false },
+      { href: "/distributor/stock", label: "My Stock", icon: Package, exact: false },
+      { href: "/distributor/replenishment", label: "Replenishment", icon: Truck, exact: false },
+    ] },
+    { label: "Account", items: [{ href: "/distributor/settings", label: "Settings", icon: Settings, exact: true }] },
   ];
   const groups = portal === "ADMIN" ? [
     { label: "Overview", items: [
@@ -67,7 +77,7 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
     ] },
     ...(managementItems.length ? [{ label: "Management", items: managementItems }] : []),
     { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
-  ] : staffGroups(roleKey);
+  ] : portal === "DISTRIBUTOR" ? distributorGroups() : staffGroups(roleKey);
   return (
     <nav className="mt-[18px] min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden pr-1 text-sm [scrollbar-color:var(--subtle)_transparent] [scrollbar-width:thin]" aria-label="Portal navigation">
       {groups.map((group) => (

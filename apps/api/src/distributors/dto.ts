@@ -1,4 +1,4 @@
-import { IsIn, IsNumber, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsNumber, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateDistributorDto {
   @IsString()
@@ -76,4 +76,24 @@ export class UpdateDistributorDto {
   @IsOptional()
   @IsIn(['ONBOARDING', 'ACTIVE', 'INACTIVE'])
   status?: 'ONBOARDING' | 'ACTIVE' | 'INACTIVE';
+}
+
+export class CreateDistributorUserDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name!: string;
+
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  password!: string;
+}
+
+export class UpdateDistributorUserStatusDto {
+  @IsIn(['ACTIVE', 'INACTIVE'])
+  status!: 'ACTIVE' | 'INACTIVE';
 }

@@ -13,7 +13,7 @@ import { OrdersService } from './orders.service.js';
 
 @Controller('orders')
 @UseGuards(SessionGuard, PortalGuard, RolesGuard)
-@Portals(PortalType.ADMIN, PortalType.STAFF)
+@Portals(PortalType.ADMIN, PortalType.STAFF, PortalType.DISTRIBUTOR)
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
