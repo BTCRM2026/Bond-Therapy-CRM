@@ -17,16 +17,12 @@ async function loadJson(path: string) {
 
 export default async function DistributorDashboardPage() {
   const session = await requireDistributorSession();
-  const [ordersResponse, stock] = await Promise.all([
-    loadJson("/orders?pageSize=100") as Promise<OrderListResponse | null>,
-    loadJson("/distributor-stock") as Promise<Array<{ quantityOnHand: number }> | null>,
-  ]);
+  const ordersResponse = (await loadJson("/orders?pageSize=100")) as OrderListResponse | null;
   const orders: Order[] = ordersResponse?.items ?? [];
-  const stockRows = stock ?? [];
 
   return (
     <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Distributor"} roleKey={session.roles[0]?.key} headerTitle="Dashboard" headerSubtitle="Your fulfillment and stock at a glance" portal="DISTRIBUTOR">
-      <DistributorDashboard orders={orders} stockCount={stockRows.length} lowStockCount={stockRows.filter((row) => row.quantityOnHand <= 5).length} />
+      <DistributorDashboard orders={orders} />
     </DashboardShell>
   );
 }

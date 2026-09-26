@@ -26,6 +26,8 @@ type PresentedUser = {
   department: Department | null;
   dataScope: DataScope;
   managerId: string | null;
+  assignedDistributorId: string | null;
+  assignedDistributor: { id: string; businessName: string } | null;
   lastLoginAt: Date | null;
   createdAt: Date;
   manager: { id: string; name: string } | null;
@@ -55,6 +57,8 @@ export class UsersService {
       dataScope: user.dataScope,
       managerId: user.managerId,
       manager: user.manager,
+      assignedDistributorId: user.assignedDistributorId,
+      assignedDistributor: user.assignedDistributor,
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,
       roles: user.roles.map(({ role }) => ({ key: role.key, name: role.name, portal: role.portal })),
@@ -66,7 +70,7 @@ export class UsersService {
     const [users, roles] = await Promise.all([
       this.prisma.user.findMany({
         where: { roles: { some: { role: { key: { in: MANAGED_ROLE_KEYS } } } } },
-        include: { manager: { select: { id: true, name: true } }, roles: { include: { role: true } }, staffProfile: true },
+        include: { manager: { select: { id: true, name: true } }, assignedDistributor: { select: { id: true, businessName: true } }, roles: { include: { role: true } }, staffProfile: true },
         orderBy: [{ status: 'asc' }, { name: 'asc' }],
       }),
       this.prisma.role.findMany({ where: { key: { in: MANAGED_ROLE_KEYS }, isActive: true }, orderBy: { priority: 'asc' } }),
@@ -94,11 +98,19 @@ export class UsersService {
     return { role, config, managerId: manager.id };
   }
 
+  private async resolveDistributor(distributorId?: string | null) {
+    if (!distributorId) return null;
+    const distributor = await this.prisma.distributor.findUnique({ where: { id: distributorId }, select: { id: true } });
+    if (!distributor) throw new BadRequestException('Select a valid distributor.');
+    return distributor.id;
+  }
+
   async create(dto: CreateUserDto, actor: SessionUser, ipAddress?: string) {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findFirst({ where: { email }, select: { id: true } });
     if (existing) throw new BadRequestException('A user with that email address already exists.');
     const { role, config, managerId } = await this.assignment(dto.roleKey, dto.managerId);
+    const assignedDistributorId = await this.resolveDistributor(dto.assignedDistributorId);
     const passwordHash = await hashPassword(dto.password);
     const user = await this.prisma.$transaction(async (tx) => {
       const counter = await tx.employeeCounter.upsert({
@@ -117,6 +129,7 @@ export class UsersService {
           department: config.department,
           dataScope: config.dataScope,
           managerId,
+          assignedDistributorId,
           roles: { create: { roleId: role.id } },
           staffProfile: {
             create: {
@@ -136,7 +149,7 @@ export class UsersService {
             },
           },
         },
-        include: { manager: { select: { id: true, name: true } }, roles: { include: { role: true } }, staffProfile: true },
+        include: { manager: { select: { id: true, name: true } }, assignedDistributor: { select: { id: true, businessName: true } }, roles: { include: { role: true } }, staffProfile: true },
       });
     });
     await recordAudit(this.prisma, {
@@ -156,6 +169,7 @@ export class UsersService {
     const roleKey = dto.roleKey ?? existing.roles.find(({ role }) => MANAGED_ROLE_KEYS.includes(role.key))?.role.key;
     if (!roleKey) throw new BadRequestException('This account does not have a manageable role.');
     const { role, config, managerId } = await this.assignment(roleKey, dto.managerId === undefined ? existing.managerId : dto.managerId, id);
+    const assignedDistributorId = dto.assignedDistributorId === undefined ? undefined : await this.resolveDistributor(dto.assignedDistributorId);
     const email = dto.email?.trim().toLowerCase();
     if (email) {
       const duplicate = await this.prisma.user.findFirst({
@@ -198,8 +212,8 @@ export class UsersService {
       }
       const updated = await tx.user.update({
         where: { id },
-        data: { name: dto.name?.trim(), email, status: dto.status, department: config.department, dataScope: config.dataScope, managerId },
-        include: { manager: { select: { id: true, name: true } }, roles: { include: { role: true } }, staffProfile: true },
+        data: { name: dto.name?.trim(), email, status: dto.status, department: config.department, dataScope: config.dataScope, managerId, assignedDistributorId },
+        include: { manager: { select: { id: true, name: true } }, assignedDistributor: { select: { id: true, businessName: true } }, roles: { include: { role: true } }, staffProfile: true },
       });
       if (dto.status && dto.status !== 'ACTIVE') await tx.session.deleteMany({ where: { userId: id } });
       return updated;

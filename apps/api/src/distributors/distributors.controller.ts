@@ -13,37 +13,57 @@ import { CreateDistributorDto, CreateDistributorUserDto, UpdateDistributorDto, U
 
 @Controller('distributors')
 @UseGuards(SessionGuard, PortalGuard, RolesGuard)
-@Portals(PortalType.ADMIN)
-@Roles('SUPER_ADMIN')
+@Portals(PortalType.ADMIN, PortalType.DISTRIBUTOR)
 export class DistributorsController {
   constructor(private readonly distributors: DistributorsService) {}
 
   @Get()
+  @Roles('SUPER_ADMIN')
   list() {
     return this.distributors.list();
   }
 
   @Post()
+  @Roles('SUPER_ADMIN')
   create(@Body() dto: CreateDistributorDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
     return this.distributors.create(dto, actor, req.ip);
   }
 
   @Patch(':id')
+  @Roles('SUPER_ADMIN')
   update(@Param('id') id: string, @Body() dto: UpdateDistributorDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
     return this.distributors.update(id, dto, actor, req.ip);
   }
 
+  @Get('me/users')
+  listMyUsers(@CurrentUser() actor: SessionUser) {
+    return this.distributors.listUsers(actor.distributorId ?? '', actor);
+  }
+
+  @Post('me/users')
+  createMyUser(@Body() dto: CreateDistributorUserDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
+    return this.distributors.createUser(actor.distributorId ?? '', dto, actor, req.ip);
+  }
+
+  @Patch('me/users/:userId/status')
+  updateMyUserStatus(@Param('userId') userId: string, @Body() dto: UpdateDistributorUserStatusDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
+    return this.distributors.updateUserStatus(actor.distributorId ?? '', userId, dto, actor, req.ip);
+  }
+
   @Get(':id/users')
-  listUsers(@Param('id') id: string) {
-    return this.distributors.listUsers(id);
+  @Roles('SUPER_ADMIN')
+  listUsers(@Param('id') id: string, @CurrentUser() actor: SessionUser) {
+    return this.distributors.listUsers(id, actor);
   }
 
   @Post(':id/users')
+  @Roles('SUPER_ADMIN')
   createUser(@Param('id') id: string, @Body() dto: CreateDistributorUserDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
     return this.distributors.createUser(id, dto, actor, req.ip);
   }
 
   @Patch(':id/users/:userId/status')
+  @Roles('SUPER_ADMIN')
   updateUserStatus(@Param('id') id: string, @Param('userId') userId: string, @Body() dto: UpdateDistributorUserStatusDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
     return this.distributors.updateUserStatus(id, userId, dto, actor, req.ip);
   }

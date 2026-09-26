@@ -19,7 +19,7 @@ export default async function DistributorReplenishmentPage() {
   const initial = await loadRequests();
   return (
     <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Distributor"} roleKey={session.roles[0]?.key} headerTitle="Replenishment" headerSubtitle="Request stock from Bond Therapy's central warehouse" portal="DISTRIBUTOR">
-      <DistributorReplenishment initial={initial} />
+      <DistributorReplenishment initial={initial} roleKey={session.roles[0]?.key} />
     </DashboardShell>
   );
 }

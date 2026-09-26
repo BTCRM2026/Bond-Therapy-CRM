@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import type { PerformanceQueryDto, UpsertPlanDto } from './dto.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
-const fulfilmentStatuses = ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED', 'FORWARDED_TO_DISTRIBUTOR', 'DISTRIBUTOR_FULFILLED'] as const;
+const fulfilmentStatuses = ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED', 'DISTRIBUTOR_FULFILLED'] as const;
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
 type Season = { name: string; weightagePercent: number; startDate: string; endDate: string };

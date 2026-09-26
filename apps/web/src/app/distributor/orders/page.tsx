@@ -19,8 +19,8 @@ export default async function DistributorOrdersPage() {
   const session = await requireDistributorSession();
   const initial = await loadOrders();
   return (
-    <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Distributor"} roleKey={session.roles[0]?.key} headerTitle="Orders" headerSubtitle="Fulfill orders routed to you from your stock" portal="DISTRIBUTOR">
-      <DistributorOrders initial={initial} />
+    <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Distributor"} roleKey={session.roles[0]?.key} headerTitle="Orders" headerSubtitle="Review, bill, and fulfill orders routed to you" portal="DISTRIBUTOR">
+      <DistributorOrders initial={initial} roleKey={session.roles[0]?.key} />
     </DashboardShell>
   );
 }

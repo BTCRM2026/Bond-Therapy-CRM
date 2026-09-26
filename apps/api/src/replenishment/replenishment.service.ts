@@ -18,6 +18,7 @@ export class ReplenishmentService {
 
   private isAdmin(actor: SessionUser) { return actor.portal === 'ADMIN' && actor.roles.some((role) => role.key === 'SUPER_ADMIN'); }
   private isDistributor(actor: SessionUser) { return actor.portal === 'DISTRIBUTOR' && Boolean(actor.distributorId); }
+  private isDistributorAccounts(actor: SessionUser) { return this.isDistributor(actor) && actor.roles.some((role) => ['DISTRIBUTOR_OWNER', 'DISTRIBUTOR_ACCOUNTS'].includes(role.key)); }
 
   private ensureAccess(actor: SessionUser) {
     if (!this.isAdmin(actor) && !this.isDistributor(actor)) throw new ForbiddenException('Replenishment requests are not available to this account.');
@@ -46,7 +47,7 @@ export class ReplenishmentService {
   }
 
   async create(actor: SessionUser, dto: CreateReplenishmentDto, ipAddress?: string) {
-    if (!this.isDistributor(actor)) throw new ForbiddenException('Only a distributor can request replenishment.');
+    if (!this.isDistributorAccounts(actor)) throw new ForbiddenException('Only a distributor Owner or Accounts login can request replenishment.');
     const productIds = [...new Set(dto.items.map((item) => item.productId))];
     if (productIds.length !== dto.items.length) throw new ConflictException('Each product may appear only once. Update its quantity instead.');
     const products = await this.prisma.product.findMany({ where: { id: { in: productIds }, isActive: true } });

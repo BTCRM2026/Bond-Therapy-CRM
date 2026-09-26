@@ -23,6 +23,7 @@ export class ListOrdersDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize = 20;
   @IsOptional() @IsEnum(OrderStatus) status?: OrderStatus;
   @IsOptional() @IsString() search?: string;
+  @IsOptional() @IsString() distributorId?: string;
 }
 
 export class UpdateOrderStatusDto {
@@ -34,4 +35,5 @@ export class UpdateOrderStatusDto {
   @IsOptional() @IsString() @MaxLength(20) deliveryPersonMobile?: string;
   @IsOptional() @IsString() @MaxLength(120) courierName?: string;
   @IsOptional() @IsString() @MaxLength(120) trackingNumber?: string;
+  @IsOptional() @IsString() @MaxLength(120) distributorInvoiceReference?: string;
 }

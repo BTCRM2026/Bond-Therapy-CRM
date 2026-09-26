@@ -20,10 +20,11 @@ export type ReplenishmentRequest = {
 const messageFrom = (data: unknown, fallback: string) => (data && typeof data === "object" && "message" in data ? String((data as { message: unknown }).message) : fallback);
 const STATUS_TONE: Record<ReplenishmentRequest["status"], string> = { REQUESTED: "bg-warning-soft text-warning", APPROVED: "bg-brand-soft text-brand", FULFILLED: "bg-success-soft text-success", REJECTED: "bg-red-50 text-danger" };
 
-export function DistributorReplenishment({ initial }: { initial: ReplenishmentRequest[] }) {
+export function DistributorReplenishment({ initial, roleKey }: { initial: ReplenishmentRequest[]; roleKey?: string }) {
   const [requests, setRequests] = useState(initial);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
+  const canRequest = roleKey === "DISTRIBUTOR_OWNER" || roleKey === "DISTRIBUTOR_ACCOUNTS";
 
   const refresh = async () => {
     const response = await fetch("/api/distributor/replenishment", { cache: "no-store" });
@@ -33,9 +34,9 @@ export function DistributorReplenishment({ initial }: { initial: ReplenishmentRe
   return (
     <div className="space-y-4">
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger">{error}</div>}
-      <div className="flex justify-end">
+      {canRequest && <div className="flex justify-end">
         <Button onClick={() => setOpen(true)}><Send size={15} />Request replenishment</Button>
-      </div>
+      </div>}
       <section className="crm-surface">
         <div className="rounded-t-xl border-b px-5 py-4"><h2 className="text-sm font-semibold text-foreground">Replenishment history</h2><p className="mt-0.5 text-xs text-muted">Requests you&apos;ve sent to Bond Therapy&apos;s central warehouse</p></div>
         <div className="overflow-hidden rounded-b-xl">

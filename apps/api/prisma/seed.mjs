@@ -90,11 +90,19 @@ for (const [key, name, permissionKey, priority] of staffRoles) {
   });
 }
 
-const distributorRole = await prisma.role.upsert({
-  where: { key: 'DISTRIBUTOR_STAFF' },
-  update: { name: 'Distributor', portal: 'DISTRIBUTOR', dashboardPath: '/distributor/dashboard', priority: 60, isActive: true },
-  create: { key: 'DISTRIBUTOR_STAFF', name: 'Distributor', description: 'Regional distributor stock and fulfillment', portal: 'DISTRIBUTOR', dashboardPath: '/distributor/dashboard', priority: 60 },
-});
+const distributorRoles = [
+  ['DISTRIBUTOR_OWNER', 'Owner', 60],
+  ['DISTRIBUTOR_ACCOUNTS', 'Accounts', 61],
+  ['DISTRIBUTOR_WAREHOUSE', 'Warehouse', 62],
+];
+const distributorRoleRecords = {};
+for (const [key, name, priority] of distributorRoles) {
+  distributorRoleRecords[key] = await prisma.role.upsert({
+    where: { key },
+    update: { name, portal: 'DISTRIBUTOR', dashboardPath: '/distributor/dashboard', priority, isActive: true },
+    create: { key, name, description: `Distributor portal - ${name}`, portal: 'DISTRIBUTOR', dashboardPath: '/distributor/dashboard', priority },
+  });
+}
 
 const loginId = process.env.ADMIN_LOGIN_ID?.trim().toLowerCase();
 const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
@@ -153,9 +161,9 @@ if (distributorLoginId && distributorEmail && distributorPassword) {
     create: { loginId: distributorLoginId, email: distributorEmail, name: 'Local Distributor User', passwordHash: hashPassword(distributorPassword), distributorId: distributor.id },
   });
   await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: user.id, roleId: distributorRole.id } },
+    where: { userId_roleId: { userId: user.id, roleId: distributorRoleRecords.DISTRIBUTOR_OWNER.id } },
     update: {},
-    create: { userId: user.id, roleId: distributorRole.id },
+    create: { userId: user.id, roleId: distributorRoleRecords.DISTRIBUTOR_OWNER.id },
   });
   console.log(`Bootstrap distributor user ready: ${distributorLoginId}`);
 }

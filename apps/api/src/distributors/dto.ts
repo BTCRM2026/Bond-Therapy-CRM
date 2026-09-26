@@ -91,6 +91,10 @@ export class CreateDistributorUserDto {
   @MinLength(8)
   @MaxLength(72)
   password!: string;
+
+  @IsOptional()
+  @IsIn(['DISTRIBUTOR_OWNER', 'DISTRIBUTOR_ACCOUNTS', 'DISTRIBUTOR_WAREHOUSE'])
+  roleKey?: 'DISTRIBUTOR_OWNER' | 'DISTRIBUTOR_ACCOUNTS' | 'DISTRIBUTOR_WAREHOUSE';
 }
 
 export class UpdateDistributorUserStatusDto {

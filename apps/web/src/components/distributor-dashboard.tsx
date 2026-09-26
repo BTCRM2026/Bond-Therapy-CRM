@@ -5,26 +5,27 @@ import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 
 const money = (value: string | number) => `₹${Number(value).toLocaleString("en-IN")}`;
 
-export function DistributorDashboard({ orders, stockCount, lowStockCount }: { orders: Order[]; stockCount: number; lowStockCount: number }) {
-  const pending = orders.filter((order) => order.status === "FORWARDED_TO_DISTRIBUTOR");
+export function DistributorDashboard({ orders }: { orders: Order[] }) {
+  const needsReview = orders.filter((order) => ["SUBMITTED", "UNDER_REVIEW"].includes(order.status));
+  const awaitingPickup = orders.filter((order) => order.status === "APPROVED");
   const fulfilled = orders.filter((order) => order.status === "DISTRIBUTOR_FULFILLED");
 
   return (
     <div className="space-y-5">
       <KpiStrip columns={3}>
-        <KpiCell label="Pending fulfillment" value={pending.length} tone={pending.length ? "warning" : "neutral"} />
-        <KpiCell label="Products in stock" value={stockCount} detail={lowStockCount ? `${lowStockCount} running low` : undefined} tone={lowStockCount ? "warning" : "success"} />
+        <KpiCell label="Needs review" value={needsReview.length} tone={needsReview.length ? "warning" : "neutral"} />
+        <KpiCell label="Awaiting pickup" value={awaitingPickup.length} />
         <KpiCell label="Fulfilled orders" value={fulfilled.length} tone="success" />
       </KpiStrip>
 
       <section className="crm-surface">
         <div className="flex items-center justify-between gap-3 rounded-t-xl border-b px-5 py-4">
-          <div><h2 className="text-sm font-semibold text-foreground">Orders awaiting fulfillment</h2><p className="mt-0.5 text-xs text-muted">Routed to you by Bond Therapy salespeople</p></div>
+          <div><h2 className="text-sm font-semibold text-foreground">Orders needing attention</h2><p className="mt-0.5 text-xs text-muted">Routed to you by Bond Therapy salespeople</p></div>
           <Link href="/distributor/orders" className="inline-flex items-center gap-1 text-xs font-semibold text-brand">View all<ArrowRight size={14} /></Link>
         </div>
         <div className="overflow-hidden rounded-b-xl">
-          {pending.length ? (
-            <div className="divide-y">{pending.slice(0, 5).map((order) => (
+          {needsReview.length || awaitingPickup.length ? (
+            <div className="divide-y">{[...needsReview, ...awaitingPickup].slice(0, 5).map((order) => (
               <div key={order.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5">
                 <div>
                   <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{order.orderNumber}</p><OrderStatus value={order.status} /></div>
@@ -34,7 +35,7 @@ export function DistributorDashboard({ orders, stockCount, lowStockCount }: { or
               </div>
             ))}</div>
           ) : (
-            <div className="px-5 py-12 text-center"><ShoppingCart className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold">Nothing pending</p><p className="mt-1 text-xs text-muted">New orders from your territory will show up here.</p></div>
+            <div className="px-5 py-12 text-center"><ShoppingCart className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold">Nothing needs your attention</p><p className="mt-1 text-xs text-muted">New orders from your territory will show up here.</p></div>
           )}
         </div>
       </section>

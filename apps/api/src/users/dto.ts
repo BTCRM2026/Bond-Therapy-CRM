@@ -75,6 +75,10 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   managerId?: string;
+
+  @IsOptional()
+  @IsString()
+  assignedDistributorId?: string;
 }
 
 export class UpdateUserDto {
@@ -99,6 +103,10 @@ export class UpdateUserDto {
 
   @IsOptional()
   managerId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  assignedDistributorId?: string | null;
 
   @IsOptional()
   @Matches(phonePattern, { message: 'Enter a valid mobile number.' })

@@ -88,7 +88,7 @@ export class BillingService {
       const order = await tx.order.findUnique({ where: { id: orderId }, include: { client: true, items: { include: { product: true } } } });
       if (!order) throw new NotFoundException('Approved order not found.');
       if (order.status !== 'APPROVED') throw new ConflictException('Only an approved order can be invoiced.');
-      if (order.client.distributorId) throw new ConflictException('This client is served by a distributor. Forward the order instead of invoicing it directly.');
+      if (order.distributorId) throw new ConflictException('This order is handled by a distributor. It is billed and fulfilled through their own portal, not invoiced by Bond Therapy.');
       const settings = await tx.billingSettings.upsert({ where: { id: 'default' }, create: { id: 'default' }, update: {} });
       const now = new Date(); const fyStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1; const fy = `${String(fyStart).slice(-2)}-${String(fyStart + 1).slice(-2)}`;
       const counter = await tx.employeeCounter.upsert({ where: { key: `INV:${fy}` }, create: { key: `INV:${fy}`, nextNumber: 1 }, update: { nextNumber: { increment: 1 } } });

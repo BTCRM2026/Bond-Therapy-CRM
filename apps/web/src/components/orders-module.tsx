@@ -19,7 +19,7 @@ const GROUPS = [
 ] as const;
 
 type OrderItemRow = { id: string; quantity: number; unitPrice: string; discountAmount: string; taxableAmount: string; gstRate: string; taxAmount: string; lineTotal: string; product: { id: string; name: string; sku: string; unit: string; stockOnHand: number } };
-export type Order = { id: string; orderNumber: string; status: string; version: number; subtotal: string; discountAmount: string; taxableAmount: string; taxAmount: string; cgstAmount: string; sgstAmount: string; igstAmount: string; totalAmount: string; notes: string | null; reviewComment: string | null; createdAt: string; submittedAt: string | null; approvedAt: string | null; deliveryMode: string | null; deliveryPersonName: string | null; deliveryPersonMobile: string | null; courierName: string | null; trackingNumber: string | null; client: { id: string; salonName: string; city: string; primaryContact: string }; salesperson: { id: string; name: string }; reviewedBy: { id: string; name: string } | null; invoice: { id: string; invoiceNumber: string; status: string; amountPaid: string; balanceDue: string } | null; deliveryProof: { id: string; arrivalPhotoMime: string | null; deliveryPhotoMime: string | null } | null; items: OrderItemRow[] };
+export type Order = { id: string; orderNumber: string; status: string; version: number; subtotal: string; discountAmount: string; taxableAmount: string; taxAmount: string; cgstAmount: string; sgstAmount: string; igstAmount: string; totalAmount: string; notes: string | null; reviewComment: string | null; createdAt: string; submittedAt: string | null; approvedAt: string | null; deliveryMode: string | null; deliveryPersonName: string | null; deliveryPersonMobile: string | null; courierName: string | null; trackingNumber: string | null; distributorInvoiceReference?: string | null; distributor?: { id: string; businessName: string } | null; client: { id: string; salonName: string; city: string; primaryContact: string }; salesperson: { id: string; name: string }; reviewedBy: { id: string; name: string } | null; invoice: { id: string; invoiceNumber: string; status: string; amountPaid: string; balanceDue: string } | null; deliveryProof: { id: string; arrivalPhotoMime: string | null; deliveryPhotoMime: string | null } | null; items: OrderItemRow[] };
 export type OrderListResponse = { items: Order[]; page: number; pageSize: number; total: number; hasMore: boolean };
 
 const money = (value: string | number) => `₹${Number(value).toLocaleString("en-IN")}`;
@@ -52,8 +52,19 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [distributorFilter, setDistributorFilter] = useState("");
+  const [distributors, setDistributors] = useState<Array<{ id: string; businessName: string }>>([]);
   const isSales = ["SALES_MANAGER", "SALES_EXECUTIVE"].includes(roleKey);
   const isAccounts = roleKey === "ACCOUNTS_BILLING" || roleKey === "SUPER_ADMIN";
+  const isAdmin = roleKey === "SUPER_ADMIN";
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      const response = await fetch("/api/distributors", { cache: "no-store" });
+      if (response.ok) setDistributors(await response.json());
+    })();
+  }, [isAdmin]);
 
   useEffect(() => { const sync = () => setHeaderSlot(document.getElementById("page-header-actions")); sync(); const frame = requestAnimationFrame(sync); return () => cancelAnimationFrame(frame); }, []);
 
@@ -80,9 +91,10 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
     let base = active.statuses.length ? data?.items.filter((order) => (active.statuses as readonly string[]).includes(order.status)) ?? [] : data?.items ?? [];
     const query = search.trim().toLowerCase();
     if (query) base = base.filter((order) => order.orderNumber.toLowerCase().includes(query) || order.client.salonName.toLowerCase().includes(query));
+    if (distributorFilter) base = base.filter((order) => distributorFilter === "NONE" ? !order.distributor : order.distributor?.id === distributorFilter);
     if (group !== "ALL") return base;
     return [...base].sort((a, b) => (actionHint(b, isAccounts) ? 1 : 0) - (actionHint(a, isAccounts) ? 1 : 0));
-  }, [data, active, group, isAccounts, search]);
+  }, [data, active, group, isAccounts, search, distributorFilter]);
   const filterKey = `${group}:${search}:${pageSize}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) { setPrevFilterKey(filterKey); setPage(1); }
@@ -100,9 +112,10 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
         <KpiCell label="Approved" value={counts(APPROVED_ONWARD)} detail="Approved through delivery" tone="success" />
         <KpiCell label="Order value" value={money(data?.items.reduce((sum, order) => sum + Number(order.totalAmount), 0) ?? 0)} detail="Across all visible orders" />
       </KpiStrip>
-      <div className="flex gap-2">
-        <label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={17} /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order number or salon name" aria-label="Search orders" /></label>
+      <div className="flex flex-wrap gap-2">
+        <label className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={17} /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order number or salon name" aria-label="Search orders" /></label>
         <FilterMenu value={group} onSelect={setGroup} options={GROUPS.map((item) => ({ key: item.key, label: item.label, count: counts(item.statuses) }))} />
+        {isAdmin && distributors.length > 0 && <FilterMenu value={distributorFilter} showLabelOnMobile ariaLabel="Filter by distributor" onSelect={setDistributorFilter} options={[{ key: "", label: "All distributors" }, { key: "NONE", label: "Direct (no distributor)" }, ...distributors.map((d) => ({ key: d.id, label: d.businessName }))]} />}
       </div>
       <section className="crm-surface">
         <div className="flex items-center justify-between gap-3 rounded-t-xl border-b px-4 py-3 sm:px-5">
@@ -118,7 +131,7 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
         {loading && !data ? <div className="space-y-3 p-4"><div className="h-16 animate-pulse rounded-lg bg-background" /><div className="h-16 animate-pulse rounded-lg bg-background" /></div>
           : paginated.length ? <div className="divide-y">{paginated.map((order) => { const hint = actionHint(order, isAccounts); return <button type="button" onClick={() => setSelected(order)} key={order.id} className="block w-full p-4 text-left transition-colors hover:bg-background/70 sm:px-5">
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0"><p className="text-sm font-semibold text-foreground">{order.orderNumber}</p><p className="mt-0.5 truncate text-xs text-muted">{order.client.salonName} · {new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(order.createdAt))}</p></div>
+              <div className="min-w-0"><p className="text-sm font-semibold text-foreground">{order.orderNumber}</p><p className="mt-0.5 truncate text-xs text-muted">{order.client.salonName} · {new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(order.createdAt))}{isAdmin && order.distributor ? ` · ${order.distributor.businessName}` : ""}</p></div>
               <div className="flex shrink-0 flex-col items-end gap-1"><p className="text-sm font-semibold text-foreground">{money(order.totalAmount)}</p><OrderStatus value={order.status} />{hint && <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${hint.tone === "warning" ? "bg-warning-soft text-warning" : "bg-brand-soft text-brand"}`}><Clock3 size={10} />{hint.label}</span>}</div>
             </div>
           </button>; })}</div>

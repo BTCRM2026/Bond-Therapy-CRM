@@ -24,7 +24,12 @@ type Distributor = {
   notes: string | null;
   assignedSalesperson: { id: string; name: string } | null;
 };
-type DistributorUser = { id: string; loginId: string; email: string; name: string; status: string; lastLoginAt: string | null; createdAt: string };
+type DistributorUser = { id: string; loginId: string; email: string; name: string; status: string; lastLoginAt: string | null; createdAt: string; roleKey: string | null; roleName: string | null };
+const DISTRIBUTOR_ROLE_OPTIONS = [
+  { value: "DISTRIBUTOR_OWNER", label: "Owner – full access" },
+  { value: "DISTRIBUTOR_ACCOUNTS", label: "Accounts – review, approve, bill" },
+  { value: "DISTRIBUTOR_WAREHOUSE", label: "Warehouse – fulfill only" },
+];
 type ReplenishmentItem = { id: string; quantity: number; product: { name: string; unit: string } };
 export type ReplenishmentRequest = {
   id: string;
@@ -222,6 +227,7 @@ function DistributorLogins({ distributor, onClose }: { distributor: Distributor;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [roleKey, setRoleKey] = useState("DISTRIBUTOR_OWNER");
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
 
@@ -237,10 +243,10 @@ function DistributorLogins({ distributor, onClose }: { distributor: Distributor;
     setCreating(true);
     setError("");
     try {
-      const response = await fetch(`/api/distributors/${distributor.id}/users`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, email, password }) });
+      const response = await fetch(`/api/distributors/${distributor.id}/users`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, email, password, roleKey }) });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(messageFrom(data, "Unable to create this login."));
-      setName(""); setEmail(""); setPassword("");
+      setName(""); setEmail(""); setPassword(""); setRoleKey("DISTRIBUTOR_OWNER");
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to create this login.");
@@ -275,6 +281,7 @@ function DistributorLogins({ distributor, onClose }: { distributor: Distributor;
             <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" required />
           </div>
           <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Temporary password (min. 8 characters)" required minLength={8} />
+          <Select value={roleKey} onChange={setRoleKey} options={DISTRIBUTOR_ROLE_OPTIONS} />
           {error && <FormError message={error} />}
           <Button className="w-full" type="submit" disabled={creating}>{creating ? <LoaderCircle className="animate-spin" size={16} /> : <Plus size={16} />}{creating ? "Creating…" : "Create login"}</Button>
         </form>
@@ -282,7 +289,10 @@ function DistributorLogins({ distributor, onClose }: { distributor: Distributor;
         <div className="space-y-2">
           {users === null ? <div className="h-16 animate-pulse rounded-lg bg-background" /> : users.length ? users.map((user) => (
             <div key={user.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-              <div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{user.name}</p><p className="truncate text-xs text-muted">{user.loginId} · {user.email}</p></div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-medium text-foreground">{user.name}</p>{user.roleName && <span className="inline-flex rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-dark">{user.roleName}</span>}</div>
+                <p className="truncate text-xs text-muted">{user.loginId} · {user.email}</p>
+              </div>
               <Button variant="secondary" disabled={busyId === user.id} onClick={() => toggleStatus(user)}>{user.status === "ACTIVE" ? "Deactivate" : "Activate"}</Button>
             </div>
           )) : <p className="px-1 py-4 text-center text-xs text-muted">No logins yet. Create one above.</p>}

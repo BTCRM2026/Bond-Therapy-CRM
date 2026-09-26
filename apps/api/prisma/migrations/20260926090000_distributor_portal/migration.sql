@@ -1,10 +1,11 @@
 -- AlterEnum
-ALTER TYPE "OrderStatus" ADD VALUE 'FORWARDED_TO_DISTRIBUTOR';
 ALTER TYPE "OrderStatus" ADD VALUE 'DISTRIBUTOR_FULFILLED';
 
 -- AlterTable
 ALTER TABLE "User" ADD COLUMN "distributorId" TEXT;
-ALTER TABLE "Order" ADD COLUMN "forwardedToDistributorAt" TIMESTAMP(3);
+ALTER TABLE "User" ADD COLUMN "assignedDistributorId" TEXT;
+ALTER TABLE "Order" ADD COLUMN "distributorId" TEXT;
+ALTER TABLE "Order" ADD COLUMN "distributorInvoiceReference" TEXT;
 ALTER TABLE "Order" ADD COLUMN "distributorFulfilledAt" TIMESTAMP(3);
 
 -- CreateEnum
@@ -68,6 +69,10 @@ CREATE TABLE "ReplenishmentItem" (
 
 -- CreateIndex
 CREATE INDEX "User_distributorId_idx" ON "User"("distributorId");
+CREATE INDEX "User_assignedDistributorId_idx" ON "User"("assignedDistributorId");
+
+-- CreateIndex
+CREATE INDEX "Order_distributorId_idx" ON "Order"("distributorId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "DistributorStock_distributorId_productId_key" ON "DistributorStock"("distributorId", "productId");
@@ -88,6 +93,10 @@ CREATE INDEX "ReplenishmentItem_productId_idx" ON "ReplenishmentItem"("productId
 
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_distributorId_fkey" FOREIGN KEY ("distributorId") REFERENCES "Distributor"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "User" ADD CONSTRAINT "User_assignedDistributorId_fkey" FOREIGN KEY ("assignedDistributorId") REFERENCES "Distributor"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_distributorId_fkey" FOREIGN KEY ("distributorId") REFERENCES "Distributor"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "DistributorStock" ADD CONSTRAINT "DistributorStock_distributorId_fkey" FOREIGN KEY ("distributorId") REFERENCES "Distributor"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -9,11 +9,13 @@ import { calculateOrder } from './order-calculation.js';
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const accountsRoles = new Set(['ACCOUNTS_BILLING']);
 const warehouseRoles = new Set(['WAREHOUSE']);
-const distributorRoles = new Set(['DISTRIBUTOR_STAFF']);
+const distributorAccountsRoles = new Set(['DISTRIBUTOR_OWNER', 'DISTRIBUTOR_ACCOUNTS']);
+const distributorWarehouseRoles = new Set(['DISTRIBUTOR_OWNER', 'DISTRIBUTOR_WAREHOUSE']);
 const orderInclude = {
-  client: { select: { id: true, salonName: true, billingName: true, city: true, state: true, stateCode: true, gstin: true, fullAddress: true, pincode: true, primaryContact: true, email: true, distributorId: true } },
+  client: { select: { id: true, salonName: true, billingName: true, city: true, state: true, stateCode: true, gstin: true, fullAddress: true, pincode: true, primaryContact: true, email: true } },
   salesperson: { select: { id: true, name: true } },
   reviewedBy: { select: { id: true, name: true } },
+  distributor: { select: { id: true, businessName: true } },
   items: { include: { product: { select: { id: true, name: true, sku: true, unit: true, hsnCode: true, stockOnHand: true } } } },
   invoice: { select: { id: true, invoiceNumber: true, status: true, amountPaid: true, balanceDue: true } },
   deliveryProof: { select: { id: true, arrivalPhotoMime: true, deliveryPhotoMime: true } },
@@ -28,15 +30,18 @@ export class OrdersService {
   private isSales(actor: SessionUser) { return actor.portal === 'STAFF' && this.hasRole(actor, salesRoles); }
   private isAccounts(actor: SessionUser) { return actor.portal === 'STAFF' && this.hasRole(actor, accountsRoles); }
   private isWarehouse(actor: SessionUser) { return actor.portal === 'STAFF' && this.hasRole(actor, warehouseRoles); }
-  private isDistributor(actor: SessionUser) { return actor.portal === 'DISTRIBUTOR' && this.hasRole(actor, distributorRoles) && Boolean(actor.distributorId); }
+  private isDistributorPortal(actor: SessionUser) { return actor.portal === 'DISTRIBUTOR' && Boolean(actor.distributorId); }
+  private isDistributorAccounts(actor: SessionUser) { return this.isDistributorPortal(actor) && this.hasRole(actor, distributorAccountsRoles); }
+  private isDistributorWarehouse(actor: SessionUser) { return this.isDistributorPortal(actor) && this.hasRole(actor, distributorWarehouseRoles); }
 
   private ensureAccess(actor: SessionUser) {
-    if (!this.isAdmin(actor) && !this.isSales(actor) && !this.isAccounts(actor) && !this.isWarehouse(actor) && !this.isDistributor(actor)) throw new ForbiddenException('Orders are not available to this account.');
+    if (!this.isAdmin(actor) && !this.isSales(actor) && !this.isAccounts(actor) && !this.isWarehouse(actor) && !this.isDistributorPortal(actor)) throw new ForbiddenException('Orders are not available to this account.');
   }
 
   private visibility(actor: SessionUser): Prisma.OrderWhereInput {
-    if (this.isAdmin(actor) || this.isAccounts(actor)) return {};
-    if (this.isDistributor(actor)) return { client: { distributorId: actor.distributorId }, status: { in: ['FORWARDED_TO_DISTRIBUTOR', 'DISTRIBUTOR_FULFILLED'] } };
+    if (this.isAdmin(actor)) return {};
+    if (this.isDistributorPortal(actor)) return { distributorId: actor.distributorId };
+    if (this.isAccounts(actor)) return { distributorId: null };
     if (this.isWarehouse(actor)) return { status: { in: ['CONFIRMED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'DISPATCHED', 'DELIVERED'] } };
     if (actor.dataScope === 'TEAM') return { OR: [{ salespersonId: actor.id }, { salesperson: { managerId: actor.id } }] };
     return { salespersonId: actor.id };
@@ -53,7 +58,7 @@ export class OrdersService {
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(query.pageSize) || 20));
     const search = query.search?.trim();
-    const where = { AND: [this.visibility(actor), query.status ? { status: query.status } : {}, search ? { OR: [{ orderNumber: { contains: search } }, { client: { salonName: { contains: search } } }] } : {}] } satisfies Prisma.OrderWhereInput;
+    const where = { AND: [this.visibility(actor), query.status ? { status: query.status } : {}, query.distributorId ? { distributorId: query.distributorId } : {}, search ? { OR: [{ orderNumber: { contains: search } }, { client: { salonName: { contains: search } } }] } : {}] } satisfies Prisma.OrderWhereInput;
     const [items, total] = await this.prisma.$transaction([
       this.prisma.order.findMany({ where, include: orderInclude, orderBy: { createdAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize }),
       this.prisma.order.count({ where }),
@@ -94,7 +99,7 @@ export class OrdersService {
     const prepared = await this.prepare(actor, dto);
     const order = await this.prisma.$transaction(async (tx) => {
       const counter = await tx.employeeCounter.upsert({ where: { key: 'ORD' }, create: { key: 'ORD', nextNumber: 1001 }, update: { nextNumber: { increment: 1 } } });
-      return tx.order.create({ data: { orderNumber: `ORD-${counter.nextNumber}`, clientId: prepared.client.id, salespersonId: actor.id, status: 'DRAFT', ...this.orderData(prepared.calculation, dto.notes), items: { create: prepared.calculation.items } }, include: orderInclude });
+      return tx.order.create({ data: { orderNumber: `ORD-${counter.nextNumber}`, clientId: prepared.client.id, salespersonId: actor.id, distributorId: actor.assignedDistributorId ?? null, status: 'DRAFT', ...this.orderData(prepared.calculation, dto.notes), items: { create: prepared.calculation.items } }, include: orderInclude });
     });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'ORDER_DRAFT_CREATED', entity: 'ORDER', entityId: order.id, details: { orderNumber: order.orderNumber, status: order.status, totalAmount: order.totalAmount.toString() }, ipAddress });
     return order;
@@ -125,15 +130,17 @@ export class OrdersService {
 
   async updateStatus(actor: SessionUser, id: string, dto: UpdateOrderStatusDto, ipAddress?: string) {
     this.ensureAccess(actor);
-    const order = await this.prisma.order.findFirst({ where: { AND: [{ id }, this.visibility(actor)] }, include: { items: { include: { product: true } }, client: { select: { distributorId: true } } } });
+    const order = await this.prisma.order.findFirst({ where: { AND: [{ id }, this.visibility(actor)] }, include: { items: { include: { product: true } } } });
     if (!order) throw new NotFoundException('Order not found.');
     const target = dto.status;
-    const isAccounts = this.isAccounts(actor) || this.isAdmin(actor);
+    const isCentralAccounts = this.isAccounts(actor) || this.isAdmin(actor);
+    const isDistAccounts = (this.isDistributorAccounts(actor) && actor.distributorId === order.distributorId) || this.isAdmin(actor);
+    const isDistWarehouse = (this.isDistributorWarehouse(actor) && actor.distributorId === order.distributorId) || this.isAdmin(actor);
+    const canReview = order.distributorId ? isDistAccounts : isCentralAccounts;
     const allowed = (this.isSales(actor) || this.isAdmin(actor)) && ['DRAFT', 'RETURNED_FOR_CORRECTION'].includes(order.status) && target === 'SUBMITTED'
-      || isAccounts && order.status === 'SUBMITTED' && ['UNDER_REVIEW', 'REJECTED', 'RETURNED_FOR_CORRECTION'].includes(target)
-      || isAccounts && order.status === 'UNDER_REVIEW' && ['APPROVED', 'REJECTED', 'RETURNED_FOR_CORRECTION'].includes(target)
-      || isAccounts && order.status === 'APPROVED' && target === 'FORWARDED_TO_DISTRIBUTOR' && Boolean(order.client.distributorId)
-      || this.isDistributor(actor) && order.status === 'FORWARDED_TO_DISTRIBUTOR' && target === 'DISTRIBUTOR_FULFILLED' && order.client.distributorId === actor.distributorId
+      || canReview && order.status === 'SUBMITTED' && ['UNDER_REVIEW', 'REJECTED', 'RETURNED_FOR_CORRECTION'].includes(target)
+      || canReview && order.status === 'UNDER_REVIEW' && ['APPROVED', 'REJECTED', 'RETURNED_FOR_CORRECTION'].includes(target)
+      || isDistWarehouse && order.status === 'APPROVED' && target === 'DISTRIBUTOR_FULFILLED' && Boolean(order.distributorId)
       || (this.isWarehouse(actor) || this.isAdmin(actor)) && order.status === 'INVOICE_GENERATED' && target === 'STOCK_RESERVED'
       || (this.isWarehouse(actor) || this.isAdmin(actor)) && order.status === 'STOCK_RESERVED' && target === 'PICKING'
       || (this.isWarehouse(actor) || this.isAdmin(actor)) && order.status === 'PICKING' && target === 'PACKED'
@@ -153,7 +160,7 @@ export class OrdersService {
         }
       }
       if (target === 'DISTRIBUTOR_FULFILLED') {
-        const distributorId = order.client.distributorId!;
+        const distributorId = order.distributorId!;
         for (const item of order.items) {
           const reserved = await tx.distributorStock.updateMany({ where: { distributorId, productId: item.productId, quantityOnHand: { gte: item.quantity } }, data: { quantityOnHand: { decrement: item.quantity } } });
           if (!reserved.count) throw new ConflictException(`${item.product.name} no longer has enough distributor stock.`);
@@ -169,8 +176,7 @@ export class OrdersService {
         : target === 'UNDER_REVIEW' ? { reviewStartedAt: new Date(), reviewedById: actor.id }
         : target === 'RETURNED_FOR_CORRECTION' ? { returnedAt: new Date(), reviewedById: actor.id }
         : target === 'REJECTED' ? { rejectedAt: new Date(), reviewedById: actor.id }
-        : target === 'APPROVED' ? { approvedAt: new Date(), reviewedById: actor.id }
-        : target === 'FORWARDED_TO_DISTRIBUTOR' ? { forwardedToDistributorAt: new Date() }
+        : target === 'APPROVED' ? { approvedAt: new Date(), reviewedById: actor.id, ...(order.distributorId ? { distributorInvoiceReference: dto.distributorInvoiceReference?.trim() || null } : {}) }
         : target === 'DISTRIBUTOR_FULFILLED' ? { distributorFulfilledAt: new Date() }
         : target === 'STOCK_RESERVED' ? { stockReservedAt: new Date() }
         : target === 'PICKING' ? { pickingStartedAt: new Date() }
@@ -180,7 +186,7 @@ export class OrdersService {
         : target === 'ARRIVED_AT_CUSTOMER' ? { arrivedAt: new Date() }
         : target === 'DISPATCHED' ? { deliveryMode: order.status === 'READY_FOR_DISPATCH' ? 'OUTSTATION_COURIER' : order.deliveryMode, courierName: order.status === 'READY_FOR_DISPATCH' ? dto.courierName?.trim() || 'Mark Courier' : order.courierName, trackingNumber: dto.trackingNumber?.trim() || order.trackingNumber, dispatchedAt: new Date() }
         : target === 'DELIVERED' ? { deliveredAt: new Date() } : {};
-      const claimed = await tx.order.updateMany({ where: { id, status: order.status, version: dto.version }, data: { status: target, ...(isAccounts ? { reviewComment: dto.comment?.trim() || null } : {}), ...dates, version: { increment: 1 } } });
+      const claimed = await tx.order.updateMany({ where: { id, status: order.status, version: dto.version }, data: { status: target, ...(canReview ? { reviewComment: dto.comment?.trim() || null } : {}), ...dates, version: { increment: 1 } } });
       if (!claimed.count) throw new ConflictException('This order changed while you were reviewing it. Refresh and try again.');
       return tx.order.findUniqueOrThrow({ where: { id }, include: orderInclude });
     });

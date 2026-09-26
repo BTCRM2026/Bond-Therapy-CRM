@@ -15,6 +15,7 @@ export type SessionUser = {
   permissions: string[];
   portal: PortalType;
   distributorId: string | null;
+  assignedDistributorId: string | null;
 };
 
 export function hashSessionToken(token: string) {
@@ -53,5 +54,6 @@ export async function loadSessionUser(prisma: PrismaService, portal: PortalType,
     permissions: [...new Set(roles.flatMap((role) => role.permissions.map(({ permission }) => permission.key)))],
     portal,
     distributorId: session.user.distributorId,
+    assignedDistributorId: session.user.assignedDistributorId,
   };
 }

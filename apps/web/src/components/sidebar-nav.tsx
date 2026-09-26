@@ -69,7 +69,10 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
       { href: "/distributor/stock", label: "My Stock", icon: Package, exact: false },
       { href: "/distributor/replenishment", label: "Replenishment", icon: Truck, exact: false },
     ] },
-    { label: "Account", items: [{ href: "/distributor/settings", label: "Settings", icon: Settings, exact: true }] },
+    { label: "Account", items: [
+      ...(roleKey === "DISTRIBUTOR_OWNER" ? [{ href: "/distributor/team", label: "Team", icon: UsersRound, exact: false }] : []),
+      { href: "/distributor/settings", label: "Settings", icon: Settings, exact: true },
+    ] },
   ];
   const groups = portal === "ADMIN" ? [
     { label: "Overview", items: [
