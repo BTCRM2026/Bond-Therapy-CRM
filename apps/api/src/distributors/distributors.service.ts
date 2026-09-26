@@ -89,8 +89,11 @@ export class DistributorsService {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findFirst({ where: { email }, select: { id: true } });
     if (existing) throw new BadRequestException('A user with that email address already exists.');
-    const role = await this.prisma.role.findFirst({ where: { key: 'DISTRIBUTOR_STAFF', isActive: true } });
-    if (!role) throw new BadRequestException('The distributor role is not configured.');
+    const role = await this.prisma.role.upsert({
+      where: { key: 'DISTRIBUTOR_STAFF' },
+      update: { portal: 'DISTRIBUTOR', dashboardPath: '/distributor/dashboard', isActive: true },
+      create: { key: 'DISTRIBUTOR_STAFF', name: 'Distributor', description: 'Regional distributor stock and fulfillment', portal: 'DISTRIBUTOR', dashboardPath: '/distributor/dashboard', priority: 60 },
+    });
     const passwordHash = await hashPassword(dto.password);
     const base = slugLoginId(dto.name);
     let loginId = base;
