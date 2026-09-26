@@ -24,6 +24,7 @@ import { IncentiveRulesModule } from './incentive-rules/incentive-rules.module.j
 import { TargetIncentiveModule } from './target-incentive/target-incentive.module.js';
 import { DistributorStockModule } from './distributor-stock/distributor-stock.module.js';
 import { ReplenishmentModule } from './replenishment/replenishment.module.js';
+import { LettersModule } from './letters/letters.module.js';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { ReplenishmentModule } from './replenishment/replenishment.module.js';
     TargetIncentiveModule,
     DistributorStockModule,
     ReplenishmentModule,
+    LettersModule,
   ],
   controllers: [AppController],
 })

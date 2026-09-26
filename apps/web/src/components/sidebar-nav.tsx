@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, AlertTriangle, Award, Building2, CalendarClock, Clock3, FileCheck2, IndianRupee, LayoutDashboard, ListChecks, MapPin, Navigation, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
+import { Activity, AlertTriangle, Award, Building2, CalendarClock, Clock3, FileCheck2, FileText, IndianRupee, LayoutDashboard, ListChecks, MapPin, Navigation, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
@@ -61,6 +61,7 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/attendance", label: "Attendance", icon: Clock3, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/field-activity", label: "Field Activity", icon: Activity, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/distributors", label: "Distributors", icon: Truck, exact: false }] : []),
+    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/letters", label: "Letters", icon: FileText, exact: false }] : []),
   ];
   const distributorGroups = () => [
     { label: "Overview", items: [{ href: "/distributor/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }] },

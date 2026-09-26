@@ -117,6 +117,8 @@ model User {
   replenishmentRequestsMade    ReplenishmentRequest[] @relation("ReplenishmentRequester")
   replenishmentRequestsReviewed ReplenishmentRequest[] @relation("ReplenishmentReviewer")
   distributorStockMovementsRecorded DistributorStockMovement[] @relation("DistributorStockMovementRecorder")
+  hrLettersReceived        HrLetter[]           @relation("HrLetterStaff")
+  hrLettersGenerated       HrLetter[]           @relation("HrLetterGenerator")
 
   @@index([department])
   @@index([managerId])
@@ -1487,4 +1489,40 @@ model Notification {
   @@index([isRead])
   @@index([type])
   @@index([recipientId, portal, isRead])
+}
+
+enum HrLetterType {
+  OFFER
+  APPOINTMENT
+  PROBATION
+  CONFIRMATION
+  INTERNSHIP
+  PROMOTION
+  SALARY_INCREMENT
+  WARNING
+  NOC
+  EXPERIENCE
+  RESIGNATION_ACCEPTANCE
+  RELIEVING
+  TERMINATION
+}
+
+model HrLetter {
+  id                   String       @id @default(cuid())
+  letterNumber         String       @unique
+  type                 HrLetterType
+  recipientName        String
+  recipientDesignation String?
+  recipientDepartment  String?
+  staffUserId          String?
+  staffUser            User?        @relation("HrLetterStaff", fields: [staffUserId], references: [id], onDelete: SetNull)
+  issuedDate           DateTime
+  details              Json
+  generatedById        String
+  generatedBy          User         @relation("HrLetterGenerator", fields: [generatedById], references: [id], onDelete: Restrict)
+  createdAt            DateTime     @default(now())
+
+  @@index([type])
+  @@index([staffUserId])
+  @@index([createdAt])
 }
