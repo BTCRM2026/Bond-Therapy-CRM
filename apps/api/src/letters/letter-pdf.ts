@@ -78,7 +78,7 @@ const inr = (value?: string) => Number(value || 0).toLocaleString('en-IN', { max
 function compensationTable(details: LetterPdfData['details']) {
   const rows = SALARY_COMPONENTS.filter((item) => Number(details[`${item.key}Monthly`] || 0) > 0 || Number(details[`${item.key}Annual`] || 0) > 0);
   const part = (key: 'A' | 'B' | 'C', label: string) => `${rows.filter((item) => item.part === key).map((item) => `<tr><td>${escapeHtml(item.label)}</td><td class="num">${inr(details[`${item.key}Monthly`])}</td><td class="num">${inr(details[`${item.key}Annual`])}</td></tr>`).join('')}<tr class="total"><td>${label}</td><td class="num">${inr(details[`total${key}Monthly`])}</td><td class="num">${inr(details[`total${key}Annual`])}</td></tr>`;
-  return `<table class="salary"><thead><tr><th>Salary component</th><th>Monthly (INR)</th><th>Annual (INR)</th></tr></thead><tbody>${part('A', 'Total Gross (A)')}${part('B', 'Total (B)')}${part('C', 'Total (C)')}<tr class="ctc"><td>Cost to Company (A + B + C)</td><td class="num">${inr(details.ctcMonthly)}</td><td class="num">${inr(details.ctcAnnual)}</td></tr></tbody></table>`;
+  return `<table class="salary"><thead><tr><th>Salary component</th><th class="num">Monthly (INR)</th><th class="num">Annual (INR)</th></tr></thead><tbody>${part('A', 'Total Gross (A)')}${part('B', 'Total (B)')}${part('C', 'Total (C)')}<tr class="ctc"><td>Cost to Company (A + B + C)</td><td class="num">${inr(details.ctcMonthly)}</td><td class="num">${inr(details.ctcAnnual)}</td></tr></tbody></table>`;
 }
 
 function renderAppointmentHtml(data: LetterPdfData, content: LetterContent) {
