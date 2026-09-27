@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -19,7 +20,10 @@ const orderInclude = {
   items: { include: { product: { select: { id: true, name: true, sku: true, unit: true, hsnCode: true, stockOnHand: true } } } },
   invoice: { select: { id: true, invoiceNumber: true, status: true, amountPaid: true, balanceDue: true } },
   deliveryProof: { select: { id: true, arrivalPhotoMime: true, deliveryPhotoMime: true } },
+  distributorInvoiceAttachment: { select: { id: true, fileName: true, mime: true } },
 } satisfies Prisma.OrderInclude;
+
+const financialYear = (date = new Date()) => { const start = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1; return `${String(start).slice(-2)}-${String(start + 1).slice(-2)}`; };
 
 @Injectable()
 export class OrdersService {
@@ -99,7 +103,7 @@ export class OrdersService {
     const prepared = await this.prepare(actor, dto);
     const order = await this.prisma.$transaction(async (tx) => {
       const counter = await tx.employeeCounter.upsert({ where: { key: 'ORD' }, create: { key: 'ORD', nextNumber: 1001 }, update: { nextNumber: { increment: 1 } } });
-      return tx.order.create({ data: { orderNumber: `ORD-${counter.nextNumber}`, clientId: prepared.client.id, salespersonId: actor.id, distributorId: actor.assignedDistributorId ?? null, status: 'DRAFT', ...this.orderData(prepared.calculation, dto.notes), items: { create: prepared.calculation.items } }, include: orderInclude });
+      return tx.order.create({ data: { orderNumber: `ORD-${counter.nextNumber}`, partnerToken: randomBytes(24).toString('hex'), clientId: prepared.client.id, salespersonId: actor.id, distributorId: actor.assignedDistributorId ?? null, status: 'DRAFT', ...this.orderData(prepared.calculation, dto.notes), items: { create: prepared.calculation.items } }, include: orderInclude });
     });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'ORDER_DRAFT_CREATED', entity: 'ORDER', entityId: order.id, details: { orderNumber: order.orderNumber, status: order.status, totalAmount: order.totalAmount.toString() }, ipAddress });
     return order;
@@ -151,6 +155,13 @@ export class OrdersService {
       || (this.isWarehouse(actor) || this.isAdmin(actor)) && order.status === 'CONFIRMED' && target === 'DISPATCHED';
     if (!allowed) throw new ConflictException(`Cannot move an order from ${order.status} to ${target}.`);
     if (['REJECTED', 'RETURNED_FOR_CORRECTION'].includes(target) && !dto.comment?.trim()) throw new ConflictException('A reason is required for this action.');
+    if (target === 'DISTRIBUTOR_FULFILLED' && !dto.distributorInvoiceReference?.trim()) throw new ConflictException('Enter the Tally/Marg invoice number before confirming dispatch.');
+    if (target === 'DISTRIBUTOR_FULFILLED') {
+      const duplicate = await this.prisma.order.findFirst({ where: { id: { not: id }, distributorId: order.distributorId, distributorInvoiceFinancialYear: financialYear(), distributorInvoiceReference: dto.distributorInvoiceReference!.trim() }, select: { orderNumber: true } });
+      if (duplicate) throw new ConflictException(`This invoice number is already linked to ${duplicate.orderNumber} in the current financial year.`);
+      const attachment = await this.prisma.distributorInvoiceAttachment.findUnique({ where: { orderId: id }, select: { id: true } });
+      if (!attachment) throw new ConflictException('Upload the Tally/Marg invoice before confirming dispatch.');
+    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (target === 'STOCK_RESERVED') {
@@ -176,8 +187,8 @@ export class OrdersService {
         : target === 'UNDER_REVIEW' ? { reviewStartedAt: new Date(), reviewedById: actor.id }
         : target === 'RETURNED_FOR_CORRECTION' ? { returnedAt: new Date(), reviewedById: actor.id }
         : target === 'REJECTED' ? { rejectedAt: new Date(), reviewedById: actor.id }
-        : target === 'APPROVED' ? { approvedAt: new Date(), reviewedById: actor.id, ...(order.distributorId ? { distributorInvoiceReference: dto.distributorInvoiceReference?.trim() || null } : {}) }
-        : target === 'DISTRIBUTOR_FULFILLED' ? { distributorFulfilledAt: new Date() }
+        : target === 'APPROVED' ? { approvedAt: new Date(), reviewedById: actor.id }
+        : target === 'DISTRIBUTOR_FULFILLED' ? { distributorFulfilledAt: new Date(), distributorInvoiceReference: dto.distributorInvoiceReference!.trim(), distributorInvoiceFinancialYear: financialYear() }
         : target === 'STOCK_RESERVED' ? { stockReservedAt: new Date() }
         : target === 'PICKING' ? { pickingStartedAt: new Date() }
         : target === 'PACKED' ? { packedAt: new Date() }
@@ -217,5 +228,65 @@ export class OrdersService {
     const mime = kind === 'arrival' ? order.deliveryProof.arrivalPhotoMime : order.deliveryProof.deliveryPhotoMime;
     if (!buffer || !mime) throw new NotFoundException('Delivery proof not found.');
     return { buffer: Buffer.from(buffer), mime };
+  }
+
+  async uploadDistributorInvoice(actor: SessionUser, id: string, file: { buffer: Buffer; mimetype: string; originalname: string; size: number }, ipAddress?: string) {
+    if (!this.isDistributorAccounts(actor) && !this.isDistributorWarehouse(actor)) throw new ForbiddenException('Invoice upload is restricted to the assigned distributor.');
+    const order = await this.prisma.order.findFirst({ where: { id, distributorId: actor.distributorId } });
+    if (!order) throw new NotFoundException('Order not found.');
+    if (!['APPROVED', 'DISTRIBUTOR_FULFILLED'].includes(order.status)) throw new ConflictException('Invoice can be attached only after the order is accepted.');
+    if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) throw new ConflictException('Upload a PDF, JPG, PNG, or WebP invoice.');
+    if (file.size > 5 * 1024 * 1024) throw new ConflictException('Invoice attachment must be 5 MB or smaller.');
+    const saved = await this.prisma.distributorInvoiceAttachment.upsert({ where: { orderId: id }, create: { orderId: id, file: file.buffer, fileName: file.originalname, mime: file.mimetype }, update: { file: file.buffer, fileName: file.originalname, mime: file.mimetype }, select: { id: true, fileName: true, mime: true } });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'DISTRIBUTOR_INVOICE_UPLOADED', entity: 'ORDER', entityId: id, details: { fileName: file.originalname }, ipAddress });
+    return saved;
+  }
+
+  async distributorInvoice(actor: SessionUser, id: string) {
+    this.ensureAccess(actor);
+    const order = await this.prisma.order.findFirst({ where: { AND: [{ id }, this.visibility(actor)] }, select: { distributorInvoiceAttachment: true } });
+    const file = order?.distributorInvoiceAttachment;
+    if (!file) throw new NotFoundException('Distributor invoice not found.');
+    return { buffer: Buffer.from(file.file), mime: file.mime, name: file.fileName };
+  }
+
+  async bulkDistributorInvoices(actor: SessionUser, file: { buffer: Buffer; size: number }, ipAddress?: string) {
+    if (!this.isDistributorAccounts(actor)) throw new ForbiddenException('Only Distributor Accounts can import invoice references.');
+    if (file.size > 2 * 1024 * 1024) throw new ConflictException('CSV file must be 2 MB or smaller.');
+    const lines = file.buffer.toString('utf8').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean); const results: Array<{ reference: string; invoice: string; matched: boolean; message?: string }> = [];
+    for (const line of lines.slice(1)) {
+      const [reference = '', invoice = ''] = line.split(',').map((value) => value.trim().replace(/^"|"$/g, ''));
+      if (!reference || !invoice) continue;
+      try {
+        const order = await this.prisma.order.findFirst({ where: { orderNumber: reference, distributorId: actor.distributorId, status: 'APPROVED' } });
+        if (!order) { results.push({ reference, invoice, matched: false, message: 'Approved order not found' }); continue; }
+        await this.prisma.order.update({ where: { id: order.id }, data: { distributorInvoiceReference: invoice, distributorInvoiceFinancialYear: financialYear() } }); results.push({ reference, invoice, matched: true });
+      } catch { results.push({ reference, invoice, matched: false, message: 'Invoice number already used' }); }
+    }
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'DISTRIBUTOR_INVOICES_IMPORTED', entity: 'ORDER', details: { matched: results.filter((row) => row.matched).length, total: results.length }, ipAddress });
+    return { results };
+  }
+
+  async partnerDetail(token: string) {
+    const order = await this.prisma.order.findUnique({ where: { partnerToken: token }, include: orderInclude });
+    if (!order?.distributorId) throw new NotFoundException('This order link is invalid or no longer available.');
+    return order;
+  }
+
+  private async partnerActor(token: string) {
+    const order = await this.prisma.order.findUnique({ where: { partnerToken: token }, select: { id: true, distributorId: true } });
+    if (!order?.distributorId) throw new NotFoundException('This order link is invalid or no longer available.');
+    const user = await this.prisma.user.findFirst({ where: { distributorId: order.distributorId, status: 'ACTIVE', roles: { some: { role: { key: 'DISTRIBUTOR_OWNER' } } } }, include: { roles: { include: { role: true } } } });
+    if (!user) throw new ConflictException('The distributor owner account is not active.');
+    const actor: SessionUser = { id: user.id, name: user.name, email: user.email, loginId: user.loginId, portal: 'DISTRIBUTOR', status: user.status, department: user.department, dataScope: user.dataScope, manager: null, distributorId: order.distributorId, assignedDistributorId: null, distributionPartner: null, permissions: [], roles: user.roles.map(({ role }) => ({ key: role.key, name: role.name })) };
+    return { orderId: order.id, actor };
+  }
+
+  async partnerUpdate(token: string, dto: UpdateOrderStatusDto, ipAddress?: string) {
+    const { actor, orderId } = await this.partnerActor(token); return this.updateStatus(actor, orderId, dto, ipAddress);
+  }
+
+  async partnerInvoice(token: string, file: { buffer: Buffer; mimetype: string; originalname: string; size: number }, ipAddress?: string) {
+    const { actor, orderId } = await this.partnerActor(token); return this.uploadDistributorInvoice(actor, orderId, file, ipAddress);
   }
 }

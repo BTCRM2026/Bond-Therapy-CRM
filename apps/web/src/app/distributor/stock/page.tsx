@@ -18,7 +18,7 @@ export default async function DistributorStockPage() {
   const session = await requireDistributorSession();
   const [stock, movements] = await Promise.all([loadJson("/distributor-stock"), loadJson("/distributor-stock/movements")]);
   return (
-    <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Distributor"} roleKey={session.roles[0]?.key} headerTitle="My Stock" headerSubtitle="Stock on hand and movement history" portal="DISTRIBUTOR">
+    <DashboardShell userName={session.name} roleName={session.distributionPartner?.partnerType === "SUPER_STOCKIST" ? "Super Stockist" : session.roles[0]?.name ?? "Distributor"} roleKey={session.roles[0]?.key} distributionPartnerType={session.distributionPartner?.partnerType} headerTitle="My Stock" headerSubtitle="Stock on hand and movement history" portal="DISTRIBUTOR">
       <DistributorStockView stock={stock} movements={movements} />
     </DashboardShell>
   );

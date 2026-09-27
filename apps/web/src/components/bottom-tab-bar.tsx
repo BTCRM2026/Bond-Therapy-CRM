@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 const SALES_ROLE_KEYS = new Set(["SALES_MANAGER", "SALES_EXECUTIVE"]);
 const WAREHOUSE_ROLE_KEYS = new Set(["WAREHOUSE"]);
 
-export function BottomTabBar({ portal = "ADMIN", roleKey, canManageStaff = false }: { portal?: PortalType; roleKey?: string; canManageStaff?: boolean }) {
+export function BottomTabBar({ portal = "ADMIN", roleKey, distributionPartnerType, canManageStaff = false }: { portal?: PortalType; roleKey?: string; distributionPartnerType?: "SUPER_STOCKIST" | "DISTRIBUTOR"; canManageStaff?: boolean }) {
   const pathname = usePathname();
   const isSales = roleKey ? SALES_ROLE_KEYS.has(roleKey) : false;
   const isWarehouse = roleKey ? WAREHOUSE_ROLE_KEYS.has(roleKey) : false;
@@ -23,7 +23,7 @@ export function BottomTabBar({ portal = "ADMIN", roleKey, canManageStaff = false
     : portal === "DISTRIBUTOR"
       ? [
           { href: "/distributor/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
-          { href: "/distributor/orders", label: "Orders", icon: ShoppingCart, exact: false },
+          { href: distributionPartnerType === "SUPER_STOCKIST" ? "/distributor/network" : "/distributor/orders", label: distributionPartnerType === "SUPER_STOCKIST" ? "Network" : "Orders", icon: distributionPartnerType === "SUPER_STOCKIST" ? Building2 : ShoppingCart, exact: false },
           { href: "/distributor/stock", label: "Stock", icon: Package, exact: false },
           { href: "/distributor/replenishment", label: "Restock", icon: Truck, exact: false },
         ]

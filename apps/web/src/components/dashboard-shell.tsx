@@ -10,6 +10,7 @@ export function DashboardShell({
   userName,
   roleName,
   roleKey,
+  distributionPartnerType,
   headerTitle,
   headerSubtitle,
   portal = "ADMIN",
@@ -19,6 +20,7 @@ export function DashboardShell({
   userName: string;
   roleName: string;
   roleKey?: string;
+  distributionPartnerType?: "SUPER_STOCKIST" | "DISTRIBUTOR";
   headerTitle: string;
   headerSubtitle: string;
   portal?: PortalType;
@@ -27,11 +29,11 @@ export function DashboardShell({
 }) {
   return (
     <main className="crm-shell min-h-screen bg-background lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
-      <DesktopSidebar userName={userName} roleName={roleName} roleKey={roleKey} portal={portal} canManageStaff={canManageStaff} />
+      <DesktopSidebar userName={userName} roleName={roleName} roleKey={roleKey} distributionPartnerType={distributionPartnerType} portal={portal} canManageStaff={canManageStaff} />
       <section className="min-w-0">
         <header className="sticky top-0 z-30 flex h-[60px] items-center justify-between gap-3 border-b bg-white/95 px-4 shadow-[0_1px_0_rgba(26,31,26,0.04)] backdrop-blur sm:px-6 lg:px-5">
           <div className="flex min-w-0 items-center gap-3">
-            <MobileSidebarDrawer portal={portal} roleKey={roleKey} canManageStaff={canManageStaff} />
+            <MobileSidebarDrawer portal={portal} roleKey={roleKey} distributionPartnerType={distributionPartnerType} canManageStaff={canManageStaff} />
             <div className="min-w-0">
               <h1 className="truncate text-[15px] font-semibold tracking-[-0.018em] text-foreground sm:text-base">{headerTitle}</h1>
               <p className="hidden text-[11px] text-muted sm:block">{headerSubtitle}</p>
@@ -44,7 +46,7 @@ export function DashboardShell({
           </div>
         </header>
         <div className="w-full p-4 pb-24 sm:p-5 sm:pb-24 lg:p-5 lg:pb-5">{children}</div>
-        <BottomTabBar portal={portal} roleKey={roleKey} canManageStaff={canManageStaff} />
+        <BottomTabBar portal={portal} roleKey={roleKey} distributionPartnerType={distributionPartnerType} canManageStaff={canManageStaff} />
       </section>
     </main>
   );

@@ -82,6 +82,20 @@ export function DispatchModule({ initial }: { initial: OrderListResponse | null 
   </div>;
 }
 
+export type WarehouseReplenishment = { id: string; requestNumber: string; status: "APPROVED" | "PICKING" | "PACKED" | "DISPATCHED" | string; invoiceReference: string | null; distributor: { businessName: string }; items: Array<{ id: string; quantity: number; acceptedQuantity: number | null; product: { name: string; unit: string } }> };
+
+export function ReplenishmentDispatch({ initial }: { initial: WarehouseReplenishment[] }) {
+  const [requests, setRequests] = useState(initial.filter((item) => ["APPROVED", "PICKING", "PACKED", "DISPATCHED"].includes(item.status)));
+  const [busy, setBusy] = useState(""); const [error, setError] = useState("");
+  const update = async (request: WarehouseReplenishment, action: "pick" | "pack" | "fulfill") => {
+    setBusy(request.id); setError("");
+    try { const response = await fetch(`/api/replenishment/${request.id}/${action}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: "{}" }); const data = await response.json().catch(() => null); if (!response.ok) throw new Error(messageFrom(data, "Unable to update replenishment.")); setRequests((current) => current.map((item) => item.id === request.id ? data : item)); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to update replenishment."); } finally { setBusy(""); }
+  };
+  if (!requests.length) return null;
+  return <section className="crm-surface overflow-hidden"><div className="border-b px-5 py-4"><h2 className="text-sm font-semibold">Super Stockist replenishment</h2><p className="mt-0.5 text-xs text-muted">Mother Depot picking, packing and dispatch queue</p></div>{error && <div className="m-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-danger">{error}</div>}<div className="divide-y">{requests.map((request) => <article key={request.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{request.requestNumber}</p><span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">{request.status.replaceAll("_", " ").toLowerCase()}</span></div><p className="mt-1 text-xs text-muted">{request.distributor.businessName} · {request.items.map((item) => `${item.product.name} × ${item.acceptedQuantity ?? item.quantity}`).join(" · ")}</p></div><div className="flex flex-wrap gap-2">{request.status === "APPROVED" && <Button disabled={busy === request.id} onClick={() => update(request, "pick")}>Start picking</Button>}{request.status === "PICKING" && <Button disabled={busy === request.id} onClick={() => update(request, "pack")}>Mark packed</Button>}{request.status === "PACKED" && <Button disabled={busy === request.id} onClick={() => update(request, "fulfill")}>Invoice &amp; dispatch</Button>}{request.invoiceReference && <a href={`/api/replenishment/${request.id}/invoice.pdf`} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-lg border px-3 text-xs font-semibold">View invoice</a>}</div></article>)}</div></section>;
+}
+
 function OrderDetailPopup({ order, onClose }: { order: Order; onClose: () => void }) {
   return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/35 p-4" role="dialog" aria-modal="true" aria-label="Order details">
     <div className="w-full max-w-lg rounded-xl border bg-white shadow-2xl">

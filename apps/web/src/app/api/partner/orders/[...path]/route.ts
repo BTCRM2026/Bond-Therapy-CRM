@@ -1,0 +1,16 @@
+import { NextResponse } from "next/server";
+
+const API = process.env.API_INTERNAL_URL ?? "http://localhost:3001";
+
+async function handle(request: Request, context: { params: Promise<{ path: string[] }> }) {
+  try {
+    const { path } = await context.params;
+    const hasBody = !["GET", "HEAD"].includes(request.method);
+    const upstream = await fetch(`${API}/partner-orders/${path.map(encodeURIComponent).join("/")}`, { method: request.method, headers: hasBody ? { "content-type": request.headers.get("content-type") ?? "application/json" } : {}, body: hasBody ? await request.arrayBuffer() : undefined, cache: "no-store" });
+    return new NextResponse(await upstream.arrayBuffer(), { status: upstream.status, headers: { "content-type": upstream.headers.get("content-type") ?? "application/json" } });
+  } catch { return NextResponse.json({ message: "This order link is temporarily unavailable." }, { status: 503 }); }
+}
+
+export const GET = handle;
+export const POST = handle;
+export const PATCH = handle;

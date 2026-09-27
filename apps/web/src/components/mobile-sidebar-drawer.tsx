@@ -6,7 +6,7 @@ import { SidebarBrand } from "@/components/sidebar-brand";
 import { SidebarNav } from "@/components/sidebar-nav";
 import type { PortalType } from "@/lib/portal-types";
 
-export function MobileSidebarDrawer({ portal, roleKey, canManageStaff = false }: { portal: PortalType; roleKey?: string; canManageStaff?: boolean }) {
+export function MobileSidebarDrawer({ portal, roleKey, distributionPartnerType, canManageStaff = false }: { portal: PortalType; roleKey?: string; distributionPartnerType?: "SUPER_STOCKIST" | "DISTRIBUTOR"; canManageStaff?: boolean }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -35,7 +35,7 @@ export function MobileSidebarDrawer({ portal, roleKey, canManageStaff = false }:
                 <X size={18} />
               </button>
             </div>
-            <SidebarNav portal={portal} roleKey={roleKey} canManageStaff={canManageStaff} onNavigate={() => setOpen(false)} />
+            <SidebarNav portal={portal} roleKey={roleKey} distributionPartnerType={distributionPartnerType} canManageStaff={canManageStaff} onNavigate={() => setOpen(false)} />
           </aside>
         </div>
       )}

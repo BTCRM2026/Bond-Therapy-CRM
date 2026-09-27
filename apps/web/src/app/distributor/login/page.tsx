@@ -32,7 +32,7 @@ export default function DistributorLoginPage() {
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand">{label}</p>
               <h2 className="text-[26px] font-semibold tracking-[-0.025em] text-foreground lg:text-[28px]">Welcome back</h2>
               <span className="mx-auto mt-3 block h-1 w-12 rounded-full bg-brand" />
-              <p className="mt-4 text-sm leading-6 text-muted">Enter your credentials to open your distributor workspace.</p>
+            <p className="mt-4 text-sm leading-6 text-muted">Enter your credentials to open your assigned distribution workspace.</p>
             </div>
             <LoginForm />
             <div className="mt-6 flex items-start justify-center gap-2 border-t pt-4 text-left text-xs leading-5 text-subtle lg:justify-start"><ShieldCheck size={15} className="mt-0.5 shrink-0" />Your access is protected and activity is recorded for security.</div>

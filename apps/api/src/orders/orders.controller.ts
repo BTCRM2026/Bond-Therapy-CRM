@@ -49,4 +49,24 @@ export class OrdersController {
     response.setHeader('cache-control', 'private, max-age=300');
     response.send(proof.buffer);
   }
+
+  @Post(':id/distributor-invoice')
+  @UseInterceptors(FileInterceptor('invoice', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  uploadDistributorInvoice(@CurrentUser() actor: SessionUser, @Param('id') id: string, @UploadedFile() file: { buffer: Buffer; mimetype: string; originalname: string; size: number } | undefined, @Req() req: Request) {
+    if (!file) throw new BadRequestException('Select an invoice to upload.');
+    return this.orders.uploadDistributorInvoice(actor, id, file, req.ip);
+  }
+
+  @Get(':id/distributor-invoice')
+  async distributorInvoice(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Res() response: Response) {
+    const file = await this.orders.distributorInvoice(actor, id);
+    response.setHeader('content-type', file.mime); response.setHeader('content-disposition', `inline; filename="${file.name.replaceAll('"', '')}"`); response.setHeader('cache-control', 'private, max-age=300'); response.send(file.buffer);
+  }
+
+  @Post('bulk-invoices')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 2 * 1024 * 1024, files: 1 } }))
+  bulkDistributorInvoices(@CurrentUser() actor: SessionUser, @UploadedFile() file: { buffer: Buffer; size: number } | undefined, @Req() req: Request) {
+    if (!file) throw new BadRequestException('Select a CSV file.');
+    return this.orders.bulkDistributorInvoices(actor, file, req.ip);
+  }
 }

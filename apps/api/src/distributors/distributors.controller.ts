@@ -40,6 +40,11 @@ export class DistributorsController {
     return this.distributors.listUsers(actor.distributorId ?? '', actor);
   }
 
+  @Get('me/network')
+  myNetwork(@CurrentUser() actor: SessionUser) {
+    return this.distributors.myNetwork(actor);
+  }
+
   @Post('me/users')
   createMyUser(@Body() dto: CreateDistributorUserDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
     return this.distributors.createUser(actor.distributorId ?? '', dto, actor, req.ip);

@@ -27,8 +27,8 @@ export default async function DistributorsPage() {
       userName={session.name}
       roleName={session.roles[0]?.name ?? "Super Admin"}
       roleKey={session.roles[0]?.key}
-      headerTitle="Distributors"
-      headerSubtitle="Regional stockists, their portal logins, and replenishment"
+      headerTitle="Distribution network"
+      headerSubtitle="Super Stockists, Distributors, portal access and replenishment"
       portal="ADMIN"
       canManageStaff={session.permissions.includes("admin.staff.manage")}
     >

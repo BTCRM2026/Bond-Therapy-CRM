@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
-import { DispatchModule } from "@/components/dispatch-module";
+import { DispatchModule, ReplenishmentDispatch, type WarehouseReplenishment } from "@/components/dispatch-module";
 import type { OrderListResponse } from "@/components/orders-module";
 import { PORTAL_HEADER } from "@/lib/portal";
 import { requireSession } from "@/lib/session";
@@ -16,9 +16,13 @@ async function loadOrders() {
   } catch { return null; }
 }
 
+async function loadReplenishments() {
+  try { const response = await fetch(`${process.env.API_INTERNAL_URL ?? "http://localhost:3001"}/replenishment`, { headers: { cookie: (await cookies()).toString(), [PORTAL_HEADER]: "STAFF" }, cache: "no-store" }); return response.ok ? await response.json() as WarehouseReplenishment[] : []; } catch { return []; }
+}
+
 export default async function DispatchPage() {
   const session = await requireSession("STAFF");
   if (!WAREHOUSE_ROLE_KEYS.has(session.roles[0]?.key ?? "")) redirect("/dashboard/access-denied");
-  const initial = await loadOrders();
-  return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} roleKey={session.roles[0]?.key} headerTitle="Warehouse & dispatch" headerSubtitle="Reserve stock, pick, pack, dispatch, and record delivery proof" portal="STAFF"><DispatchModule initial={initial} /></DashboardShell>;
+  const [initial, replenishments] = await Promise.all([loadOrders(), loadReplenishments()]);
+  return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} roleKey={session.roles[0]?.key} headerTitle="Warehouse & dispatch" headerSubtitle="Reserve stock, pick, pack, dispatch, and record delivery proof" portal="STAFF"><div className="space-y-5"><ReplenishmentDispatch initial={replenishments} /><DispatchModule initial={initial} /></div></DashboardShell>;
 }

@@ -18,8 +18,8 @@ export default async function DistributorReplenishmentPage() {
   const session = await requireDistributorSession();
   const initial = await loadRequests();
   return (
-    <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Distributor"} roleKey={session.roles[0]?.key} headerTitle="Replenishment" headerSubtitle="Request stock from Bond Therapy's central warehouse" portal="DISTRIBUTOR">
-      <DistributorReplenishment initial={initial} roleKey={session.roles[0]?.key} />
+    <DashboardShell userName={session.name} roleName={session.distributionPartner?.partnerType === "SUPER_STOCKIST" ? "Super Stockist" : session.roles[0]?.name ?? "Distributor"} roleKey={session.roles[0]?.key} distributionPartnerType={session.distributionPartner?.partnerType} headerTitle="Replenishment" headerSubtitle={session.distributionPartner?.partnerType === "SUPER_STOCKIST" ? "Request Mother Depot stock and fulfil distributor demand" : "Request stock from your assigned Super Stockist"} portal="DISTRIBUTOR">
+      <DistributorReplenishment initial={initial} roleKey={session.roles[0]?.key} partnerId={session.distributionPartner!.id} partnerType={session.distributionPartner?.partnerType ?? "DISTRIBUTOR"} />
     </DashboardShell>
   );
 }

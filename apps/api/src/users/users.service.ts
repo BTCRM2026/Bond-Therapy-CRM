@@ -100,7 +100,7 @@ export class UsersService {
 
   private async resolveDistributor(distributorId?: string | null) {
     if (!distributorId) return null;
-    const distributor = await this.prisma.distributor.findUnique({ where: { id: distributorId }, select: { id: true } });
+    const distributor = await this.prisma.distributor.findFirst({ where: { id: distributorId, partnerType: 'DISTRIBUTOR', status: { not: 'INACTIVE' } }, select: { id: true } });
     if (!distributor) throw new BadRequestException('Select a valid distributor.');
     return distributor.id;
   }

@@ -20,7 +20,7 @@ export default async function DistributorTeamPage() {
   if (session.roles[0]?.key !== "DISTRIBUTOR_OWNER") redirect("/distributor/dashboard");
   const initial = await loadTeam();
   return (
-    <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Owner"} roleKey={session.roles[0]?.key} headerTitle="Team" headerSubtitle="Manage who has access to your distributor portal" portal="DISTRIBUTOR">
+    <DashboardShell userName={session.name} roleName={session.distributionPartner?.partnerType === "SUPER_STOCKIST" ? "Super Stockist" : session.roles[0]?.name ?? "Owner"} roleKey={session.roles[0]?.key} distributionPartnerType={session.distributionPartner?.partnerType} headerTitle="Team" headerSubtitle="Manage who has access to your distribution portal" portal="DISTRIBUTOR">
       <DistributorTeam initial={initial} />
     </DashboardShell>
   );

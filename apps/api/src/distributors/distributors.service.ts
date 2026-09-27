@@ -28,14 +28,42 @@ export class DistributorsService {
 
   list() {
     return this.prisma.distributor.findMany({
-      include: { assignedSalesperson: { select: { id: true, name: true } } },
+      include: { assignedSalesperson: { select: { id: true, name: true } }, parent: { select: { id: true, businessName: true } }, _count: { select: { children: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
 
+  async myNetwork(actor: SessionUser) {
+    if (actor.portal !== 'DISTRIBUTOR' || !actor.distributorId) throw new ForbiddenException('Distribution network is not available to this account.');
+    const partner = await this.prisma.distributor.findUnique({ where: { id: actor.distributorId }, select: { partnerType: true } });
+    if (partner?.partnerType !== 'SUPER_STOCKIST') throw new ForbiddenException('Only Super Stockists can view a distributor network.');
+    return this.prisma.distributor.findMany({
+      where: { parentId: actor.distributorId },
+      select: {
+        id: true, businessName: true, contactName: true, phone: true, email: true, territory: true, creditLimit: true, status: true,
+        stock: { select: { quantityOnHand: true } },
+        replenishmentRequests: { where: { sourceDistributorId: actor.distributorId, status: { in: ['REQUESTED', 'APPROVED'] } }, select: { id: true } },
+      },
+      orderBy: { businessName: 'asc' },
+    });
+  }
+
+  private async validateHierarchy(partnerType: 'SUPER_STOCKIST' | 'DISTRIBUTOR', parentId?: string | null, currentId?: string) {
+    if (partnerType === 'SUPER_STOCKIST') return null;
+    if (!parentId) return null;
+    if (parentId === currentId) throw new BadRequestException('A partner cannot be its own parent.');
+    const parent = await this.prisma.distributor.findFirst({ where: { id: parentId, partnerType: 'SUPER_STOCKIST', status: { not: 'INACTIVE' } }, select: { id: true } });
+    if (!parent) throw new BadRequestException('Select an active Super Stockist.');
+    return parent.id;
+  }
+
   async create(dto: CreateDistributorDto, actor: SessionUser, ipAddress?: string) {
+    const partnerType = dto.partnerType ?? 'DISTRIBUTOR';
+    const parentId = await this.validateHierarchy(partnerType, dto.parentId);
     const distributor = await this.prisma.distributor.create({
       data: {
+        partnerType,
+        parentId,
         businessName: dto.businessName.trim(),
         contactName: dto.contactName.trim(),
         phone: dto.phone,
@@ -61,9 +89,17 @@ export class DistributorsService {
     const existing = await this.prisma.distributor.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Distributor not found.');
 
+    const partnerType = dto.partnerType ?? existing.partnerType;
+    if (existing.partnerType === 'SUPER_STOCKIST' && partnerType === 'DISTRIBUTOR') {
+      const children = await this.prisma.distributor.count({ where: { parentId: id } });
+      if (children) throw new BadRequestException('Reassign this Super Stockist\'s distributors before changing its type.');
+    }
+    const parentId = await this.validateHierarchy(partnerType, partnerType === 'SUPER_STOCKIST' ? null : dto.parentId === undefined ? existing.parentId : dto.parentId || null, id);
     const distributor = await this.prisma.distributor.update({
       where: { id },
       data: {
+        partnerType,
+        parentId,
         businessName: dto.businessName?.trim(),
         contactName: dto.contactName?.trim(),
         phone: dto.phone,

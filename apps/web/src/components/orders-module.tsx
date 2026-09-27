@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Clock3, FileCheck2, FileText, Minus, Package, Plus, RotateCcw, Search, Send, ShoppingCart, X, XCircle } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Clock3, FileCheck2, FileText, MessageCircle, Minus, Package, Plus, RotateCcw, Search, Send, ShoppingCart, X, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ const GROUPS = [
 ] as const;
 
 type OrderItemRow = { id: string; quantity: number; unitPrice: string; discountAmount: string; taxableAmount: string; gstRate: string; taxAmount: string; lineTotal: string; product: { id: string; name: string; sku: string; unit: string; stockOnHand: number } };
-export type Order = { id: string; orderNumber: string; status: string; version: number; subtotal: string; discountAmount: string; taxableAmount: string; taxAmount: string; cgstAmount: string; sgstAmount: string; igstAmount: string; totalAmount: string; notes: string | null; reviewComment: string | null; createdAt: string; submittedAt: string | null; approvedAt: string | null; deliveryMode: string | null; deliveryPersonName: string | null; deliveryPersonMobile: string | null; courierName: string | null; trackingNumber: string | null; distributorInvoiceReference?: string | null; distributor?: { id: string; businessName: string } | null; client: { id: string; salonName: string; city: string; primaryContact: string }; salesperson: { id: string; name: string }; reviewedBy: { id: string; name: string } | null; invoice: { id: string; invoiceNumber: string; status: string; amountPaid: string; balanceDue: string } | null; deliveryProof: { id: string; arrivalPhotoMime: string | null; deliveryPhotoMime: string | null } | null; items: OrderItemRow[] };
+export type Order = { id: string; orderNumber: string; partnerToken?: string | null; status: string; version: number; subtotal: string; discountAmount: string; taxableAmount: string; taxAmount: string; cgstAmount: string; sgstAmount: string; igstAmount: string; totalAmount: string; notes: string | null; reviewComment: string | null; createdAt: string; submittedAt: string | null; approvedAt: string | null; deliveryMode: string | null; deliveryPersonName: string | null; deliveryPersonMobile: string | null; courierName: string | null; trackingNumber: string | null; distributorInvoiceReference?: string | null; distributorInvoiceAttachment?: { id: string; fileName: string; mime: string } | null; distributor?: { id: string; businessName: string } | null; client: { id: string; salonName: string; city: string; primaryContact: string }; salesperson: { id: string; name: string }; reviewedBy: { id: string; name: string } | null; invoice: { id: string; invoiceNumber: string; status: string; amountPaid: string; balanceDue: string } | null; deliveryProof: { id: string; arrivalPhotoMime: string | null; deliveryPhotoMime: string | null } | null; items: OrderItemRow[] };
 export type OrderListResponse = { items: Order[]; page: number; pageSize: number; total: number; hasMore: boolean };
 
 const money = (value: string | number) => `₹${Number(value).toLocaleString("en-IN")}`;
@@ -53,7 +53,7 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [distributorFilter, setDistributorFilter] = useState("");
-  const [distributors, setDistributors] = useState<Array<{ id: string; businessName: string }>>([]);
+  const [distributors, setDistributors] = useState<Array<{ id: string; businessName: string; partnerType: "SUPER_STOCKIST" | "DISTRIBUTOR" }>>([]);
   const isSales = ["SALES_MANAGER", "SALES_EXECUTIVE"].includes(roleKey);
   const isAccounts = roleKey === "ACCOUNTS_BILLING" || roleKey === "SUPER_ADMIN";
   const isAdmin = roleKey === "SUPER_ADMIN";
@@ -62,7 +62,7 @@ export function OrdersModule({ initial, roleKey }: { initial: OrderListResponse 
     if (!isAdmin) return;
     (async () => {
       const response = await fetch("/api/distributors", { cache: "no-store" });
-      if (response.ok) setDistributors(await response.json());
+      if (response.ok) setDistributors((await response.json()).filter((item: { partnerType: string }) => item.partnerType === "DISTRIBUTOR"));
     })();
   }, [isAdmin]);
 
@@ -158,7 +158,7 @@ function OrderDetailModal({ order, canReview, canSubmit, onEdit, onClose, onChan
       {canReview && ["SUBMITTED", "UNDER_REVIEW"].includes(order.status) && <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Review comment <span className="text-muted">(required when returning or rejecting)</span></span><textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={3} className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/10" placeholder="Add a clear note for Sales…" /></label>}
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger">{error}</div>}
     </div>
-    <div className="flex flex-wrap justify-end gap-2 border-t bg-white p-4">{canSubmit && ["DRAFT", "RETURNED_FOR_CORRECTION"].includes(order.status) && <><Button variant="secondary" disabled={Boolean(busy)} onClick={onEdit}>Edit draft</Button><Button disabled={Boolean(busy)} onClick={() => transition("SUBMITTED")}><Send size={15} />Submit to Accounts</Button></>}{canReview && order.status === "SUBMITTED" && <Button disabled={Boolean(busy)} onClick={() => transition("UNDER_REVIEW")}><Clock3 size={15} />Start review</Button>}{canReview && ["SUBMITTED", "UNDER_REVIEW"].includes(order.status) && <><Button variant="secondary" disabled={Boolean(busy) || !comment.trim()} onClick={() => transition("RETURNED_FOR_CORRECTION")}><RotateCcw size={15} />Return</Button><Button variant="secondary" disabled={Boolean(busy) || !comment.trim()} onClick={() => transition("REJECTED")}><XCircle size={15} />Reject</Button></>}{canReview && order.status === "UNDER_REVIEW" && <Button disabled={Boolean(busy)} onClick={() => transition("APPROVED")}><Check size={15} />Approve</Button>}{canReview && order.status === "APPROVED" && <Button disabled={Boolean(busy)} onClick={generateInvoice}><FileCheck2 size={15} />{busy === "INVOICE" ? "Generating…" : "Generate invoice"}</Button>}</div>
+    <div className="flex flex-wrap justify-end gap-2 border-t bg-white p-4">{canSubmit && order.distributor && order.partnerToken && ["SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(order.status) && <a href={`https://wa.me/?text=${encodeURIComponent(`New Bond Therapy order ${order.orderNumber}\nSalon: ${order.client.salonName}\nProducts: ${order.items.map((item) => `${item.product.name} x ${item.quantity}`).join(", ")}\nAmount: ${money(order.totalAmount)}\nOpen and confirm: ${typeof window !== "undefined" ? window.location.origin : ""}/partner/order/${order.partnerToken}`)}`} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-lg border bg-white px-3 text-xs font-semibold"><MessageCircle size={15} />Share on WhatsApp</a>}{canSubmit && ["DRAFT", "RETURNED_FOR_CORRECTION"].includes(order.status) && <><Button variant="secondary" disabled={Boolean(busy)} onClick={onEdit}>Edit draft</Button><Button disabled={Boolean(busy)} onClick={() => transition("SUBMITTED")}><Send size={15} />{order.distributor ? "Submit to distributor" : "Submit to Accounts"}</Button></>}{canReview && order.status === "SUBMITTED" && <Button disabled={Boolean(busy)} onClick={() => transition("UNDER_REVIEW")}><Clock3 size={15} />Start review</Button>}{canReview && ["SUBMITTED", "UNDER_REVIEW"].includes(order.status) && <><Button variant="secondary" disabled={Boolean(busy) || !comment.trim()} onClick={() => transition("RETURNED_FOR_CORRECTION")}><RotateCcw size={15} />Return</Button><Button variant="secondary" disabled={Boolean(busy) || !comment.trim()} onClick={() => transition("REJECTED")}><XCircle size={15} />Reject</Button></>}{canReview && order.status === "UNDER_REVIEW" && <Button disabled={Boolean(busy)} onClick={() => transition("APPROVED")}><Check size={15} />Approve</Button>}{canReview && order.status === "APPROVED" && <Button disabled={Boolean(busy)} onClick={generateInvoice}><FileCheck2 size={15} />{busy === "INVOICE" ? "Generating…" : "Generate invoice"}</Button>}</div>
   </div></div>;
 }
 function Row({ label, value }: { label: string; value: string }) { return <div className="flex justify-between gap-5"><span className="text-muted">{label}</span><span className="font-medium text-foreground">{value}</span></div>; }

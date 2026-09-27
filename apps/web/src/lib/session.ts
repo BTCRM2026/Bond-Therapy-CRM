@@ -17,6 +17,8 @@ export type SessionUser = {
   permissions: string[];
   portal: PortalType;
   dashboardPath: string;
+  distributorId: string | null;
+  distributionPartner: { id: string; businessName: string; partnerType: "SUPER_STOCKIST" | "DISTRIBUTOR"; parentId: string | null } | null;
   profile: {
     employeeCode: string;
     mobile: string;

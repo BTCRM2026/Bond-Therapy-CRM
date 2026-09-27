@@ -1,6 +1,14 @@
 import { IsEmail, IsIn, IsNumber, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateDistributorDto {
+  @IsOptional()
+  @IsIn(['SUPER_STOCKIST', 'DISTRIBUTOR'])
+  partnerType?: 'SUPER_STOCKIST' | 'DISTRIBUTOR';
+
+  @IsOptional()
+  @IsString()
+  parentId?: string;
+
   @IsString()
   @MinLength(2)
   @MaxLength(160)
@@ -37,6 +45,14 @@ export class CreateDistributorDto {
 }
 
 export class UpdateDistributorDto {
+  @IsOptional()
+  @IsIn(['SUPER_STOCKIST', 'DISTRIBUTOR'])
+  partnerType?: 'SUPER_STOCKIST' | 'DISTRIBUTOR';
+
+  @IsOptional()
+  @IsString()
+  parentId?: string;
+
   @IsOptional()
   @IsString()
   @MinLength(2)

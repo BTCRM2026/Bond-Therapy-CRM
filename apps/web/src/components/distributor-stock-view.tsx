@@ -4,7 +4,7 @@ import { Package } from "lucide-react";
 import { useState } from "react";
 import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 
-type StockRow = { id: string; quantityOnHand: number; updatedAt: string; product: { id: string; name: string; sku: string; unit: string } };
+type StockRow = { id: string; quantityOnHand: number; availableQuantity: number; reservedQuantity: number; inboundQuantity: number; updatedAt: string; product: { id: string; name: string; sku: string; unit: string } };
 type MovementRow = { id: string; type: string; quantityChange: number; createdAt: string; product: { name: string; unit: string }; recordedBy: { name: string } };
 
 const pretty = (value: string) => value.toLowerCase().split("_").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ");
@@ -33,12 +33,12 @@ export function DistributorStockView({ stock, movements }: { stock: StockRow[]; 
             <>
               <div className="hidden overflow-visible xl:block">
                 <table className="w-full text-left text-[13px]">
-                  <thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><tr><th className="px-5 py-3">Product</th><th className="px-4 py-3">SKU</th><th className="px-4 py-3">Quantity on hand</th><th className="px-5 py-3">Last updated</th></tr></thead>
+                  <thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><tr><th className="px-5 py-3">Product</th><th className="px-4 py-3">SKU</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3 text-right">Reserved</th><th className="px-4 py-3 text-right">In transit</th><th className="px-5 py-3">Last updated</th></tr></thead>
                   <tbody className="divide-y">{stock.map((row) => (
                     <tr key={row.id} className="transition-colors hover:bg-brand-soft/40">
                       <td className="px-5 py-4 font-semibold text-foreground">{row.product.name}</td>
                       <td className="px-4 py-4 text-muted">{row.product.sku}</td>
-                      <td className="px-4 py-4 text-foreground">{row.quantityOnHand} {row.product.unit}</td>
+                      <td className="px-4 py-4 text-right font-semibold text-foreground">{row.availableQuantity} {row.product.unit}</td><td className="px-4 py-4 text-right text-muted">{row.reservedQuantity}</td><td className="px-4 py-4 text-right text-muted">{row.inboundQuantity}</td>
                       <td className="px-5 py-4 text-muted">{dateLabel(row.updatedAt)}</td>
                     </tr>
                   ))}</tbody>
@@ -48,7 +48,7 @@ export function DistributorStockView({ stock, movements }: { stock: StockRow[]; 
                 <article key={row.id} className="rounded-lg border bg-white p-4">
                   <p className="text-sm font-semibold text-foreground">{row.product.name}</p>
                   <p className="mt-0.5 text-xs text-muted">{row.product.sku}</p>
-                  <p className="mt-3 text-lg font-semibold text-foreground">{row.quantityOnHand} <span className="text-xs font-normal text-muted">{row.product.unit}</span></p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center"><div><p className="text-base font-semibold">{row.availableQuantity}</p><p className="text-[10px] uppercase tracking-wide text-muted">Available</p></div><div><p className="text-base font-semibold">{row.reservedQuantity}</p><p className="text-[10px] uppercase tracking-wide text-muted">Reserved</p></div><div><p className="text-base font-semibold">{row.inboundQuantity}</p><p className="text-[10px] uppercase tracking-wide text-muted">In transit</p></div></div>
                   <p className="mt-1 text-xs text-muted">Updated {dateLabel(row.updatedAt)}</p>
                 </article>
               ))}</div>

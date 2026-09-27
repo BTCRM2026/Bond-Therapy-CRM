@@ -11,6 +11,7 @@ export default async function DistributorSettingsPage() {
       userName={session.name}
       roleName={roleName}
       roleKey={session.roles[0]?.key}
+      distributionPartnerType={session.distributionPartner?.partnerType}
       headerTitle="Settings"
       headerSubtitle="Profile and account details"
       portal="DISTRIBUTOR"

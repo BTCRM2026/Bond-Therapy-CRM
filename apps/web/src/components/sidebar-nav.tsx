@@ -48,7 +48,7 @@ function staffGroups(roleKey?: string) {
   ];
 }
 
-export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, onNavigate }: { portal?: PortalType; roleKey?: string; canManageStaff?: boolean; onNavigate?: () => void }) {
+export function SidebarNav({ portal = "ADMIN", roleKey, distributionPartnerType, canManageStaff = false, onNavigate }: { portal?: PortalType; roleKey?: string; distributionPartnerType?: "SUPER_STOCKIST" | "DISTRIBUTOR"; canManageStaff?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
   const managementItems = [
     ...(canManageStaff ? [{ href: "/dashboard/staff", label: "Staff & Access", icon: UsersRound, exact: false }] : []),
@@ -61,13 +61,13 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/target-incentive", label: "Target & Incentive", icon: Award, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/attendance", label: "Attendance", icon: Clock3, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/field-activity", label: "Field Activity", icon: Activity, exact: false }] : []),
-    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/distributors", label: "Distributors", icon: Truck, exact: false }] : []),
+    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/distributors", label: "Distribution network", icon: Truck, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/letters", label: "Letters", icon: FileText, exact: false }] : []),
   ];
   const distributorGroups = () => [
     { label: "Overview", items: [{ href: "/distributor/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }] },
     { label: "Fulfillment", items: [
-      { href: "/distributor/orders", label: "Orders", icon: ShoppingCart, exact: false },
+      ...(distributionPartnerType === "SUPER_STOCKIST" ? [{ href: "/distributor/network", label: "Distributor network", icon: Building2, exact: false }] : [{ href: "/distributor/orders", label: "Salon orders", icon: ShoppingCart, exact: false }]),
       { href: "/distributor/stock", label: "My Stock", icon: Package, exact: false },
       { href: "/distributor/replenishment", label: "Replenishment", icon: Truck, exact: false },
     ] },

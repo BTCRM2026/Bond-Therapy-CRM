@@ -205,8 +205,8 @@ function StaffEditor({ mode, user, roles, managers, onClose, onSaved }: { mode: 
     password: "",
   });
   const [saving, setSaving] = useState(false); const [error, setError] = useState("");
-  const [distributors, setDistributors] = useState<Array<{ id: string; businessName: string }>>([]);
-  useEffect(() => { (async () => { const response = await fetch("/api/distributors", { cache: "no-store" }); if (response.ok) setDistributors(await response.json()); })(); }, []);
+  const [distributors, setDistributors] = useState<Array<{ id: string; businessName: string; partnerType: "SUPER_STOCKIST" | "DISTRIBUTOR" }>>([]);
+  useEffect(() => { (async () => { const response = await fetch("/api/distributors", { cache: "no-store" }); if (response.ok) setDistributors((await response.json()).filter((item: { partnerType: string }) => item.partnerType === "DISTRIBUTOR")); })(); }, []);
   const role = roles.find((item) => item.key === form.roleKey);
   const isSalesRole = ["SALES_MANAGER", "SALES_EXECUTIVE"].includes(form.roleKey);
   const set = (key: keyof typeof form) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm((value) => ({ ...value, [key]: event.target.value }));

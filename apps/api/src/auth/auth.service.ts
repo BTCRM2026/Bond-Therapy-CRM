@@ -23,6 +23,7 @@ type AuthUser = {
   dataScope: DataScope;
   manager: { id: string; name: string } | null;
   staffProfile: StaffProfile | null;
+  distributorStaffOf: { id: string; businessName: string; partnerType: 'SUPER_STOCKIST' | 'DISTRIBUTOR'; parentId: string | null } | null;
   roles: Array<{
     role: {
       key: string;
@@ -63,6 +64,8 @@ export class AuthService {
       permissions: [...new Set(roles.flatMap((role) => role.permissions.map(({ permission }) => permission.key)))],
       portal,
       dashboardPath: roles[0]?.dashboardPath ?? '/dashboard',
+      distributorId: user.distributorStaffOf?.id ?? null,
+      distributionPartner: user.distributorStaffOf,
     };
   }
 
@@ -70,7 +73,7 @@ export class AuthService {
     const identifier = dto.identifier.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
       where: { OR: [{ email: identifier }, { loginId: identifier }] },
-      include: { manager: { select: { id: true, name: true } }, staffProfile: true, roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
+      include: { manager: { select: { id: true, name: true } }, staffProfile: true, distributorStaffOf: { select: { id: true, businessName: true, partnerType: true, parentId: true } }, roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
     });
 
     if (!user) {
@@ -128,7 +131,7 @@ export class AuthService {
       where: { id: this.sessionId(token) },
       include: {
         user: {
-          include: { manager: { select: { id: true, name: true } }, staffProfile: true, roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
+          include: { manager: { select: { id: true, name: true } }, staffProfile: true, distributorStaffOf: { select: { id: true, businessName: true, partnerType: true, parentId: true } }, roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
         },
       },
     });

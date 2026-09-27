@@ -2,7 +2,7 @@ import { proxyToApi } from "@/lib/api-proxy";
 
 async function handle(request: Request, context: { params: Promise<{ path?: string[] }> }) {
   const { path } = await context.params;
-  return proxyToApi(request, `/replenishment${path?.length ? `/${path.join("/")}` : ""}`, { allowedPortals: ["ADMIN"] });
+  return proxyToApi(request, `/replenishment${path?.length ? `/${path.join("/")}` : ""}`, { allowedPortals: ["ADMIN", "STAFF"] });
 }
 
 export const GET = handle;

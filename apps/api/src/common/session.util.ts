@@ -16,6 +16,7 @@ export type SessionUser = {
   portal: PortalType;
   distributorId: string | null;
   assignedDistributorId: string | null;
+  distributionPartner: { id: string; businessName: string; partnerType: 'SUPER_STOCKIST' | 'DISTRIBUTOR'; parentId: string | null } | null;
 };
 
 export function hashSessionToken(token: string) {
@@ -30,6 +31,7 @@ export async function loadSessionUser(prisma: PrismaService, portal: PortalType,
       user: {
         include: {
           manager: { select: { id: true, name: true } },
+          distributorStaffOf: { select: { id: true, businessName: true, partnerType: true, parentId: true } },
           roles: {
             where: { role: { portal, isActive: true } },
             include: { role: { include: { permissions: { include: { permission: true } } } } },
@@ -55,5 +57,6 @@ export async function loadSessionUser(prisma: PrismaService, portal: PortalType,
     portal,
     distributorId: session.user.distributorId,
     assignedDistributorId: session.user.assignedDistributorId,
+    distributionPartner: session.user.distributorStaffOf,
   };
 }
