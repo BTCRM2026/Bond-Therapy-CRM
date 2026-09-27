@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import { AttendanceService } from './attendance.service.js';
 
@@ -15,6 +15,8 @@ function prismaFor(record: { punchInAt: Date; punchOutAt: Date | null } | null, 
 }
 
 describe('AttendanceService status derivation', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-24T05:00:00.000Z')); });
+  afterEach(() => vi.useRealTimers());
   it('keeps today as not punched instead of marking the employee absent', async () => {
     const service = new AttendanceService(prismaFor(null) as unknown as PrismaService);
     await expect(service.today(actor)).resolves.toMatchObject({ status: 'NOT_PUNCHED', workingHours: null });

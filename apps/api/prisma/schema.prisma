@@ -1507,6 +1507,18 @@ enum HrLetterType {
   TERMINATION
 }
 
+enum HrLetterStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  GENERATED
+  SENT
+  ACKNOWLEDGED
+  REJECTED
+  SUPERSEDED
+  CANCELLED
+}
+
 model HrLetter {
   id                   String       @id @default(cuid())
   letterNumber         String       @unique
@@ -1518,11 +1530,47 @@ model HrLetter {
   staffUser            User?        @relation("HrLetterStaff", fields: [staffUserId], references: [id], onDelete: SetNull)
   issuedDate           DateTime
   details              Json
+  snapshot             Json
+  status               HrLetterStatus @default(DRAFT)
+  version              Int            @default(1)
+  verificationToken    String         @unique
+  supersedesId         String?
+  submittedAt          DateTime?
+  submittedById        String?
+  approvedAt           DateTime?
+  approvedById         String?
+  managementApprovedAt DateTime?
+  managementApprovedById String?
+  generatedAt          DateTime?
+  sentAt               DateTime?
+  acknowledgedAt       DateTime?
+  rejectionReason      String?
+  cancelledAt          DateTime?
   generatedById        String
   generatedBy          User         @relation("HrLetterGenerator", fields: [generatedById], references: [id], onDelete: Restrict)
   createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  activities           HrLetterActivity[]
 
   @@index([type])
   @@index([staffUserId])
   @@index([createdAt])
+  @@index([status])
+  @@index([supersedesId])
+}
+
+model HrLetterActivity {
+  id         String         @id @default(cuid())
+  letterId   String
+  letter     HrLetter       @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  action     String
+  fromStatus HrLetterStatus?
+  toStatus   HrLetterStatus?
+  actorId    String?
+  actorName  String?
+  comment    String?
+  metadata   Json?
+  createdAt  DateTime       @default(now())
+
+  @@index([letterId, createdAt])
 }

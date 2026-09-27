@@ -14,4 +14,11 @@ export class CreateHrLetterDto {
 export class ListHrLettersDto {
   @IsOptional() @IsIn(LETTER_TYPES) type?: LetterType;
   @IsOptional() @IsString() search?: string;
+  @IsOptional() @IsIn(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'GENERATED', 'SENT', 'ACKNOWLEDGED', 'REJECTED', 'SUPERSEDED', 'CANCELLED']) status?: string;
+}
+
+export class UpdateHrLetterDto extends CreateHrLetterDto {}
+
+export class HrLetterActionDto {
+  @IsOptional() @IsString() @MaxLength(500) comment?: string;
 }
