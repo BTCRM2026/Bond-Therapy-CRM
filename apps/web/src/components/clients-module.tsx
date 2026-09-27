@@ -70,8 +70,10 @@ const messageFrom = (data: unknown, fallback: string) =>
 
 export function ClientsModule({
   initial,
+  allSalons = false,
 }: {
   initial: ClientListResponse | null;
+  allSalons?: boolean;
 }) {
   const [data, setData] = useState(initial);
   const [search, setSearch] = useState("");
@@ -176,7 +178,7 @@ export function ClientsModule({
           <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5">
             <div>
               <p className="text-sm font-semibold text-foreground">
-                Assigned salons
+                {allSalons ? "All salons" : "Assigned salons"}
               </p>
               <p className="mt-0.5 text-xs text-muted">
                 {data?.total ?? 0} relationship{data?.total === 1 ? "" : "s"}

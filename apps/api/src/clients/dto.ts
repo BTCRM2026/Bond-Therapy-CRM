@@ -1,6 +1,6 @@
-import { IsArray, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ClientActivityStatus, ClientActivityType, ClientCategory, ClientPotential, ClientStatus, CustomerSegment, DemoOutcome } from '@prisma/client';
+import { ClientActivityStatus, ClientActivityType, ClientCategory, ClientPotential, ClientStatus, CustomerSegment, DemoOutcome, VisitOutcome } from '@prisma/client';
 
 export class ListClientsDto {
   @IsOptional() @IsString() @MaxLength(120) search?: string;
@@ -72,6 +72,8 @@ export class ClientActivityDto {
   @IsOptional() @IsString() assignedToId?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(1000) attendeeCount?: number;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => RequestedProductDto) requestedProducts?: RequestedProductDto[];
+  @IsOptional() @IsBoolean() sampleGiven?: boolean;
+  @IsOptional() @IsString() @MaxLength(500) nextAction?: string;
 }
 
 export class ListActivitiesDto {
@@ -83,4 +85,7 @@ export class UpdateActivityStatusDto {
   @IsEnum(ClientActivityStatus) status!: ClientActivityStatus;
   @IsOptional() @IsString() @MaxLength(1000) note?: string;
   @IsOptional() @IsEnum(DemoOutcome) outcome?: DemoOutcome;
+  @IsOptional() @IsEnum(VisitOutcome) visitOutcome?: VisitOutcome;
+  @IsOptional() @IsBoolean() sampleGiven?: boolean;
+  @IsOptional() @IsString() @MaxLength(500) nextAction?: string;
 }

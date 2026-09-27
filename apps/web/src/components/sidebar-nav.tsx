@@ -52,6 +52,7 @@ export function SidebarNav({ portal = "ADMIN", roleKey, canManageStaff = false, 
   const pathname = usePathname();
   const managementItems = [
     ...(canManageStaff ? [{ href: "/dashboard/staff", label: "Staff & Access", icon: UsersRound, exact: false }] : []),
+    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/clients", label: "Salon 360", icon: Building2, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/products", label: "Products", icon: Package, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/orders", label: "Order approvals", icon: FileCheck2, exact: false }, { href: "/dashboard/invoices", label: "Invoices & payments", icon: ReceiptText, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/territory-admin", label: "Territory Management", icon: MapPin, exact: false }] : []),

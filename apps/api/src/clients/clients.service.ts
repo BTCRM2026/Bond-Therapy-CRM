@@ -10,6 +10,7 @@ const clientInclude = {
   assignedSalesperson: { select: { id: true, name: true, loginId: true } },
   assignedTrainer: { select: { id: true, name: true, loginId: true } },
   distributor: { select: { id: true, businessName: true } },
+  beat: { select: { id: true, name: true, visitFrequencyDays: true } },
   createdBy: { select: { id: true, name: true } },
 } satisfies Prisma.ClientInclude;
 
@@ -70,24 +71,74 @@ export class ClientsService {
 
   async detail(actor: SessionUser, id: string) {
     const client = await this.getVisible(actor, id);
-    const activities = await this.prisma.clientActivity.findMany({ where: { clientId: client.id }, orderBy: { createdAt: 'desc' }, take: 10, include: { createdBy: { select: { id: true, name: true } } } });
-    const nextVisit = await this.prisma.clientActivity.findFirst({ where: { clientId: client.id, type: ClientActivityType.VISIT, status: ClientActivityStatus.OPEN, scheduledAt: { not: null, gte: new Date() } }, orderBy: { scheduledAt: 'asc' } });
-    const openActions = await this.prisma.clientActivity.findMany({ where: { clientId: client.id, status: ClientActivityStatus.OPEN }, orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }], take: 8 });
-    const financialStatuses = ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] as const;
-    const orderAggregate = await this.prisma.order.aggregate({ where: { clientId: client.id, status: { in: [...financialStatuses] } }, _sum: { totalAmount: true }, _avg: { totalAmount: true }, _count: true });
-    const lastOrder = await this.prisma.order.findFirst({ where: { clientId: client.id, status: { in: [...financialStatuses] } }, orderBy: { createdAt: 'desc' }, select: { orderNumber: true, createdAt: true, totalAmount: true } });
-    const recentOrders = await this.prisma.order.findMany({ where: { clientId: client.id, status: { in: [...financialStatuses] } }, orderBy: { createdAt: 'desc' }, take: 5, include: { items: { include: { product: { select: { name: true } } } } } });
+    const now = new Date();
+    const fyYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const fyStart = new Date(`${fyYear}-04-01T00:00:00+05:30`);
+    const [activities, orders, invoices, exchanges] = await Promise.all([
+      this.prisma.clientActivity.findMany({ where: { clientId: client.id }, orderBy: { createdAt: 'desc' }, take: 200, include: { createdBy: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } } } }),
+      this.prisma.order.findMany({ where: { clientId: client.id }, orderBy: { createdAt: 'desc' }, take: 200, include: { items: { include: { product: { select: { id: true, name: true, sku: true } }, exchangeItems: { where: { exchange: { status: { not: 'REJECTED' } } }, select: { requestedQuantity: true, approvedQuantity: true } } } }, invoice: { select: { id: true, invoiceNumber: true } } } }),
+      this.prisma.invoice.findMany({ where: { clientId: client.id }, orderBy: { issuedAt: 'desc' }, take: 200, include: { payments: { orderBy: { paymentDate: 'desc' } }, items: { include: { product: { select: { id: true, name: true, sku: true } } } }, order: { select: { orderNumber: true } } } }),
+      this.prisma.exchangeRequest.findMany({ where: { clientId: client.id }, orderBy: { createdAt: 'desc' }, take: 100, include: { requestedBy: { select: { name: true } }, items: { select: { id: true, orderItemId: true, requestedQuantity: true, approvedQuantity: true, receivedQuantity: true, reason: true, batchNumber: true, expiryDate: true, conditionPhotoMime: true, disposition: true, inspectionNotes: true, originalProduct: { select: { name: true, sku: true } }, replacementProduct: { select: { name: true, sku: true } } } } } }),
+    ]);
+    const nextVisit = activities.filter((item) => item.type === ClientActivityType.VISIT && item.status === ClientActivityStatus.OPEN && item.scheduledAt && item.scheduledAt >= now).sort((a, b) => Number(a.scheduledAt) - Number(b.scheduledAt))[0] ?? null;
+    const openActions = activities.filter((item) => item.status === ClientActivityStatus.OPEN).sort((a, b) => Number(a.scheduledAt ?? a.createdAt) - Number(b.scheduledAt ?? b.createdAt)).slice(0, 8);
+    const currentYearSales = invoices.filter((invoice) => invoice.issuedAt >= fyStart).reduce((sum, invoice) => sum + Number(invoice.totalAmount), 0);
+    const lifetimeSales = invoices.reduce((sum, invoice) => sum + Number(invoice.totalAmount), 0);
+    const outstanding = invoices.reduce((sum, invoice) => sum + Number(invoice.balanceDue), 0);
+    const overdue = invoices.filter((invoice) => invoice.dueDate < now && Number(invoice.balanceDue) > 0).reduce((sum, invoice) => sum + Number(invoice.balanceDue), 0);
+    const paidOrders = orders.filter((order) => !['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'RETURNED_FOR_CORRECTION', 'REJECTED', 'CANCELLED'].includes(order.status));
+    const lastOrder = paidOrders[0] ?? null;
+    const productMap = new Map<string, { productId: string | null; name: string; sku: string; quantity: number; value: number; dates: Date[] }>();
+    for (const invoice of invoices) for (const item of invoice.items) {
+      const key = item.productId ?? item.sku;
+      const current = productMap.get(key) ?? { productId: item.productId, name: item.productName, sku: item.sku, quantity: 0, value: 0, dates: [] };
+      current.quantity += item.quantity; current.value += Number(item.lineTotal); current.dates.push(invoice.issuedAt); productMap.set(key, current);
+    }
+    const products = [...productMap.values()].map((item) => {
+      const dates = item.dates.sort((a, b) => a.getTime() - b.getTime());
+      const intervals = dates.slice(1).map((date, index) => Math.max(1, Math.round((date.getTime() - dates[index].getTime()) / 86_400_000)));
+      const averageReorderDays = intervals.length ? Math.round(intervals.reduce((sum, days) => sum + days, 0) / intervals.length) : null;
+      const lastPurchasedAt = dates.at(-1)!;
+      const daysSinceLastPurchase = Math.floor((now.getTime() - lastPurchasedAt.getTime()) / 86_400_000);
+      return { productId: item.productId, name: item.name, sku: item.sku, totalQuantity: item.quantity, totalValue: item.value, firstPurchasedAt: dates[0], lastPurchasedAt, averageReorderDays, daysSinceLastPurchase, reorderDue: averageReorderDays != null && daysSinceLastPurchase >= averageReorderDays };
+    }).sort((a, b) => b.totalValue - a.totalValue);
+    const pendingExchange = exchanges.find((item) => !['REJECTED', 'CLOSED'].includes(item.status));
+    const overdueFollowUp = activities.find((item) => item.type === 'FOLLOW_UP' && item.status === 'OPEN' && item.scheduledAt && item.scheduledAt < now);
+    const lastCompletedVisit = activities.find((item) => item.type === 'VISIT' && item.status === 'COMPLETED');
+    const visitFrequencyDays = client.beat?.visitFrequencyDays ?? 30;
+    const visitOverdue = !lastCompletedVisit || (now.getTime() - (lastCompletedVisit.completedAt ?? lastCompletedVisit.createdAt).getTime()) / 86_400_000 > visitFrequencyDays;
+    const daysSinceOrder = lastOrder ? Math.floor((now.getTime() - lastOrder.createdAt.getTime()) / 86_400_000) : null;
+    const alerts = [
+      overdue > 0 ? { type: 'PAYMENT_OVERDUE', label: `₹${overdue.toLocaleString('en-IN')} payment overdue`, level: 'danger' } : null,
+      daysSinceOrder == null || daysSinceOrder >= 60 ? { type: 'NO_RECENT_ORDER', label: daysSinceOrder == null ? 'No order placed yet' : `No order for ${daysSinceOrder} days`, level: 'warning' } : null,
+      overdueFollowUp ? { type: 'FOLLOW_UP_OVERDUE', label: 'Follow-up is overdue', level: 'warning' } : null,
+      pendingExchange ? { type: 'EXCHANGE_PENDING', label: `${pendingExchange.exchangeNumber} needs attention`, level: 'info' } : null,
+      visitOverdue ? { type: 'VISIT_OVERDUE', label: 'Salon visit is due', level: 'warning' } : null,
+    ].filter(Boolean);
+    const nextAction = overdue > 0 ? { label: 'Recover overdue payment', date: null }
+      : overdueFollowUp ? { label: overdueFollowUp.purpose || 'Complete overdue follow-up', date: overdueFollowUp.scheduledAt }
+      : pendingExchange ? { label: `Progress ${pendingExchange.exchangeNumber}`, date: null }
+      : products.find((item) => item.reorderDue) ? { label: `Reorder ${products.find((item) => item.reorderDue)!.name}`, date: null }
+      : nextVisit ? { label: nextVisit.purpose || 'Upcoming salon visit', date: nextVisit.scheduledAt }
+      : { label: 'Schedule the next salon visit', date: null };
+    const timeline = [
+      ...activities.map((item) => ({ id: `activity:${item.id}`, kind: 'ACTIVITY', date: item.completedAt ?? item.scheduledAt ?? item.createdAt, title: item.type.replaceAll('_', ' '), summary: item.note || item.purpose || item.personMet || 'Salon activity', status: item.status, actor: item.createdBy.name, referenceId: item.id })),
+      ...orders.map((item) => ({ id: `order:${item.id}`, kind: 'ORDER', date: item.createdAt, title: item.orderNumber, summary: `${item.items.map((line) => `${line.product.name} × ${line.quantity}`).join(', ')} · ₹${Number(item.totalAmount).toLocaleString('en-IN')}`, status: item.status, actor: null, referenceId: item.id })),
+      ...invoices.map((item) => ({ id: `invoice:${item.id}`, kind: 'INVOICE', date: item.issuedAt, title: item.invoiceNumber, summary: `Invoice ₹${Number(item.totalAmount).toLocaleString('en-IN')} · Balance ₹${Number(item.balanceDue).toLocaleString('en-IN')}`, status: item.status, actor: null, referenceId: item.id })),
+      ...invoices.flatMap((invoice) => invoice.payments.map((item) => ({ id: `payment:${item.id}`, kind: 'PAYMENT', date: item.paymentDate, title: `Payment for ${invoice.invoiceNumber}`, summary: `₹${Number(item.amount).toLocaleString('en-IN')} via ${item.mode.replaceAll('_', ' ')}`, status: 'RECORDED', actor: null, referenceId: invoice.id }))),
+      ...exchanges.map((item) => ({ id: `exchange:${item.id}`, kind: 'EXCHANGE', date: item.createdAt, title: item.exchangeNumber, summary: item.items.map((line) => `${line.originalProduct.name} × ${line.requestedQuantity}`).join(', '), status: item.status, actor: item.requestedBy.name, referenceId: item.id })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     return {
-      client, activities, openActions, nextVisit,
+      client, activities: activities.slice(0, 10), allActivities: activities, openActions, nextVisit, alerts, nextAction, timeline,
       salesSnapshot: {
-        lifetimeSales: orderAggregate._count > 0 ? Number(orderAggregate._sum.totalAmount ?? 0) : null,
-        currentYearSales: null,
-        averageOrderValue: orderAggregate._count > 0 ? Number(orderAggregate._avg.totalAmount ?? 0) : null,
-        lastOrder: lastOrder ? `${lastOrder.orderNumber} · ₹${Number(lastOrder.totalAmount).toLocaleString('en-IN')}` : null,
-        outstanding: null,
-        overdue: null,
+        lifetimeSales, currentYearSales, averageOrderValue: invoices.length ? lifetimeSales / invoices.length : 0,
+        lastOrder: lastOrder ? { id: lastOrder.id, orderNumber: lastOrder.orderNumber, createdAt: lastOrder.createdAt, totalAmount: Number(lastOrder.totalAmount), status: lastOrder.status } : null,
+        outstanding, overdue, financialYear: `${fyYear}-${String(fyYear + 1).slice(-2)}`,
       },
-      productSnapshot: { purchased: recentOrders, lastProduct: recentOrders[0]?.items[0]?.product.name ?? null, mostPurchased: null, demos: [], samples: [] },
+      productSnapshot: { products, mostPurchased: products[0]?.name ?? null, demos: activities.filter((item) => item.type === 'DEMO'), samples: activities.filter((item) => item.type === 'SAMPLE') },
+      orders, invoices, exchanges,
+      exchangeEligibleOrders: orders.filter((order) => ['DELIVERED', 'DISTRIBUTOR_FULFILLED'].includes(order.status) && order.invoice).map((order) => ({ id: order.id, orderNumber: order.orderNumber, createdAt: order.createdAt, invoice: order.invoice, items: order.items.map((item) => ({ id: item.id, product: item.product, deliveredQuantity: item.quantity, exchangedQuantity: item.exchangeItems.reduce((sum, exchangeItem) => sum + (exchangeItem.approvedQuantity ?? exchangeItem.requestedQuantity), 0) })) })),
+      growth: { estimatedMonthlyBusiness: client.estimatedMonthlyBusiness == null ? null : Number(client.estimatedMonthlyBusiness), recommendation: nextAction.label },
     };
   }
 
@@ -161,7 +212,7 @@ export class ClientsService {
       data: {
         clientId: client.id, type: dto.type, status: dto.status ?? 'OPEN', purpose: dto.purpose?.trim() || null, personMet: dto.personMet?.trim() || null, note: dto.note?.trim() || null,
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null, completedAt: dto.status === 'COMPLETED' ? new Date() : null, createdById: actor.id,
-        assignedToId: dto.assignedToId || null, attendeeCount: dto.attendeeCount ?? null, requestedProducts: dto.requestedProducts ? (dto.requestedProducts as unknown as Prisma.InputJsonValue) : undefined,
+        assignedToId: dto.assignedToId || null, attendeeCount: dto.attendeeCount ?? null, requestedProducts: dto.requestedProducts ? (dto.requestedProducts as unknown as Prisma.InputJsonValue) : undefined, sampleGiven: dto.sampleGiven ?? false, nextAction: dto.nextAction?.trim() || null,
       },
       include: { createdBy: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } } },
     });
@@ -192,7 +243,7 @@ export class ClientsService {
     if (!activity) throw new NotFoundException('Activity not found or you do not have access to it.');
     return this.prisma.clientActivity.update({
       where: { id },
-      data: { status: dto.status, note: dto.note?.trim() || activity.note, completedAt: dto.status === 'COMPLETED' ? new Date() : activity.completedAt, outcome: dto.outcome ?? activity.outcome },
+      data: { status: dto.status, note: dto.note?.trim() || activity.note, completedAt: dto.status === 'COMPLETED' ? new Date() : activity.completedAt, outcome: dto.outcome ?? activity.outcome, visitOutcome: dto.visitOutcome ?? activity.visitOutcome, sampleGiven: dto.sampleGiven ?? activity.sampleGiven, nextAction: dto.nextAction?.trim() || activity.nextAction },
       include: { client: { select: { id: true, salonName: true } } },
     });
   }
