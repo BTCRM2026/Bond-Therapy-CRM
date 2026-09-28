@@ -86,7 +86,7 @@ export function DistributorManagement({ initialDistributors, initialRequests }: 
 
   const pendingRequests = requests.filter((request) => request.status === "REQUESTED" || request.status === "APPROVED");
 
-  const review = async (request: ReplenishmentRequest, action: "approve" | "reject" | "pick" | "pack" | "fulfill") => {
+  const review = async (request: ReplenishmentRequest, action: "approve" | "reject" | "fulfill") => {
     setBusyId(request.id);
     setError("");
     try {
@@ -144,7 +144,7 @@ export function DistributorManagement({ initialDistributors, initialRequests }: 
         </section>
 
         <section className="crm-surface">
-          <div className="rounded-t-xl border-b px-5 py-4"><h2 className="text-sm font-semibold text-foreground">Mother Depot replenishment</h2><p className="mt-0.5 text-xs text-muted">Accept, prepare, invoice and dispatch Super Stockist requests</p></div>
+          <div className="rounded-t-xl border-b px-5 py-4"><h2 className="text-sm font-semibold text-foreground">Mother Depot replenishment</h2><p className="mt-0.5 text-xs text-muted">Accept, invoice and dispatch Super Stockist requests</p></div>
           <div className="overflow-hidden rounded-b-xl">
             {requests.length ? (
               <div className="divide-y">{requests.map((request) => (
@@ -161,9 +161,7 @@ export function DistributorManagement({ initialDistributors, initialRequests }: 
                       <Button disabled={busyId === request.id} onClick={() => review(request, "approve")}><Check size={14} />Accept request</Button>
                       <Button variant="secondary" disabled={busyId === request.id} onClick={() => review(request, "reject")}>Reject</Button>
                     </>}
-                    {!request.sourceDistributor && request.status === "APPROVED" && <Button disabled={busyId === request.id} onClick={() => review(request, "pick")}><Truck size={14} />Start picking</Button>}
-                    {!request.sourceDistributor && request.status === "PICKING" && <Button disabled={busyId === request.id} onClick={() => review(request, "pack")}><Truck size={14} />Mark packed</Button>}
-                    {!request.sourceDistributor && request.status === "PACKED" && <Button disabled={busyId === request.id} onClick={() => review(request, "fulfill")}><Truck size={14} />Generate invoice &amp; dispatch</Button>}
+                    {!request.sourceDistributor && ["APPROVED", "PICKING", "PACKED"].includes(request.status) && <Button disabled={busyId === request.id} onClick={() => review(request, "fulfill")}><Truck size={14} />Generate invoice &amp; dispatch</Button>}
                     {!request.sourceDistributor && request.invoiceReference && <a href={`/api/replenishment/${request.id}/invoice.pdf`} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-lg border bg-white px-3 text-xs font-semibold hover:bg-background">View invoice</a>}
                   </div>
                 </article>

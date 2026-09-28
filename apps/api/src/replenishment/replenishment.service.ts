@@ -127,7 +127,7 @@ export class ReplenishmentService {
     if (!request) throw new NotFoundException('Replenishment request not found.');
     const central = !request.sourceDistributorId;
     if (!(central ? this.isAdmin(actor) || this.isCentralWarehouse(actor) : this.isDistributorWarehouse(actor) && actor.distributorId === request.sourceDistributorId)) throw new ForbiddenException('Only the supplying warehouse can dispatch this request.');
-    if (request.status !== 'PACKED') throw new ConflictException('Only a packed request can be dispatched.');
+    if (!['APPROVED', 'PICKING', 'PACKED'].includes(request.status)) throw new ConflictException('Only an accepted request can be dispatched.');
     if (!central && !dto.invoiceReference?.trim()) throw new ConflictException('Enter the Tally/Marg invoice number before dispatch.');
     if (!central && !request.invoiceFile) throw new ConflictException('Upload the Tally/Marg invoice before dispatch.');
     if (!central) { const duplicate = await this.prisma.replenishmentRequest.findFirst({ where: { id: { not: id }, sourceDistributorId: request.sourceDistributorId, invoiceFinancialYear: financialYear(), invoiceReference: dto.invoiceReference!.trim() }, select: { requestNumber: true } }); if (duplicate) throw new ConflictException(`This invoice number is already linked to ${duplicate.requestNumber} in the current financial year.`); }

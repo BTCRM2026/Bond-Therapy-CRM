@@ -142,7 +142,7 @@ export class OrdersService {
     const isDistWarehouse = (this.isDistributorWarehouse(actor) && actor.distributorId === order.distributorId) || this.isAdmin(actor);
     const canReview = order.distributorId ? isDistAccounts : isCentralAccounts;
     const allowed = (this.isSales(actor) || this.isAdmin(actor)) && ['DRAFT', 'RETURNED_FOR_CORRECTION'].includes(order.status) && target === 'SUBMITTED'
-      || canReview && order.status === 'SUBMITTED' && ['UNDER_REVIEW', 'REJECTED', 'RETURNED_FOR_CORRECTION'].includes(target)
+      || canReview && order.status === 'SUBMITTED' && ['UNDER_REVIEW', 'APPROVED', 'REJECTED', 'RETURNED_FOR_CORRECTION'].includes(target)
       || canReview && order.status === 'UNDER_REVIEW' && ['APPROVED', 'REJECTED', 'RETURNED_FOR_CORRECTION'].includes(target)
       || isDistWarehouse && order.status === 'APPROVED' && target === 'DISTRIBUTOR_FULFILLED' && Boolean(order.distributorId)
       || (this.isWarehouse(actor) || this.isAdmin(actor)) && order.status === 'INVOICE_GENERATED' && target === 'STOCK_RESERVED'

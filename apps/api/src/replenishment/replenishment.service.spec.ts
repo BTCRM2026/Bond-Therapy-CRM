@@ -33,4 +33,29 @@ describe('Replenishment supplier routing', () => {
     const unassigned = setup({ partnerType: 'DISTRIBUTOR', parentId: null });
     await expect(unassigned.service.create(actor, { items: [{ productId: 'product-1', quantity: 2 }] })).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('dispatches an accepted Mother Depot request without picking and packing clicks', async () => {
+    const admin = { id: 'admin-1', portal: 'ADMIN', roles: [{ key: 'SUPER_ADMIN', name: 'Super Admin' }] } as SessionUser;
+    const request = {
+      id: 'request-1', requestNumber: 'REPL-1001', status: 'APPROVED', sourceDistributorId: null, distributorId: 'destination-1',
+      items: [{ id: 'item-1', productId: 'product-1', quantity: 2, acceptedQuantity: 2, product: { name: 'Shampoo' } }],
+    };
+    const update = vi.fn().mockResolvedValue({ ...request, status: 'DISPATCHED', invoiceReference: 'BT/REP/26-27/00001' });
+    const tx = {
+      employeeCounter: { upsert: vi.fn().mockResolvedValue({ nextNumber: 1 }) },
+      product: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      stockMovement: { create: vi.fn().mockResolvedValue({}) },
+      replenishmentItem: { update: vi.fn().mockResolvedValue({}) },
+      replenishmentRequest: { update },
+    };
+    const prisma = {
+      replenishmentRequest: { findUnique: vi.fn().mockResolvedValue(request) },
+      auditLog: { create: vi.fn().mockResolvedValue({}) },
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+
+    const service = new ReplenishmentService(prisma as unknown as PrismaService);
+    await expect(service.fulfill(admin, request.id, {})).resolves.toMatchObject({ status: 'DISPATCHED' });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'DISPATCHED' }) }));
+  });
 });

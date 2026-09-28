@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock3, FileSpreadsheet, MessageCircle, PackageCheck, RotateCcw, Search, Truck, Upload, X, XCircle } from "lucide-react";
+import { Camera, Check, FileSpreadsheet, MessageCircle, PackageCheck, RotateCcw, Search, Truck, Upload, X, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { OrderStatus, type Order, type OrderListResponse } from "@/components/orders-module";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 
 const GROUPS = [
-  { key: "REVIEW", label: "Needs review", statuses: ["SUBMITTED", "UNDER_REVIEW"] },
-  { key: "APPROVED", label: "Approved · awaiting pickup", statuses: ["APPROVED"] },
+  { key: "REVIEW", label: "New orders", statuses: ["SUBMITTED", "UNDER_REVIEW"] },
+  { key: "APPROVED", label: "Ready to invoice", statuses: ["APPROVED"] },
   { key: "FULFILLED", label: "Fulfilled", statuses: ["DISTRIBUTOR_FULFILLED"] },
   { key: "RETURNED", label: "Returned / rejected", statuses: ["RETURNED_FOR_CORRECTION", "REJECTED"] },
 ] as const;
@@ -42,8 +42,8 @@ export function DistributorOrders({ initial, roleKey }: { initial: OrderListResp
   return (
     <div className="space-y-4">
       <KpiStrip columns={3}>
-        <KpiCell label="Needs review" value={counts(["SUBMITTED", "UNDER_REVIEW"])} tone="warning" />
-        <KpiCell label="Awaiting pickup" value={counts(["APPROVED"])} />
+        <KpiCell label="New orders" value={counts(["SUBMITTED", "UNDER_REVIEW"])} tone="warning" />
+        <KpiCell label="Ready to invoice" value={counts(["APPROVED"])} />
         <KpiCell label="Fulfilled" value={counts(["DISTRIBUTOR_FULFILLED"])} tone="success" />
       </KpiStrip>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger">{error}</div>}
@@ -136,7 +136,7 @@ function DistributorOrderModal({ order, canReview, canFulfill, onClose, onChange
           </div>
           <div className="flex items-center justify-between rounded-lg bg-background p-3 text-sm font-semibold text-foreground"><span>Grand total</span><span>{money(order.totalAmount)}</span></div>
           {order.distributorInvoiceReference && <div className="rounded-lg border p-3"><p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Your invoice reference</p><p className="mt-1 text-sm text-foreground">{order.distributorInvoiceReference}</p></div>}
-          {canFulfill && order.status === "APPROVED" && <div className="grid gap-3 sm:grid-cols-2"><label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Tally / Marg invoice number</span><Input value={invoiceReference} onChange={(event) => setInvoiceReference(event.target.value)} placeholder="Required before dispatch" /></label><label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Invoice PDF or photo</span><span className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium hover:bg-background"><Upload size={15} />{order.distributorInvoiceAttachment?.fileName ?? "Upload invoice"}<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => uploadInvoice(event.target.files?.[0])} /></span></label></div>}
+          {canFulfill && order.status === "APPROVED" && <div className="grid gap-3 sm:grid-cols-2"><label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Tally / Marg invoice number</span><Input value={invoiceReference} onChange={(event) => setInvoiceReference(event.target.value)} placeholder="Required before dispatch" /></label><div className="space-y-1.5"><span className="text-xs font-medium text-foreground">Add invoice</span><div className="grid grid-cols-2 gap-2"><label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium hover:bg-background"><Camera size={15} />Take photo<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={(event) => uploadInvoice(event.target.files?.[0])} /></label><label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium hover:bg-background"><Upload size={15} />PDF / photo<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => uploadInvoice(event.target.files?.[0])} /></label></div>{order.distributorInvoiceAttachment?.fileName && <p className="truncate text-xs text-muted">Added: {order.distributorInvoiceAttachment.fileName}</p>}</div></div>}
           {order.distributorInvoiceAttachment && <a href={`/api/distributor/orders/${order.id}/distributor-invoice`} target="_blank" rel="noreferrer" className="inline-flex text-xs font-semibold text-brand hover:underline">View attached invoice</a>}
           {canReview && ["SUBMITTED", "UNDER_REVIEW"].includes(order.status) && (
             <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Comment <span className="text-muted">(required when returning or rejecting)</span></span><textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={3} className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/10" placeholder="Add a clear note for the salesperson…" /></label>
@@ -145,12 +145,11 @@ function DistributorOrderModal({ order, canReview, canFulfill, onClose, onChange
         </div>
         <div className="flex flex-wrap justify-end gap-2 border-t bg-white p-4">
           <a href={`https://wa.me/?text=${encodeURIComponent(`New Bond Therapy order ${order.orderNumber}\nSalon: ${order.client.salonName}\nProducts: ${order.items.map((item) => `${item.product.name} x ${item.quantity}`).join(", ")}\nAmount: ${money(order.totalAmount)}${order.partnerToken ? `\nOpen and confirm: ${typeof window !== "undefined" ? window.location.origin : ""}/partner/order/${order.partnerToken}` : ""}`)}`} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-lg border bg-white px-3 text-xs font-semibold text-foreground hover:bg-background"><MessageCircle size={14} />Share on WhatsApp</a>
-          {canReview && order.status === "SUBMITTED" && <Button disabled={Boolean(busy)} onClick={() => transition("UNDER_REVIEW")}><Clock3 size={15} />Start review</Button>}
           {canReview && ["SUBMITTED", "UNDER_REVIEW"].includes(order.status) && <>
             <Button variant="secondary" disabled={Boolean(busy) || !comment.trim()} onClick={() => transition("RETURNED_FOR_CORRECTION")}><RotateCcw size={15} />Return</Button>
             <Button variant="secondary" disabled={Boolean(busy) || !comment.trim()} onClick={() => transition("REJECTED")}><XCircle size={15} />Reject</Button>
           </>}
-          {canReview && order.status === "UNDER_REVIEW" && <Button disabled={Boolean(busy)} onClick={() => transition("APPROVED")}><Check size={15} />Accept order</Button>}
+          {canReview && ["SUBMITTED", "UNDER_REVIEW"].includes(order.status) && <Button disabled={Boolean(busy)} onClick={() => transition("APPROVED")}><Check size={15} />Accept order</Button>}
           {canFulfill && order.status === "APPROVED" && <Button disabled={Boolean(busy) || !invoiceReference.trim() || !order.distributorInvoiceAttachment} onClick={() => transition("DISTRIBUTOR_FULFILLED", { distributorInvoiceReference: invoiceReference.trim() })}><Truck size={15} />{busy === "DISTRIBUTOR_FULFILLED" ? "Confirming…" : "Confirm invoice & dispatch"}</Button>}
         </div>
       </div>
