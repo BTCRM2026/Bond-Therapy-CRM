@@ -1,0 +1,9 @@
+ALTER TYPE "ClientCategory" RENAME VALUE 'SPA' TO 'UNISEX';
+
+CREATE TYPE "ClientType" AS ENUM ('NEW_CLIENT', 'EXISTING_CLIENT');
+
+ALTER TABLE "Client" ADD COLUMN "clientType" "ClientType" NOT NULL DEFAULT 'EXISTING_CLIENT';
+ALTER TABLE "Client" ALTER COLUMN "clientType" SET DEFAULT 'NEW_CLIENT';
+ALTER TABLE "Client" ALTER COLUMN "status" SET DEFAULT 'ACTIVE';
+
+CREATE INDEX "Client_clientType_idx" ON "Client"("clientType");

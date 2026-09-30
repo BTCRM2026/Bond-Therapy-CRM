@@ -5,8 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  LoaderCircle,
-  MapPin,
   MessageCircle,
   Phone,
   Plus,
@@ -31,6 +29,7 @@ type Client = {
   id: string;
   salonName: string;
   category: string;
+  clientType: string;
   status: string;
   ownerName: string | null;
   managerName: string | null;
@@ -77,7 +76,7 @@ export function ClientsModule({
 }) {
   const [data, setData] = useState(initial);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [clientType, setClientType] = useState("");
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
@@ -102,7 +101,7 @@ export function ClientsModule({
           pageSize: "20",
         });
         if (search.trim()) params.set("search", search.trim());
-        if (status) params.set("status", status);
+        if (clientType) params.set("clientType", clientType);
         if (category) params.set("category", category);
         const response = await fetch(`/api/clients?${params}`, {
           cache: "no-store",
@@ -121,10 +120,10 @@ export function ClientsModule({
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [page, search, status, category]);
+  }, [page, search, clientType, category]);
   const clearFilters = () => {
     setSearch("");
-    setStatus("");
+    setClientType("");
     setCategory("");
     setPage(1);
   };
@@ -157,9 +156,9 @@ export function ClientsModule({
               aria-label="Search clients"
             />
           </label>
-          <FilterMenu value={status} fullWidth showLabelOnMobile ariaLabel="Filter clients by status" onSelect={(value) => { setStatus(value); setPage(1); }} options={[{ key: "", label: "All statuses" }, { key: "PROSPECT", label: "Prospect" }, { key: "ACTIVE", label: "Active" }, { key: "INACTIVE", label: "Inactive" }]} />
-          <FilterMenu value={category} fullWidth showLabelOnMobile ariaLabel="Filter clients by category" onSelect={(value) => { setCategory(value); setPage(1); }} options={[{ key: "", label: "All categories" }, { key: "SALON", label: "Salon" }, { key: "SPA", label: "Spa" }, { key: "STUDIO", label: "Studio" }, { key: "ACADEMY", label: "Academy" }]} />
-          {(search || status || category) && (
+          <FilterMenu value={clientType} fullWidth showLabelOnMobile ariaLabel="Filter clients by type" onSelect={(value) => { setClientType(value); setPage(1); }} options={[{ key: "", label: "All client types" }, { key: "NEW_CLIENT", label: "New client" }, { key: "EXISTING_CLIENT", label: "Existing client" }]} />
+          <FilterMenu value={category} fullWidth showLabelOnMobile ariaLabel="Filter clients by category" onSelect={(value) => { setCategory(value); setPage(1); }} options={[{ key: "", label: "All categories" }, { key: "SALON", label: "Salon" }, { key: "UNISEX", label: "Unisex" }, { key: "STUDIO", label: "Studio" }, { key: "ACADEMY", label: "Academy" }]} />
+          {(search || clientType || category) && (
             <Button variant="secondary" onClick={clearFilters}>
               <X size={15} />
               Clear
@@ -201,7 +200,7 @@ export function ClientsModule({
                       <th className="px-4 py-3">Contact</th>
                       <th className="px-4 py-3">Location</th>
                       <th className="px-4 py-3">Potential</th>
-                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Client type</th>
                       <th className="px-5 py-3 text-right">Open</th>
                     </tr>
                   </thead>
@@ -250,7 +249,7 @@ export function ClientsModule({
                           ) : null}
                         </td>
                         <td className="px-4 py-4">
-                          <Status value={client.status} />
+                          <ClientTypeBadge value={client.clientType} />
                         </td>
                         <td className="px-5 py-4 text-right">
                           <Link
@@ -339,7 +338,7 @@ function ClientCard({ client }: { client: Client }) {
             {client.ownerName ? ` · ${client.ownerName}` : ""}
           </p>
         </div>
-        <Status value={client.status} />
+        <ClientTypeBadge value={client.clientType} />
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs">
         <div>
@@ -404,10 +403,10 @@ function ClientCard({ client }: { client: Client }) {
     </article>
   );
 }
-function Status({ value }: { value: string }) {
+function ClientTypeBadge({ value }: { value: string }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${value === "ACTIVE" ? "bg-success-soft text-success" : value === "INACTIVE" ? "bg-background text-muted" : "bg-warning-soft text-warning"}`}
+      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${value === "EXISTING_CLIENT" ? "bg-success-soft text-success" : "bg-brand-soft text-brand-dark"}`}
     >
       {pretty(value)}
     </span>
@@ -434,73 +433,37 @@ function EmptyClients({ onAdd }: { onAdd: () => void }) {
 
 type FormState = {
   salonName: string;
-  billingName: string;
-  gstin: string;
   state: string;
-  stateCode: string;
   category: string;
-  status: string;
+  clientType: string;
   ownerName: string;
-  managerName: string;
   primaryContact: string;
   whatsappNumber: string;
-  email: string;
-  keyProfessional: string;
   fullAddress: string;
   area: string;
   city: string;
   pincode: string;
-  googleMapsUrl: string;
-  latitude: string;
-  longitude: string;
   chairCount: string;
   staffCount: string;
-  stylistCount: string;
-  approximateDailyCustomers: string;
   potential: string;
   customerSegment: string;
-  estimatedMonthlyBusiness: string;
-  purchasingFrequency: string;
-  businessPotentialRating: string;
-  relationshipRating: string;
-  paymentBehaviourRating: string;
-  productOpportunityRating: string;
-  overallRating: string;
 };
 const initialForm: FormState = {
   salonName: "",
-  billingName: "",
-  gstin: "",
   state: "",
-  stateCode: "",
   category: "SALON",
-  status: "PROSPECT",
+  clientType: "NEW_CLIENT",
   ownerName: "",
-  managerName: "",
   primaryContact: "",
   whatsappNumber: "",
-  email: "",
-  keyProfessional: "",
   fullAddress: "",
   area: "",
   city: "",
   pincode: "",
-  googleMapsUrl: "",
-  latitude: "",
-  longitude: "",
   chairCount: "",
   staffCount: "",
-  stylistCount: "",
-  approximateDailyCustomers: "",
   potential: "",
   customerSegment: "",
-  estimatedMonthlyBusiness: "",
-  purchasingFrequency: "",
-  businessPotentialRating: "",
-  relationshipRating: "",
-  paymentBehaviourRating: "",
-  productOpportunityRating: "",
-  overallRating: "",
 };
 function ClientForm({
   onClose,
@@ -513,17 +476,6 @@ function ClientForm({
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [locating, setLocating] = useState(false);
-  const [locationError, setLocationError] = useState("");
-  const captureLocation = () => {
-    if (!navigator.geolocation) { setLocationError("Location is not supported on this device."); return; }
-    setLocating(true); setLocationError("");
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => { setForm((value) => ({ ...value, latitude: String(coords.latitude), longitude: String(coords.longitude) })); setLocating(false); },
-      () => { setLocationError("Allow location access to capture the salon's position."); setLocating(false); },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
-  };
   const update =
     (key: keyof FormState) =>
     (
@@ -547,26 +499,11 @@ function ClientForm({
     const numeric = [
       "chairCount",
       "staffCount",
-      "stylistCount",
-      "approximateDailyCustomers",
-      "businessPotentialRating",
-      "relationshipRating",
-      "paymentBehaviourRating",
-      "productOpportunityRating",
-      "overallRating",
     ];
     const payload: Record<string, unknown> = {
       ...form,
-      email: form.email || undefined,
       potential: form.potential || undefined,
       customerSegment: form.customerSegment || undefined,
-      purchasingFrequency: form.purchasingFrequency || undefined,
-      googleMapsUrl: form.googleMapsUrl || undefined,
-      latitude: form.latitude ? Number(form.latitude) : undefined,
-      longitude: form.longitude ? Number(form.longitude) : undefined,
-      estimatedMonthlyBusiness: form.estimatedMonthlyBusiness
-        ? Number(form.estimatedMonthlyBusiness)
-        : undefined,
     };
     numeric.forEach((key) => {
       payload[key] = form[key as keyof FormState]
@@ -617,6 +554,9 @@ function ClientForm({
           </button>
         </div>
         <div className="border-b px-4 py-3 sm:px-5">
+          <p className="mb-3 text-xs font-semibold text-foreground sm:hidden">
+            Step {step + 1} of {steps.length} · {steps[step]}
+          </p>
           <div className="flex items-center gap-2">
             {steps.map((label, index) => (
               <div
@@ -645,7 +585,7 @@ function ClientForm({
         <form onSubmit={next} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
             {step === 0 && (
-              <section className="space-y-4">
+              <section className="space-y-5">
                 <Field label="Salon name *">
                   <Input
                     value={form.salonName}
@@ -656,46 +596,27 @@ function ClientForm({
                     autoFocus
                   />
                 </Field>
-                <Field label="Category *">
-                  <Select
-                    value={form.category}
-                    onChange={update("category")}
-                    options={[
-                      ["SALON", "Salon"],
-                      ["SPA", "Spa"],
-                      ["STUDIO", "Studio"],
-                      ["ACADEMY", "Academy"],
-                    ]}
-                  />
-                </Field>
-                <Field label="Status">
-                  <Select
-                    value={form.status}
-                    onChange={update("status")}
-                    options={[
-                      ["PROSPECT", "Prospect"],
-                      ["ACTIVE", "Active"],
-                      ["INACTIVE", "Inactive"],
-                    ]}
-                  />
-                </Field>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Category *">
+                    <ChoiceGrid value={form.category} onChange={(category) => setForm((current) => ({ ...current, category }))} options={[["SALON", "Salon"], ["UNISEX", "Unisex"], ["STUDIO", "Studio"], ["ACADEMY", "Academy"]]} />
+                  </Field>
+                  <Field label="Client type *">
+                    <ChoiceGrid value={form.clientType} onChange={(clientType) => setForm((current) => ({ ...current, clientType }))} options={[["NEW_CLIENT", "New client"], ["EXISTING_CLIENT", "Existing client"]]} />
+                  </Field>
+                </div>
               </section>
             )}
             {step === 1 && (
               <section className="grid gap-4 sm:grid-cols-2">
-                <Field label="Owner name">
-                  <Input
-                    value={form.ownerName}
-                    onChange={update("ownerName")}
-                  />
-                </Field>
-                <Field label="Manager name">
-                  <Input
-                    value={form.managerName}
-                    onChange={update("managerName")}
-                  />
-                </Field>
-                <Field label="Primary contact *">
+                <div className="sm:col-span-2">
+                  <Field label="Owner name">
+                    <Input
+                      value={form.ownerName}
+                      onChange={update("ownerName")}
+                    />
+                  </Field>
+                </div>
+                <Field label="Primary number *">
                   <Input
                     value={form.primaryContact}
                     onChange={update("primaryContact")}
@@ -713,19 +634,6 @@ function ClientForm({
                     inputMode="tel"
                   />
                 </Field>
-                <Field label="Email">
-                  <Input
-                    value={form.email}
-                    onChange={update("email")}
-                    type="email"
-                  />
-                </Field>
-                <Field label="Key professional">
-                  <Input
-                    value={form.keyProfessional}
-                    onChange={update("keyProfessional")}
-                  />
-                </Field>
               </section>
             )}
             {step === 2 && (
@@ -741,12 +649,6 @@ function ClientForm({
                     className="w-full resize-y rounded-lg border bg-white px-3 py-2.5 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10"
                   />
                 </label>
-                <Field label="Billing name">
-                  <Input value={form.billingName} onChange={update("billingName")} placeholder="If different from salon name" />
-                </Field>
-                <Field label="GSTIN">
-                  <Input value={form.gstin} onChange={update("gstin")} maxLength={30} />
-                </Field>
                 <Field label="Area / locality">
                   <Input value={form.area} onChange={update("area")} />
                 </Field>
@@ -756,9 +658,6 @@ function ClientForm({
                 <Field label="State">
                   <Input value={form.state} onChange={update("state")} />
                 </Field>
-                <Field label="GST state code">
-                  <Input value={form.stateCode} onChange={update("stateCode")} maxLength={5} inputMode="numeric" />
-                </Field>
                 <Field label="Pincode">
                   <Input
                     value={form.pincode}
@@ -766,34 +665,10 @@ function ClientForm({
                     inputMode="numeric"
                   />
                 </Field>
-                <Field label="Google Maps link (optional)">
-                  <Input
-                    value={form.googleMapsUrl}
-                    onChange={update("googleMapsUrl")}
-                    type="url"
-                    placeholder="Add a maps link if available"
-                  />
-                </Field>
-                <div className="sm:col-span-2">
-                  <span className="mb-1.5 block text-xs font-medium text-foreground">Salon location (optional)</span>
-                  {form.latitude && form.longitude ? (
-                    <div className="flex items-center justify-between gap-3 rounded-lg border bg-success-soft/40 px-3 py-2.5">
-                      <span className="flex items-center gap-2 text-xs text-success"><MapPin size={14} className="shrink-0" />Captured — {Number(form.latitude).toFixed(5)}, {Number(form.longitude).toFixed(5)}</span>
-                      <button type="button" onClick={captureLocation} className="shrink-0 text-xs font-semibold text-brand-dark hover:underline">Recapture</button>
-                    </div>
-                  ) : (
-                    <button type="button" onClick={captureLocation} disabled={locating} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-dashed bg-background text-xs font-semibold text-foreground hover:border-brand/40 disabled:opacity-60">
-                      {locating ? <LoaderCircle size={15} className="animate-spin" /> : <MapPin size={15} />}
-                      {locating ? "Locating…" : "Use current location"}
-                    </button>
-                  )}
-                  <p className="mt-1.5 text-[11px] text-subtle">Captured once from the device — an administrator can correct it later if needed.</p>
-                  {locationError && <p className="mt-1.5 text-[11px] text-danger">{locationError}</p>}
-                </div>
               </section>
             )}
             {step === 3 && (
-              <section className="space-y-5">
+              <section>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Potential">
                     <Select
@@ -819,25 +694,6 @@ function ClientForm({
                       ]}
                     />
                   </Field>
-                  <Field label="Estimated monthly business">
-                    <Input
-                      value={form.estimatedMonthlyBusiness}
-                      onChange={update("estimatedMonthlyBusiness")}
-                      type="number"
-                      min="0"
-                      inputMode="decimal"
-                      placeholder="₹"
-                    />
-                  </Field>
-                  <Field label="Purchasing frequency">
-                    <Input
-                      value={form.purchasingFrequency}
-                      onChange={update("purchasingFrequency")}
-                      placeholder="e.g. Monthly"
-                    />
-                  </Field>
-                </div>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <Field label="Chairs">
                     <Input
                       value={form.chairCount}
@@ -854,50 +710,8 @@ function ClientForm({
                       min="0"
                     />
                   </Field>
-                  <Field label="Stylists">
-                    <Input
-                      value={form.stylistCount}
-                      onChange={update("stylistCount")}
-                      type="number"
-                      min="0"
-                    />
-                  </Field>
-                  <Field label="Daily customers">
-                    <Input
-                      value={form.approximateDailyCustomers}
-                      onChange={update("approximateDailyCustomers")}
-                      type="number"
-                      min="0"
-                    />
-                  </Field>
                 </div>
-                <div>
-                  <p className="mb-3 text-xs font-semibold text-foreground">
-                    Ratings{" "}
-                    <span className="font-normal text-muted">
-                      (optional, 1–5)
-                    </span>
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {[
-                      ["businessPotentialRating", "Business potential"],
-                      ["relationshipRating", "Relationship"],
-                      ["paymentBehaviourRating", "Payment behaviour"],
-                      ["productOpportunityRating", "Product opportunity"],
-                      ["overallRating", "Overall salon"],
-                    ].map(([key, label]) => (
-                      <Field key={key} label={label}>
-                        <Rating
-                          value={form[key as keyof FormState]}
-                          onChange={(value) =>
-                            setForm((current) => ({ ...current, [key]: value }))
-                          }
-                        />
-                      </Field>
-                    ))}
-                  </div>
-                </div>
-                <p className="rounded-lg border border-brand/15 bg-brand-soft/50 px-3 py-2.5 text-xs leading-5 text-muted">
+                <p className="mt-4 rounded-lg border border-brand/15 bg-brand-soft/50 px-3 py-2.5 text-xs leading-5 text-muted">
                   Your account is assigned automatically. Admins can adjust
                   salesperson, trainer, territory and distributor assignment
                   later.
@@ -964,31 +778,28 @@ function Select({
     </select>
   );
 }
-function Rating({
+function ChoiceGrid({
   value,
   onChange,
+  options,
 }: {
   value: string;
   onChange: (value: string) => void;
+  options: string[][];
 }) {
   return (
-    <div className="flex gap-1" role="radiogroup" aria-label="Rating">
-      {[1, 2, 3, 4, 5].map((star) => (
+    <div className="grid grid-cols-2 gap-2" role="radiogroup">
+      {options.map(([key, label]) => (
         <button
-          key={star}
+          key={key}
           type="button"
-          onClick={() => onChange(String(star))}
-          className="grid size-8 place-items-center rounded-md hover:bg-warning-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/20"
-          aria-label={`${star} stars`}
+          role="radio"
+          aria-checked={value === key}
+          onClick={() => onChange(key)}
+          className={`flex h-10 items-center gap-2 rounded-lg border px-3 text-left text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/15 ${value === key ? "border-brand bg-brand-soft text-brand-dark" : "bg-white text-muted hover:border-brand/30 hover:text-foreground"}`}
         >
-          <Star
-            size={17}
-            className={
-              Number(value) >= star
-                ? "fill-warning text-warning"
-                : "text-subtle"
-            }
-          />
+          <span className={`size-2 rounded-full ${value === key ? "bg-brand" : "bg-border"}`} />
+          {label}
         </button>
       ))}
     </div>

@@ -1,11 +1,12 @@
 import { IsArray, IsBoolean, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ClientActivityStatus, ClientActivityType, ClientCategory, ClientPotential, ClientStatus, CustomerSegment, DemoOutcome, VisitOutcome } from '@prisma/client';
+import { ClientActivityStatus, ClientActivityType, ClientCategory, ClientPotential, ClientStatus, ClientType, CustomerSegment, DemoOutcome, VisitOutcome } from '@prisma/client';
 
 export class ListClientsDto {
   @IsOptional() @IsString() @MaxLength(120) search?: string;
   @IsOptional() @IsEnum(ClientStatus) status?: ClientStatus;
   @IsOptional() @IsEnum(ClientCategory) category?: ClientCategory;
+  @IsOptional() @IsEnum(ClientType) clientType?: ClientType;
   @IsOptional() @IsEnum(ClientPotential) potential?: ClientPotential;
   @IsOptional() @IsEnum(CustomerSegment) customerSegment?: CustomerSegment;
   @IsOptional() @IsString() city?: string;
@@ -16,6 +17,7 @@ export class ListClientsDto {
 export class ClientDto {
   @IsString() @MinLength(2) @MaxLength(160) salonName!: string;
   @IsEnum(ClientCategory) category!: ClientCategory;
+  @IsOptional() @IsEnum(ClientType) clientType?: ClientType;
   @IsOptional() @IsEnum(ClientStatus) status?: ClientStatus;
   @IsOptional() @IsString() @MaxLength(120) ownerName?: string;
   @IsOptional() @IsString() @MaxLength(120) managerName?: string;

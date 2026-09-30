@@ -389,9 +389,14 @@ model ReplenishmentItem {
 
 enum ClientCategory {
   SALON
-  SPA
+  UNISEX
   STUDIO
   ACADEMY
+}
+
+enum ClientType {
+  NEW_CLIENT
+  EXISTING_CLIENT
 }
 
 enum ClientStatus {
@@ -438,7 +443,8 @@ model Client {
   id                        String            @id @default(cuid())
   salonName                 String
   category                  ClientCategory
-  status                    ClientStatus      @default(PROSPECT)
+  clientType                ClientType        @default(NEW_CLIENT)
+  status                    ClientStatus      @default(ACTIVE)
   ownerName                 String?
   managerName               String?
   primaryContact            String
@@ -496,6 +502,7 @@ model Client {
 
   @@index([assignedSalespersonId, status])
   @@index([assignedTrainerId, status])
+  @@index([clientType])
   @@index([createdById])
   @@index([distributorId])
   @@index([city, area])

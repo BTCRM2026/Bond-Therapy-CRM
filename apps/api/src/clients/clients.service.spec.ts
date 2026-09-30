@@ -27,5 +27,8 @@ describe('ClientsService client creation', () => {
       },
       select: { id: true },
     });
+    expect(prisma.client.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ clientType: 'NEW_CLIENT', status: 'ACTIVE' }),
+    }));
   });
 });

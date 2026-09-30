@@ -58,6 +58,7 @@ export class ClientsService {
     ] });
     if (query.status) filters.push({ status: query.status });
     if (query.category) filters.push({ category: query.category });
+    if (query.clientType) filters.push({ clientType: query.clientType });
     if (query.potential) filters.push({ potential: query.potential });
     if (query.customerSegment) filters.push({ customerSegment: query.customerSegment });
     if (query.city) filters.push({ city: { contains: query.city.trim() } });
@@ -163,7 +164,7 @@ export class ClientsService {
 
   private data(dto: ClientDto, assignments: { assignedSalespersonId: string | null; assignedTrainerId: string | null }, locationStamp?: { locationSetAt: Date; locationSetById: string }) {
     return {
-      salonName: dto.salonName.trim(), category: dto.category, status: dto.status ?? 'PROSPECT', ownerName: dto.ownerName?.trim() || null, managerName: dto.managerName?.trim() || null,
+      salonName: dto.salonName.trim(), category: dto.category, clientType: dto.clientType ?? 'NEW_CLIENT', status: dto.status ?? 'ACTIVE', ownerName: dto.ownerName?.trim() || null, managerName: dto.managerName?.trim() || null,
       primaryContact: dto.primaryContact.trim(), whatsappNumber: dto.whatsappNumber?.trim() || null, email: dto.email?.trim().toLowerCase() || null, keyProfessional: dto.keyProfessional?.trim() || null,
       fullAddress: dto.fullAddress?.trim() || null, billingName: dto.billingName?.trim() || null, gstin: dto.gstin?.trim().toUpperCase() || null, state: dto.state?.trim() || null, stateCode: dto.stateCode?.trim() || null, area: dto.area?.trim() || null, city: dto.city.trim(), pincode: dto.pincode?.trim() || null, googleMapsUrl: dto.googleMapsUrl?.trim() || null, latitude: dto.latitude, longitude: dto.longitude, ...locationStamp,
       chairCount: dto.chairCount, staffCount: dto.staffCount, stylistCount: dto.stylistCount, approximateDailyCustomers: dto.approximateDailyCustomers, potential: dto.potential, customerSegment: dto.customerSegment,
