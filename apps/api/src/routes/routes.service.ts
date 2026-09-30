@@ -160,7 +160,7 @@ export class RoutesService {
     if (stop.status !== 'PLANNED') throw new BadRequestException('This stop is no longer active.');
 
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) throw new BadRequestException('Capture a JPG, PNG, or WebP photo.');
-    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Photo must be 5 MB or smaller.');
+    if (file.size > 8 * 1024 * 1024) throw new BadRequestException('Photo must be 8 MB or smaller.');
     const settings = await this.prisma.operationsSettings.findUnique({ where: { id: 'default' }, select: { visitRadiusMeters: true } });
     const hasSalonLocation = stop.client.latitude != null && stop.client.longitude != null;
     const distanceMeters = hasSalonLocation ? this.haversineMeters(Number(stop.client.latitude), Number(stop.client.longitude), dto.latitude, dto.longitude) : null;
@@ -246,7 +246,7 @@ export class RoutesService {
     if (!stop.activity?.visitProof) throw new BadRequestException('Start the visit with GPS and a check-in selfie before completing it.');
     if (stop.activity.status === 'COMPLETED') throw new BadRequestException('This visit has already been completed.');
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) throw new BadRequestException('Capture a JPG, PNG, or WebP photo.');
-    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Photo must be 5 MB or smaller.');
+    if (file.size > 8 * 1024 * 1024) throw new BadRequestException('Photo must be 8 MB or smaller.');
     const activity = stop.activity;
     const settings = await this.prisma.operationsSettings.findUnique({ where: { id: 'default' }, select: { visitRadiusMeters: true } });
     const hasSalonLocation = stop.client.latitude != null && stop.client.longitude != null;

@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, ArrowDown, ArrowUp, Calendar, Camera, CheckCircle2, Clock3, LoaderCircle, MapPin, Plus, RotateCcw, Star, Trash2 } from "lucide-react";
+import Image from "next/image";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FormError } from "@/components/ui/field";
@@ -8,6 +9,7 @@ import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { SuccessToast } from "@/components/ui/toast";
+import { prepareImageFile } from "@/lib/invoice-file";
 
 type Salon = { id: string; salonName: string; city: string; area: string | null; potential: string | null; beat: { id: string; name: string } | null };
 type Activity = { id: string; checkInAt: string | null; checkOutAt: string | null; visitOutcome: string | null; status: string; note: string | null };
@@ -228,6 +230,26 @@ function StopStatusBadge({ stop }: { stop: RouteStop }) {
   return <span className="inline-flex rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold text-muted">Pending</span>;
 }
 
+function VisitPhotoCapture({ photo, label, onChange, onError }: { photo: File | null; label: string; onChange: (file: File | null) => void; onError: (message: string) => void }) {
+  const [preparing, setPreparing] = useState(false);
+  const preview = useMemo(() => photo ? URL.createObjectURL(photo) : "", [photo]);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  const select = async (file?: File) => {
+    if (!file) return;
+    setPreparing(true); onError("");
+    const prepared = await prepareImageFile(file, 1280, 0.72, 300 * 1024);
+    if (prepared.size > 8 * 1024 * 1024) { onChange(null); onError("This camera photo could not be optimized. Please retake it."); }
+    else onChange(prepared);
+    setPreparing(false);
+  };
+  const input = <input type="file" accept="image/jpeg,image/png,image/webp" capture="user" className="sr-only" onChange={(event) => void select(event.target.files?.[0])} />;
+  if (!photo) return <label className="block cursor-pointer rounded-xl border border-dashed bg-background p-5 text-center transition-colors hover:border-brand/40 hover:bg-brand-soft/20"><span className="mx-auto grid size-11 place-items-center rounded-full border bg-white text-brand"><Camera size={20} /></span><span className="mt-3 block text-sm font-semibold text-foreground">{preparing ? "Optimizing photo…" : label}</span><span className="mt-1 block text-xs text-muted">Front camera · automatically resized for fast upload</span>{input}</label>;
+  return <div className="grid gap-3 rounded-xl border bg-background p-3 sm:grid-cols-[96px_1fr] sm:items-center">
+    <div className="relative h-32 overflow-hidden rounded-lg bg-white sm:h-24"><Image src={preview} alt="Visit selfie preview" fill sizes="96px" className="object-cover" unoptimized /></div>
+    <div className="min-w-0"><div className="flex items-center gap-2 text-success"><CheckCircle2 size={16} /><p className="text-sm font-semibold">Photo ready</p></div><p className="mt-1 text-xs text-muted">Optimized to {(photo.size / 1024).toFixed(0)} KB for a faster upload.</p><div className="mt-3 flex flex-wrap gap-2"><label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border bg-white px-3 text-xs font-semibold hover:bg-background"><Camera size={14} />Retake{input}</label><button type="button" onClick={() => onChange(null)} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-danger hover:bg-red-50"><Trash2 size={14} />Remove</button></div></div>
+  </div>;
+}
+
 function CompleteVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; date: string; onClose: () => void; onDone: () => Promise<void> }) {
   const [outcome, setOutcome] = useState<string>("PRODUCTIVE");
   const [personMet, setPersonMet] = useState("");
@@ -268,7 +290,7 @@ function CompleteVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; 
   return <Modal title="Complete visit" subtitle={stop.client.salonName} onClose={onClose}>
     <form onSubmit={submit} className="space-y-4">
       <div className={`flex items-start gap-2 rounded-lg border p-3 text-xs ${location ? "border-success/20 bg-success-soft/50 text-success" : "border-warning/20 bg-warning-soft/50 text-warning"}`}><MapPin className="mt-0.5 shrink-0" size={15} /><span>{locationStatus}</span></div>
-      <label className="block cursor-pointer rounded-xl border border-dashed bg-background p-5 text-center hover:border-brand/40"><Camera className="mx-auto text-brand" size={24} /><span className="mt-2 block text-sm font-semibold text-foreground">{photo ? photo.name : "Take a check-out selfie"}</span><span className="mt-1 block text-xs text-muted">Live camera only — gallery photos aren&apos;t accepted.</span><input type="file" accept="image/jpeg,image/png,image/webp" capture="user" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} /></label>
+      <VisitPhotoCapture photo={photo} label="Take check-out selfie" onChange={setPhoto} onError={setError} />
       <Field label="Outcome *"><select value={outcome} onChange={(e) => setOutcome(e.target.value)} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{OUTCOMES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
       <Field label="Person met"><Input value={personMet} onChange={(e) => setPersonMet(e.target.value)} maxLength={120} placeholder="e.g. Owner, Manager" /></Field>
       <label className="flex items-center gap-2.5 rounded-lg border bg-background px-3 py-2.5"><input type="checkbox" checked={sampleGiven} onChange={(e) => setSampleGiven(e.target.checked)} className="size-4 accent-[var(--brand)]" /><span className="text-xs font-medium text-foreground">Sample given during this visit</span></label>
@@ -304,7 +326,7 @@ function StartVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; dat
   };
   return <Modal title="Start visit" subtitle={stop.client.salonName} onClose={onClose}><form onSubmit={submit} className="space-y-4">
     <div className={`flex items-start gap-2 rounded-lg border p-3 text-xs ${location ? "border-success/20 bg-success-soft/50 text-success" : "border-warning/20 bg-warning-soft/50 text-warning"}`}><MapPin className="mt-0.5 shrink-0" size={15} /><span>{locationStatus}</span></div>
-    <label className="block cursor-pointer rounded-xl border border-dashed bg-background p-5 text-center hover:border-brand/40"><Camera className="mx-auto text-brand" size={24} /><span className="mt-2 block text-sm font-semibold text-foreground">{photo ? photo.name : "Take a check-in selfie"}</span><span className="mt-1 block text-xs text-muted">Live camera only — gallery photos aren&apos;t accepted.</span><input type="file" accept="image/jpeg,image/png,image/webp" capture="user" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} /></label>
+    <VisitPhotoCapture photo={photo} label="Take check-in selfie" onChange={setPhoto} onError={setError} />
     {error && <FormError message={error} />}
     <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving || !photo || !location}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Starting…" : "Start visit"}</Button></div>
   </form></Modal>;

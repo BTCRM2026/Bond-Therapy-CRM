@@ -51,14 +51,14 @@ export class RoutesController {
   setStopStatus(@CurrentUser() actor: SessionUser, @Param('date') date: string, @Param('stopId') stopId: string, @Body() dto: StopStatusDto, @Req() req: Request) { return this.routes.setStopStatus(actor, date, stopId, dto, req.ip); }
 
   @Post(':date/stops/:stopId/start')
-  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 8 * 1024 * 1024, files: 1 } }))
   start(@CurrentUser() actor: SessionUser, @Param('date') date: string, @Param('stopId') stopId: string, @Body() dto: StartVisitDto, @UploadedFile() file: { buffer: Buffer; mimetype: string; size: number } | undefined, @Req() req: Request) {
     if (!file) throw new BadRequestException('Capture a check-in photo before starting the visit.');
     return this.routes.startVisit(actor, date, stopId, dto, file, req.ip);
   }
 
   @Post(':date/stops/:stopId/complete')
-  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 8 * 1024 * 1024, files: 1 } }))
   complete(@CurrentUser() actor: SessionUser, @Param('date') date: string, @Param('stopId') stopId: string, @Body() dto: CompleteVisitDto, @UploadedFile() file: { buffer: Buffer; mimetype: string; size: number } | undefined, @Req() req: Request) {
     if (!file) throw new BadRequestException('Capture a check-out selfie before completing the visit.');
     return this.routes.completeVisit(actor, date, stopId, dto, file, req.ip);
