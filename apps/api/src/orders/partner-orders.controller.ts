@@ -15,7 +15,7 @@ export class PartnerOrdersController {
   update(@Param('token') token: string, @Body() dto: UpdateOrderStatusDto, @Req() request: Request) { return this.orders.partnerUpdate(token, dto, request.ip); }
 
   @Post(':token/invoice')
-  @UseInterceptors(FileInterceptor('invoice', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  @UseInterceptors(FileInterceptor('invoice', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
   invoice(@Param('token') token: string, @UploadedFile() file: { buffer: Buffer; mimetype: string; originalname: string; size: number } | undefined, @Req() request: Request) {
     if (!file) throw new BadRequestException('Select an invoice to upload.');
     return this.orders.partnerInvoice(token, file, request.ip);

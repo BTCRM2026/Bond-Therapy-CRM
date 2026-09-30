@@ -62,7 +62,7 @@ export class ReplenishmentController {
   }
 
   @Post(':id/invoice-attachment')
-  @UseInterceptors(FileInterceptor('invoice', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  @UseInterceptors(FileInterceptor('invoice', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
   uploadInvoice(@CurrentUser() actor: SessionUser, @Param('id') id: string, @UploadedFile() file: { buffer: Buffer; mimetype: string; originalname: string; size: number } | undefined, @Req() req: Request) {
     if (!file) throw new BadRequestException('Select an invoice to upload.');
     return this.replenishment.uploadInvoice(actor, id, file, req.ip);

@@ -10,6 +10,6 @@ export class PartnerReplenishmentController {
   @Get(':token') detail(@Param('token') token: string) { return this.replenishment.partnerDetail(token); }
   @Patch(':token') action(@Param('token') token: string, @Body() dto: PartnerReplenishmentActionDto, @Req() request: Request) { return this.replenishment.partnerAction(token, dto, request.ip); }
   @Post(':token/invoice')
-  @UseInterceptors(FileInterceptor('invoice', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  @UseInterceptors(FileInterceptor('invoice', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
   invoice(@Param('token') token: string, @UploadedFile() file: { buffer: Buffer; mimetype: string; originalname: string; size: number } | undefined, @Req() request: Request) { if (!file) throw new BadRequestException('Select an invoice to upload.'); return this.replenishment.partnerInvoice(token, file, request.ip); }
 }

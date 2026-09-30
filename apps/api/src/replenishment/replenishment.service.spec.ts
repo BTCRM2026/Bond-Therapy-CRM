@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import type { SessionUser } from '../common/session.util.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
@@ -46,7 +46,7 @@ describe('Replenishment supplier routing', () => {
       product: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       stockMovement: { create: vi.fn().mockResolvedValue({}) },
       replenishmentItem: { update: vi.fn().mockResolvedValue({}) },
-      replenishmentRequest: { update },
+      replenishmentRequest: { update, updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     };
     const prisma = {
       replenishmentRequest: { findUnique: vi.fn().mockResolvedValue(request) },
@@ -56,6 +56,33 @@ describe('Replenishment supplier routing', () => {
 
     const service = new ReplenishmentService(prisma as unknown as PrismaService);
     await expect(service.fulfill(admin, request.id, {})).resolves.toMatchObject({ status: 'DISPATCHED' });
+    expect(tx.replenishmentRequest.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: request.id }) }));
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'DISPATCHED' }) }));
+  });
+
+  it('does not credit stock when receipt was already claimed', async () => {
+    const request = { id: 'request-1', status: 'DISPATCHED', distributorId: 'destination-1', sourceDistributorId: 'ss-1', items: [{ id: 'item-1', productId: 'product-1', quantity: 2, acceptedQuantity: 2, dispatchedQuantity: 2 }] };
+    const tx = {
+      replenishmentRequest: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      distributorStock: { upsert: vi.fn() },
+    };
+    const prisma = {
+      replenishmentRequest: { findUnique: vi.fn().mockResolvedValue(request) },
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+
+    const service = new ReplenishmentService(prisma as unknown as PrismaService);
+    await expect(service.receive(actor, request.id, {})).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.distributorStock.upsert).not.toHaveBeenCalled();
+  });
+
+  it('opens legacy links by a secure shortened token prefix', async () => {
+    const findFirst = vi.fn().mockResolvedValue({ id: 'request-1', sourceDistributorId: 'ss-1', createdAt: new Date(), status: 'REQUESTED' });
+    const service = new ReplenishmentService({ replenishmentRequest: { findFirst } } as unknown as PrismaService);
+    const token = 'a'.repeat(24);
+
+    await expect(service.partnerDetail(token)).resolves.toMatchObject({ id: 'request-1' });
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { confirmationToken: { startsWith: token } } }));
+    await expect(service.partnerDetail('too-short')).rejects.toBeInstanceOf(NotFoundException);
   });
 });

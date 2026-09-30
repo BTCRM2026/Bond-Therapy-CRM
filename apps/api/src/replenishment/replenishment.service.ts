@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import PDFDocument from 'pdfkit';
 import { recordAudit } from '../common/audit.util.js';
+import { validateInvoiceFile } from '../common/invoice-file.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateReplenishmentDto, ListReplenishableProductsDto, ListReplenishmentDto, PartnerReplenishmentActionDto, ReviewReplenishmentDto } from './dto.js';
@@ -16,6 +17,7 @@ const requestInclude = {
 } satisfies Prisma.ReplenishmentRequestInclude;
 
 const financialYear = (date = new Date()) => { const start = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1; return `${String(start).slice(-2)}-${String(start + 1).slice(-2)}`; };
+const partnerLinkActive = (createdAt: Date, status: string) => Date.now() - createdAt.getTime() <= 30 * 24 * 60 * 60 * 1000 && ['REQUESTED', 'APPROVED', 'PICKING', 'PACKED'].includes(status);
 
 @Injectable()
 export class ReplenishmentService {
@@ -75,7 +77,7 @@ export class ReplenishmentService {
           distributorId: actor.distributorId!,
           sourceDistributorId: destination.parentId,
           requestedById: actor.id,
-          confirmationToken: randomBytes(24).toString('hex'),
+          confirmationToken: randomBytes(12).toString('base64url'),
           notes: dto.notes?.trim() || null,
           items: { create: dto.items.map((item) => ({ productId: item.productId, quantity: item.quantity })) },
         },
@@ -87,7 +89,7 @@ export class ReplenishmentService {
     return request;
   }
 
-  async approve(actor: SessionUser, id: string, dto: ReviewReplenishmentDto, ipAddress?: string) {
+  async approve(actor: SessionUser, id: string, dto: ReviewReplenishmentDto, ipAddress?: string, access: 'PORTAL' | 'SECURE_LINK' = 'PORTAL') {
     const request = await this.prisma.replenishmentRequest.findUnique({ where: { id }, include: { items: { include: { product: true } } } });
     if (!request) throw new NotFoundException('Replenishment request not found.');
     if (!(request.sourceDistributorId ? this.isSourcePartner(actor, request.sourceDistributorId) : this.isAdmin(actor))) throw new ForbiddenException('Only the supplying partner can accept this request.');
@@ -107,22 +109,22 @@ export class ReplenishmentService {
       for (const item of request.items) await tx.replenishmentItem.update({ where: { id: item.id }, data: { acceptedQuantity: decisions.has(item.id) ? decisions.get(item.id)! : item.quantity } });
       return tx.replenishmentRequest.update({ where: { id }, data: { status: 'APPROVED', reviewedById: actor.id }, include: requestInclude, omit: { invoiceFile: true } });
     });
-    await recordAudit(this.prisma, { actorId: actor.id, action: 'REPLENISHMENT_APPROVED', entity: 'REPLENISHMENT_REQUEST', entityId: id, details: { requestNumber: updated.requestNumber }, ipAddress });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'REPLENISHMENT_APPROVED', entity: 'REPLENISHMENT_REQUEST', entityId: id, details: { requestNumber: updated.requestNumber, access }, ipAddress });
     return updated;
   }
 
-  async reject(actor: SessionUser, id: string, dto: ReviewReplenishmentDto, ipAddress?: string) {
+  async reject(actor: SessionUser, id: string, dto: ReviewReplenishmentDto, ipAddress?: string, access: 'PORTAL' | 'SECURE_LINK' = 'PORTAL') {
     if (!dto.comment?.trim()) throw new ConflictException('A reason is required to reject a request.');
     const request = await this.prisma.replenishmentRequest.findUnique({ where: { id } });
     if (!request) throw new NotFoundException('Replenishment request not found.');
     if (!(request.sourceDistributorId ? this.isSourcePartner(actor, request.sourceDistributorId) : this.isAdmin(actor))) throw new ForbiddenException('Only the supplying partner can reject this request.');
     if (!['REQUESTED', 'APPROVED'].includes(request.status)) throw new ConflictException(`Cannot reject a request that is ${request.status}.`);
     const updated = await this.prisma.replenishmentRequest.update({ where: { id }, data: { status: 'REJECTED', reviewedById: actor.id }, include: requestInclude, omit: { invoiceFile: true } });
-    await recordAudit(this.prisma, { actorId: actor.id, action: 'REPLENISHMENT_REJECTED', entity: 'REPLENISHMENT_REQUEST', entityId: id, details: { requestNumber: updated.requestNumber, comment: dto.comment.trim() }, ipAddress });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'REPLENISHMENT_REJECTED', entity: 'REPLENISHMENT_REQUEST', entityId: id, details: { requestNumber: updated.requestNumber, comment: dto.comment.trim(), access }, ipAddress });
     return updated;
   }
 
-  async fulfill(actor: SessionUser, id: string, dto: ReviewReplenishmentDto, ipAddress?: string) {
+  async fulfill(actor: SessionUser, id: string, dto: ReviewReplenishmentDto, ipAddress?: string, access: 'PORTAL' | 'SECURE_LINK' = 'PORTAL') {
     const request = await this.prisma.replenishmentRequest.findUnique({ where: { id }, include: { items: { include: { product: true } } } });
     if (!request) throw new NotFoundException('Replenishment request not found.');
     const central = !request.sourceDistributorId;
@@ -135,6 +137,8 @@ export class ReplenishmentService {
     for (const item of request.items) { const quantity = dispatchDecisions.has(item.id) ? dispatchDecisions.get(item.id)! : item.acceptedQuantity ?? item.quantity; if (quantity < 0 || quantity > (item.acceptedQuantity ?? item.quantity)) throw new ConflictException(`Dispatch quantity for ${item.product.name} is invalid.`); }
     if (!request.items.some((item) => (dispatchDecisions.has(item.id) ? dispatchDecisions.get(item.id)! : item.acceptedQuantity ?? item.quantity) > 0)) throw new ConflictException('Dispatch at least one product quantity.');
     const updated = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.replenishmentRequest.updateMany({ where: { id, status: { in: ['APPROVED', 'PICKING', 'PACKED'] } }, data: { status: 'DISPATCHED' } });
+      if (!claimed.count) throw new ConflictException('This request was already dispatched. Refresh to see its latest status.');
       let invoiceReference = dto.invoiceReference?.trim() || null;
       const invoiceFinancialYear = financialYear();
       if (central && !invoiceReference) {
@@ -157,7 +161,7 @@ export class ReplenishmentService {
       }
       return tx.replenishmentRequest.update({ where: { id }, data: { status: 'DISPATCHED', invoiceReference, invoiceFinancialYear, invoiceDate: new Date(), dispatchedAt: new Date() }, include: requestInclude, omit: { invoiceFile: true } });
     });
-    await recordAudit(this.prisma, { actorId: actor.id, action: 'REPLENISHMENT_DISPATCHED', entity: 'REPLENISHMENT_REQUEST', entityId: id, details: { requestNumber: updated.requestNumber, invoiceReference: updated.invoiceReference }, ipAddress });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'REPLENISHMENT_DISPATCHED', entity: 'REPLENISHMENT_REQUEST', entityId: id, details: { requestNumber: updated.requestNumber, invoiceReference: updated.invoiceReference, access }, ipAddress });
     return updated;
   }
 
@@ -167,6 +171,8 @@ export class ReplenishmentService {
     if (!request || request.distributorId !== actor.distributorId) throw new NotFoundException('Replenishment request not found.');
     if (request.status !== 'DISPATCHED') throw new ConflictException('Only a dispatched request can be received.');
     const updated = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.replenishmentRequest.updateMany({ where: { id, status: 'DISPATCHED' }, data: { status: 'FULFILLED' } });
+      if (!claimed.count) throw new ConflictException('Receipt was already confirmed. Refresh to see its latest status.');
       const received = new Map(dto.items?.map((item) => [item.itemId, item]) ?? []);
       let hasVariance = false;
       for (const item of request.items) {
@@ -205,15 +211,14 @@ export class ReplenishmentService {
     return updated;
   }
 
-  async uploadInvoice(actor: SessionUser, id: string, file: { buffer: Buffer; mimetype: string; originalname: string; size: number }, ipAddress?: string) {
+  async uploadInvoice(actor: SessionUser, id: string, file: { buffer: Buffer; mimetype: string; originalname: string; size: number }, ipAddress?: string, access: 'PORTAL' | 'SECURE_LINK' = 'PORTAL') {
     const request = await this.prisma.replenishmentRequest.findUnique({ where: { id } });
     if (!request) throw new NotFoundException('Replenishment request not found.');
     const allowed = request.sourceDistributorId ? actor.distributorId === request.sourceDistributorId && (this.isDistributorAccounts(actor) || this.isDistributorWarehouse(actor)) : this.isAdmin(actor) || this.isCentralWarehouse(actor);
     if (!allowed) throw new ForbiddenException('Only the supplying partner can attach this invoice.');
-    if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) throw new ConflictException('Upload a PDF, JPG, PNG, or WebP invoice.');
-    if (file.size > 5 * 1024 * 1024) throw new ConflictException('Invoice attachment must be 5 MB or smaller.');
-    await this.prisma.replenishmentRequest.update({ where: { id }, data: { invoiceFile: file.buffer, invoiceFileName: file.originalname, invoiceMime: file.mimetype } });
-    await recordAudit(this.prisma, { actorId: actor.id, action: 'REPLENISHMENT_INVOICE_UPLOADED', entity: 'REPLENISHMENT_REQUEST', entityId: id, details: { fileName: file.originalname }, ipAddress });
+    const mime = validateInvoiceFile(file);
+    await this.prisma.replenishmentRequest.update({ where: { id }, data: { invoiceFile: file.buffer, invoiceFileName: file.originalname, invoiceMime: mime } });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'REPLENISHMENT_INVOICE_UPLOADED', entity: 'REPLENISHMENT_REQUEST', entityId: id, details: { fileName: file.originalname, access }, ipAddress });
     return { uploaded: true };
   }
 
@@ -259,14 +264,20 @@ export class ReplenishmentService {
   }
 
   async partnerDetail(token: string) {
-    const request = await this.prisma.replenishmentRequest.findUnique({ where: { confirmationToken: token }, include: requestInclude, omit: { invoiceFile: true } });
-    if (!request?.sourceDistributorId) throw new NotFoundException('This replenishment link is invalid or no longer available.');
+    if (token.length < 16) throw new NotFoundException('This replenishment link is invalid or no longer available.');
+    const request = token.length === 16 || token.length === 48
+      ? await this.prisma.replenishmentRequest.findUnique({ where: { confirmationToken: token }, include: requestInclude, omit: { invoiceFile: true } })
+      : await this.prisma.replenishmentRequest.findFirst({ where: { confirmationToken: { startsWith: token } }, include: requestInclude, omit: { invoiceFile: true } });
+    if (!request?.sourceDistributorId || !partnerLinkActive(request.createdAt, request.status)) throw new NotFoundException('This replenishment link has expired or is no longer available.');
     return request;
   }
 
   private async partnerActor(token: string) {
-    const request = await this.prisma.replenishmentRequest.findUnique({ where: { confirmationToken: token }, select: { id: true, sourceDistributorId: true } });
-    if (!request?.sourceDistributorId) throw new NotFoundException('This replenishment link is invalid or no longer available.');
+    if (token.length < 16) throw new NotFoundException('This replenishment link is invalid or no longer available.');
+    const request = token.length === 16 || token.length === 48
+      ? await this.prisma.replenishmentRequest.findUnique({ where: { confirmationToken: token }, select: { id: true, sourceDistributorId: true, createdAt: true, status: true } })
+      : await this.prisma.replenishmentRequest.findFirst({ where: { confirmationToken: { startsWith: token } }, select: { id: true, sourceDistributorId: true, createdAt: true, status: true } });
+    if (!request?.sourceDistributorId || !partnerLinkActive(request.createdAt, request.status)) throw new NotFoundException('This replenishment link has expired or is no longer available.');
     const user = await this.prisma.user.findFirst({ where: { distributorId: request.sourceDistributorId, status: 'ACTIVE', roles: { some: { role: { key: 'DISTRIBUTOR_OWNER' } } } }, include: { roles: { include: { role: true } } } });
     if (!user) throw new ConflictException('The supplying partner owner account is not active.');
     const actor: SessionUser = { id: user.id, name: user.name, email: user.email, loginId: user.loginId, portal: 'DISTRIBUTOR', status: user.status, department: user.department, dataScope: user.dataScope, manager: null, distributorId: request.sourceDistributorId, assignedDistributorId: null, distributionPartner: null, permissions: [], roles: user.roles.map(({ role }) => ({ key: role.key, name: role.name })) };
@@ -275,14 +286,14 @@ export class ReplenishmentService {
 
   async partnerAction(token: string, dto: PartnerReplenishmentActionDto, ipAddress?: string) {
     const { id, actor } = await this.partnerActor(token);
-    if (dto.action === 'approve') return this.approve(actor, id, dto, ipAddress);
-    if (dto.action === 'reject') return this.reject(actor, id, dto, ipAddress);
+    if (dto.action === 'approve') return this.approve(actor, id, dto, ipAddress, 'SECURE_LINK');
+    if (dto.action === 'reject') return this.reject(actor, id, dto, ipAddress, 'SECURE_LINK');
     if (dto.action === 'pick') return this.warehouseStep(actor, id, 'PICKING', ipAddress);
     if (dto.action === 'pack') return this.warehouseStep(actor, id, 'PACKED', ipAddress);
-    return this.fulfill(actor, id, dto, ipAddress);
+    return this.fulfill(actor, id, dto, ipAddress, 'SECURE_LINK');
   }
 
   async partnerInvoice(token: string, file: { buffer: Buffer; mimetype: string; originalname: string; size: number }, ipAddress?: string) {
-    const { id, actor } = await this.partnerActor(token); return this.uploadInvoice(actor, id, file, ipAddress);
+    const { id, actor } = await this.partnerActor(token); return this.uploadInvoice(actor, id, file, ipAddress, 'SECURE_LINK');
   }
 }
