@@ -2,9 +2,12 @@
 
 import {
   Building2,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Filter,
+  LoaderCircle,
+  MapPin,
   MessageCircle,
   Phone,
   Plus,
@@ -443,6 +446,8 @@ type FormState = {
   area: string;
   city: string;
   pincode: string;
+  latitude: string;
+  longitude: string;
   chairCount: string;
   staffCount: string;
   potential: string;
@@ -460,6 +465,8 @@ const initialForm: FormState = {
   area: "",
   city: "",
   pincode: "",
+  latitude: "",
+  longitude: "",
   chairCount: "",
   staffCount: "",
   potential: "",
@@ -476,6 +483,9 @@ function ClientForm({
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const update =
     (key: keyof FormState) =>
     (
@@ -485,9 +495,39 @@ function ClientForm({
     ) =>
       setForm((value) => ({ ...value, [key]: event.target.value }));
   const steps = ["Basic", "Contact", "Location", "Business"];
+  const stepDescriptions = [
+    "Identify the salon and its relationship with Bond Therapy.",
+    "Add the owner and the two numbers used for daily coordination.",
+    "Save the address and exact salon GPS for attendance verification.",
+    "Record only the business details needed by the sales team.",
+  ];
+  const captureLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("GPS is not supported on this device.");
+      return;
+    }
+    setLocating(true);
+    setLocationError("");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setForm((value) => ({ ...value, latitude: String(coords.latitude), longitude: String(coords.longitude) }));
+        setLocationAccuracy(coords.accuracy);
+        setLocating(false);
+      },
+      () => {
+        setLocationError("Allow location access and try again while you are at the salon.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  };
   const next = (event: FormEvent) => {
     event.preventDefault();
     if (step < steps.length - 1) {
+      if (step === 2 && (!form.latitude || !form.longitude)) {
+        setLocationError("Capture the salon GPS before continuing.");
+        return;
+      }
       setStep((value) => value + 1);
       return;
     }
@@ -504,6 +544,8 @@ function ClientForm({
       ...form,
       potential: form.potential || undefined,
       customerSegment: form.customerSegment || undefined,
+      latitude: form.latitude ? Number(form.latitude) : undefined,
+      longitude: form.longitude ? Number(form.longitude) : undefined,
     };
     numeric.forEach((key) => {
       payload[key] = form[key as keyof FormState]
@@ -529,19 +571,19 @@ function ClientForm({
   };
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/40 p-3 backdrop-blur-[1px] sm:p-6"
+      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/45 p-2 backdrop-blur-[2px] sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Add client"
     >
-      <div className="my-auto flex max-h-[calc(100dvh-24px)] w-full max-w-2xl flex-col rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-48px)]">
-        <div className="flex items-center justify-between border-b px-4 py-4 sm:px-5">
+      <div className="my-auto flex max-h-[calc(100dvh-16px)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.16)] sm:max-h-[calc(100dvh-48px)]">
+        <div className="flex items-center justify-between border-b px-4 py-4 sm:px-6">
           <div>
-            <h2 className="text-base font-semibold text-foreground">
+            <h2 className="text-lg font-semibold tracking-[-0.01em] text-foreground">
               Add client
             </h2>
             <p className="mt-1 text-xs text-muted">
-              Create a client record in four quick steps
+              Create a clean Salon 360 record in four quick steps
             </p>
           </div>
           <button
@@ -553,7 +595,7 @@ function ClientForm({
             <X size={18} />
           </button>
         </div>
-        <div className="border-b px-4 py-3 sm:px-5">
+        <div className="border-b bg-background/60 px-4 py-3 sm:px-6">
           <p className="mb-3 text-xs font-semibold text-foreground sm:hidden">
             Step {step + 1} of {steps.length} · {steps[step]}
           </p>
@@ -565,6 +607,7 @@ function ClientForm({
               >
                 <span
                   className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold ${index <= step ? "bg-brand text-white" : "bg-background text-muted"}`}
+                  aria-current={index === step ? "step" : undefined}
                 >
                   {index + 1}
                 </span>
@@ -583,7 +626,12 @@ function ClientForm({
           </div>
         </div>
         <form onSubmit={next} className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+            <div className="mb-5 border-b pb-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Step {step + 1} of {steps.length}</p>
+              <h3 className="mt-1 text-base font-semibold text-foreground">{steps[step]}</h3>
+              <p className="mt-1 text-xs leading-5 text-muted">{stepDescriptions[step]}</p>
+            </div>
             {step === 0 && (
               <section className="space-y-5">
                 <Field label="Salon name *">
@@ -665,6 +713,30 @@ function ClientForm({
                     inputMode="numeric"
                   />
                 </Field>
+                <div className="sm:col-span-2">
+                  <div className={`rounded-xl border p-4 ${form.latitude && form.longitude ? "border-success/25 bg-success-soft/35" : "bg-background"}`}>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 gap-3">
+                        <span className={`grid size-10 shrink-0 place-items-center rounded-lg border bg-white ${form.latitude ? "text-success" : "text-brand"}`}>
+                          {form.latitude ? <CheckCircle2 size={19} /> : <MapPin size={19} />}
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Salon GPS location *</p>
+                          <p className="mt-1 text-xs leading-5 text-muted">
+                            {form.latitude && form.longitude
+                              ? `${Number(form.latitude).toFixed(6)}, ${Number(form.longitude).toFixed(6)}${locationAccuracy ? ` · accuracy ±${Math.round(locationAccuracy)} m` : ""}`
+                              : "Capture this while at the salon. Visits and attendance will be matched against this point."}
+                          </p>
+                        </div>
+                      </div>
+                      <Button type="button" variant="secondary" className="shrink-0" onClick={captureLocation} disabled={locating}>
+                        {locating ? <LoaderCircle className="animate-spin" size={15} /> : <MapPin size={15} />}
+                        {locating ? "Capturing…" : form.latitude ? "Recapture GPS" : "Capture GPS"}
+                      </Button>
+                    </div>
+                  </div>
+                  {locationError && <p className="mt-2 text-xs text-danger" role="alert">{locationError}</p>}
+                </div>
               </section>
             )}
             {step === 3 && (
@@ -727,28 +799,22 @@ function ClientForm({
               </p>
             )}
           </div>
-          <div className="sticky bottom-0 flex gap-2 border-t bg-white p-4 sm:justify-end sm:px-5">
-            {step > 0 && (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setStep((value) => value - 1)}
-              >
-                <ChevronLeft size={16} />
-                Back
-              </Button>
-            )}
-            <Button type="button" variant="secondary" onClick={onClose}>
+          <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving}>
-              {saving
-                ? "Saving…"
-                : step === steps.length - 1
-                  ? "Save client"
-                  : "Continue"}
-              {step < steps.length - 1 && <ChevronRight size={16} />}
-            </Button>
+            <div className="flex gap-2">
+              {step > 0 && (
+                <Button className="flex-1 sm:flex-none" type="button" variant="secondary" onClick={() => setStep((value) => value - 1)}>
+                  <ChevronLeft size={16} />
+                  Back
+                </Button>
+              )}
+              <Button className="flex-1 sm:flex-none" type="submit" disabled={saving}>
+                {saving ? "Saving…" : step === steps.length - 1 ? "Save client" : "Continue"}
+                {step < steps.length - 1 && <ChevronRight size={16} />}
+              </Button>
+            </div>
           </div>
         </form>
       </div>
