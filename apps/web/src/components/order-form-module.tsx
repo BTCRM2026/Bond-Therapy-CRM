@@ -61,7 +61,6 @@ export function OrderFormModule() {
   const [editing, setEditing] = useState<Order | null>(null);
   const [saved, setSaved] = useState<Order | null>(null);
   const [busy, setBusy] = useState(false);
-  const [submittingId, setSubmittingId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
@@ -254,33 +253,6 @@ export function OrderFormModule() {
     }
   };
 
-  const submitForApproval = async (order: Order) => {
-    setSubmittingId(order.id);
-    setError("");
-    try {
-      const response = await fetch(`/api/orders/${order.id}/status`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: "SUBMITTED", version: order.version }),
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok)
-        throw new Error(
-          message(data, "Could not submit this order for approval."),
-        );
-      setLoading(true);
-      setRefresh((value) => value + 1);
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Could not submit this order for approval.",
-      );
-    } finally {
-      setSubmittingId("");
-    }
-  };
-
   return (
     <div className="space-y-4">
       {headerSlot &&
@@ -366,24 +338,13 @@ export function OrderFormModule() {
                   {["DRAFT", "RETURNED_FOR_CORRECTION"].includes(
                     order.status,
                   ) && (
-                    <>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => start(order)}
-                      >
-                        Edit draft
-                      </Button>
-                      <Button
-                        type="button"
-                        disabled={submittingId === order.id}
-                        onClick={() => void submitForApproval(order)}
-                      >
-                        {submittingId === order.id
-                          ? "Submitting…"
-                          : "Submit for approval"}
-                      </Button>
-                    </>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => start(order)}
+                    >
+                      Edit draft
+                    </Button>
                   )}
                 </div>
               </article>
@@ -452,8 +413,7 @@ export function OrderFormModule() {
             {saved ? (
               <div className="p-5">
                 <p className="rounded-lg border border-success/20 bg-success-soft p-3 text-sm text-success">
-                  Saved as a draft. Download the PDF now, or submit it for
-                  approval from the list.
+                  Saved as a draft. You can download the PDF now or edit it later.
                 </p>
                 <div className="mt-5 flex flex-wrap justify-end gap-2">
                   <Button type="button" variant="secondary" onClick={close}>
