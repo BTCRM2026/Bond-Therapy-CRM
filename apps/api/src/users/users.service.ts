@@ -106,9 +106,10 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto, actor: SessionUser, ipAddress?: string) {
-    const email = dto.email.trim().toLowerCase();
-    const existing = await this.prisma.user.findFirst({ where: { email }, select: { id: true } });
-    if (existing) throw new BadRequestException('A user with that email address already exists.');
+    const chosenLoginId = dto.loginId?.trim().toLowerCase();
+    if (chosenLoginId && await this.prisma.user.findFirst({ where: { loginId: chosenLoginId }, select: { id: true } })) throw new BadRequestException('That Login ID is already in use.');
+    const suppliedEmail = dto.email?.trim().toLowerCase();
+    if (suppliedEmail && await this.prisma.user.findFirst({ where: { email: suppliedEmail }, select: { id: true } })) throw new BadRequestException('A user with that email address already exists.');
     const { role, config, managerId } = await this.assignment(dto.roleKey, dto.managerId);
     const assignedDistributorId = await this.resolveDistributor(dto.assignedDistributorId);
     const passwordHash = await hashPassword(dto.password);
@@ -119,7 +120,8 @@ export class UsersService {
         update: { nextNumber: { increment: 1 } },
       });
       const code = employeeCode(counter.nextNumber);
-      const loginId = generatedLoginId(dto.name, code);
+      const loginId = chosenLoginId ?? generatedLoginId(dto.name, code);
+      const email = suppliedEmail ?? `${loginId}@pending.bondtherapy.local`;
       return tx.user.create({
         data: {
           loginId,
@@ -134,10 +136,10 @@ export class UsersService {
           staffProfile: {
             create: {
               employeeCode: code,
-              mobile: dto.mobile.trim(),
-              jobTitle: dto.jobTitle.trim(),
+              mobile: dto.mobile?.trim() ?? '',
+              jobTitle: dto.jobTitle?.trim() || role.name,
               employmentType: dto.employmentType as EmploymentType,
-              joiningDate: dateOnly(dto.joiningDate),
+              joiningDate: dateOnly(dto.joiningDate ?? new Date().toISOString().slice(0, 10)),
               dateOfBirth: dto.dateOfBirth ? dateOnly(dto.dateOfBirth) : null,
               shiftStart: optionalText(dto.shiftStart),
               shiftEnd: optionalText(dto.shiftEnd),

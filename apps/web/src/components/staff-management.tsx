@@ -185,6 +185,7 @@ function StaffEditor({ mode, user, roles, managers, onClose, onSaved }: { mode: 
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
     name: user?.name ?? "",
+    loginId: "",
     email: user?.email ?? "",
     mobile: profile?.mobile ?? "",
     jobTitle: profile?.jobTitle ?? "",
@@ -213,13 +214,15 @@ function StaffEditor({ mode, user, roles, managers, onClose, onSaved }: { mode: 
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError("");
     try {
+      const create = mode === "create";
       const payload = {
         name: form.name,
-        email: form.email,
-        mobile: form.mobile,
-        jobTitle: form.jobTitle,
+        ...(create && form.loginId.trim() ? { loginId: form.loginId.trim() } : {}),
+        email: create ? form.email.trim() || undefined : form.email,
+        mobile: create ? form.mobile.trim() || undefined : form.mobile,
+        jobTitle: create ? form.jobTitle.trim() || undefined : form.jobTitle,
         employmentType: form.employmentType,
-        joiningDate: form.joiningDate,
+        joiningDate: create ? form.joiningDate || undefined : form.joiningDate,
         dateOfBirth: form.dateOfBirth || null,
         shiftStart: form.shiftStart || null,
         shiftEnd: form.shiftEnd || null,
@@ -243,9 +246,9 @@ function StaffEditor({ mode, user, roles, managers, onClose, onSaved }: { mode: 
   const selectClass = "h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10";
   return <Modal maxWidth="max-w-4xl" title={mode === "create" ? "Add staff" : "Edit staff details"} subtitle="Create one reusable employee record with controlled portal access." onClose={onClose}>
     <form onSubmit={submit} className="space-y-6">
-      {mode === "create" ? <div className="rounded-lg border border-brand/15 bg-brand-soft/50 px-4 py-3"><p className="text-xs font-semibold text-foreground">Employee code and Login ID are generated automatically</p><p className="mt-1 text-xs text-muted">They will be shown after the staff account is created.</p></div> : <div className="grid gap-4 rounded-lg border bg-background p-4 sm:grid-cols-2"><Field label="Employee code"><Input value={profile?.employeeCode ?? "Generated when saved"} readOnly className="bg-white text-muted" /></Field><Field label="Login ID"><Input value={user?.loginId ?? ""} readOnly className="bg-white text-muted" /></Field></div>}
+      {mode === "create" ? <div className="grid gap-4 rounded-lg border border-brand/15 bg-brand-soft/50 p-4 sm:grid-cols-2"><Field label="Login ID"><Input value={form.loginId} onChange={set("loginId")} placeholder="Leave blank to generate" pattern="[A-Za-z0-9._\-]{3,60}" maxLength={60} autoComplete="off" /></Field><p className="text-xs leading-5 text-muted sm:self-end sm:pb-2">Employee code is generated automatically. Mobile, email and job title are optional now; staff can complete them later.</p></div> : <div className="grid gap-4 rounded-lg border bg-background p-4 sm:grid-cols-2"><Field label="Employee code"><Input value={profile?.employeeCode ?? "Generated when saved"} readOnly className="bg-white text-muted" /></Field><Field label="Login ID"><Input value={user?.loginId ?? ""} readOnly className="bg-white text-muted" /></Field></div>}
 
-      <section className="space-y-4"><SectionHeading title="Contact details" /><div className="grid gap-4 sm:grid-cols-2"><Field label="Full name *"><Input value={form.name} onChange={set("name")} minLength={2} maxLength={120} required /></Field><Field label="Mobile *"><Input value={form.mobile} onChange={set("mobile")} type="tel" inputMode="tel" minLength={7} maxLength={20} required /></Field><Field label="Email *"><Input value={form.email} onChange={set("email")} type="email" maxLength={254} required autoComplete="off" /></Field><Field label="Job title *"><Input value={form.jobTitle} onChange={set("jobTitle")} placeholder="e.g. Event Operations Manager" minLength={2} maxLength={120} required /></Field></div></section>
+      <section className="space-y-4"><SectionHeading title="Contact details" /><div className="grid gap-4 sm:grid-cols-2"><Field label="Full name *"><Input value={form.name} onChange={set("name")} minLength={2} maxLength={120} required /></Field><Field label={mode === "create" ? "Mobile" : "Mobile *"}><Input value={form.mobile} onChange={set("mobile")} type="tel" inputMode="tel" minLength={7} maxLength={20} required={mode !== "create"} /></Field><Field label={mode === "create" ? "Email" : "Email *"}><Input value={form.email} onChange={set("email")} type="email" maxLength={254} required={mode !== "create"} autoComplete="off" /></Field><Field label={mode === "create" ? "Job title" : "Job title *"}><Input value={form.jobTitle} onChange={set("jobTitle")} placeholder="e.g. Sales Executive" minLength={2} maxLength={120} required={mode !== "create"} /></Field></div></section>
 
       <section className="space-y-4"><SectionHeading title="Employment" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Field label="Role *"><select value={form.roleKey} onChange={set("roleKey")} className={selectClass} required>{roles.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select></Field><Field label="Department"><Input value={pretty(role?.department)} readOnly className="bg-background text-muted" /></Field><Field label="Employment type"><select value={form.employmentType} onChange={set("employmentType")} className={selectClass}><option value="FULL_TIME">Full Time</option><option value="PART_TIME">Part Time</option><option value="CONTRACT">Contract</option><option value="INTERN">Intern</option></select></Field><Field label="Joining date *"><Input value={form.joiningDate} onChange={set("joiningDate")} type="date" required /></Field><Field label="Shift start"><Input value={form.shiftStart} onChange={set("shiftStart")} type="time" /></Field><Field label="Shift end"><Input value={form.shiftEnd} onChange={set("shiftEnd")} type="time" /></Field><Field label="Work location"><Input value={form.workLocation} onChange={set("workLocation")} maxLength={120} /></Field>{form.roleKey === "SALES_EXECUTIVE" && <Field label="Sales Manager"><select value={form.managerId} onChange={set("managerId")} className={selectClass}><option value="">Not assigned</option>{managers.filter((manager) => manager.id !== user?.id).map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}</select></Field>}{isSalesRole && <Field label="Allotted distributor"><select value={form.assignedDistributorId} onChange={set("assignedDistributorId")} className={selectClass}><option value="">No distributor — Bond Therapy fulfills directly</option>{distributors.map((distributor) => <option key={distributor.id} value={distributor.id}>{distributor.businessName}</option>)}</select></Field>}{mode === "edit" && <Field label="Account status"><select value={form.status} onChange={set("status")} className={selectClass}><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option><option value="LOCKED">Locked</option></select></Field>}</div>{role && <div className="grid grid-cols-3 gap-2 rounded-lg border bg-background p-3 text-xs"><div><p className="text-muted">Portal</p><p className="mt-1 font-semibold text-foreground">{pretty(role.portal)}</p></div><div><p className="text-muted">Department</p><p className="mt-1 font-semibold text-foreground">{pretty(role.department)}</p></div><div><p className="text-muted">Record access</p><p className="mt-1 font-semibold text-foreground">{pretty(role.dataScope)}</p></div></div>}</section>
 

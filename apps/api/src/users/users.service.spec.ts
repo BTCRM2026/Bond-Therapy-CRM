@@ -24,7 +24,7 @@ describe('UsersService administrator password updates', () => {
           staffProfile: { employeeCode: 'BT-01' },
         }),
       },
-      role: { findFirst: vi.fn().mockResolvedValue({ id: 'role-1', key: 'SALES_MANAGER' }) },
+      role: { findFirst: vi.fn().mockResolvedValue({ id: 'role-1', key: 'SALES_MANAGER', name: 'Sales Manager' }) },
       employeeCounter: { upsert: vi.fn().mockResolvedValue({ key: 'BT', nextNumber: 1 }) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit-1' }) },
       $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma)),
@@ -33,13 +33,9 @@ describe('UsersService administrator password updates', () => {
 
     await service.create({
       name: 'New Staff',
-      email: 'new.staff@example.com',
       password: 'secure-password',
       roleKey: 'SALES_MANAGER',
-      mobile: '9000000001',
-      jobTitle: 'Manager',
       employmentType: 'FULL_TIME',
-      joiningDate: '2026-09-23',
     }, { id: 'admin-1' } as never);
 
     expect(prisma.employeeCounter.upsert).toHaveBeenCalledWith({
@@ -50,7 +46,8 @@ describe('UsersService administrator password updates', () => {
     expect(prisma.user.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         loginId: 'new.staff.bt01',
-        staffProfile: { create: expect.objectContaining({ employeeCode: 'BT-01' }) },
+        email: 'new.staff.bt01@pending.bondtherapy.local',
+        staffProfile: { create: expect.objectContaining({ employeeCode: 'BT-01', mobile: '', jobTitle: 'Sales Manager' }) },
       }),
     }));
   });

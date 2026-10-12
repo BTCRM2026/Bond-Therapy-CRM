@@ -6,28 +6,37 @@ const phonePattern = /^[0-9+() -]{7,20}$/;
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export class CreateUserDto {
+  @IsOptional()
+  @Matches(/^[A-Za-z0-9._-]{3,60}$/, { message: 'Login ID may use letters, numbers, dots, dashes and underscores (3-60 characters).' })
+  loginId?: string;
+
+  // Optional: staff complete these from their own profile later.
+  @IsOptional()
   @IsEmail()
   @MaxLength(254)
-  email!: string;
+  email?: string;
 
   @IsString()
   @MinLength(2)
   @MaxLength(120)
   name!: string;
 
+  @IsOptional()
   @Matches(phonePattern, { message: 'Enter a valid mobile number.' })
-  mobile!: string;
+  mobile?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(2)
   @MaxLength(120)
-  jobTitle!: string;
+  jobTitle?: string;
 
   @IsIn(employmentTypes)
   employmentType!: (typeof employmentTypes)[number];
 
+  @IsOptional()
   @IsDateString()
-  joiningDate!: string;
+  joiningDate?: string;
 
   @IsOptional()
   @IsDateString()
