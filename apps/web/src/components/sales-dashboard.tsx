@@ -1,9 +1,10 @@
 "use client";
 
-import { CalendarClock, CheckCircle2, Clock3, IndianRupee, LogIn, MapPin, Navigation, Target, TrendingUp, Trophy, UserPlus } from "lucide-react";
+import { Building2, CalendarClock, CheckCircle2, Clock3, IndianRupee, LogIn, MapPin, Navigation, Target, TrendingUp, Trophy, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
+import { isStaffModuleEnabled } from "@/lib/staff-modules";
 
 type DashboardData = {
   period: { month: number; year: number };
@@ -42,24 +43,27 @@ export function SalesDashboardWidgets() {
   if (loading) return <div className="h-[108px] animate-pulse rounded-[10px] bg-white" />;
   if (!data) return null;
 
+  const optionalKpis = ["/dashboard/orders", "/dashboard/leads", "/dashboard/follow-ups"].filter(isStaffModuleEnabled).length;
+  const kpiCount = (optionalKpis === 0 ? 2 : 1 + optionalKpis) as 2 | 3 | 4;
   const progress = data.target ? Math.min(100, Math.round((data.achieved / data.target) * 100)) : null;
   const stops = route?.stops.filter((stop) => stop.status !== "REMOVED") ?? [];
   const pending = stops.filter((stop) => stop.status === "PLANNED");
   const nextVisit = pending[0];
 
   return <div className="space-y-5">
-    {route && stops.length > 0 && <Link href="/dashboard/route" className="crm-surface group flex items-center justify-between gap-4 p-5 transition hover:-translate-y-0.5 hover:border-brand/30">
+    {isStaffModuleEnabled("/dashboard/route") && route && stops.length > 0 && <Link href="/dashboard/route" className="crm-surface group flex items-center justify-between gap-4 p-5 transition hover:-translate-y-0.5 hover:border-brand/30">
       <div className="flex items-center gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand"><Navigation size={19} /></span>
         <div><p className="text-sm font-semibold text-foreground">{nextVisit ? `Next: ${nextVisit.client.salonName}` : "Today's route complete"}</p><p className="mt-0.5 text-xs text-muted">{nextVisit?.plannedTime ? `${timeOf(nextVisit.plannedTime)} · ` : ""}{pending.length} pending · {stops.length - pending.length} done of {stops.length}</p></div>
       </div>
       <CheckCircle2 size={18} className="shrink-0 text-subtle group-hover:text-brand" />
     </Link>}
 
-    <KpiStrip columns={4}>
+    <KpiStrip columns={kpiCount}>
       <KpiCell label="Revenue achieved" value={money(data.achieved)} detail={`${MONTHS[data.period.month - 1]} ${data.period.year}`} tone="success" />
-      <Link href="/dashboard/orders" className="contents"><KpiCell label="Orders booked" value={data.orderCount} detail="Confirmed this month" className="cursor-pointer hover:bg-brand-soft/45" /></Link>
-      <Link href="/dashboard/leads" className="contents"><KpiCell label="Open leads" value={data.openLeads} detail="Awaiting conversion" tone="warning" className="cursor-pointer hover:bg-brand-soft/45" /></Link>
-      <Link href="/dashboard/follow-ups" className="contents"><KpiCell label="Overdue follow-ups" value={data.overdueFollowUps} detail={data.overdueFollowUps ? "Needs attention" : "Nothing overdue"} tone={data.overdueFollowUps ? "danger" : "neutral"} className="cursor-pointer hover:bg-brand-soft/45" /></Link>
+      {optionalKpis === 0 && <KpiCell label="Monthly target" value={data.target ? money(data.target) : "Not set"} detail={`${MONTHS[data.period.month - 1]} ${data.period.year}`} />}
+      {isStaffModuleEnabled("/dashboard/orders") && <Link href="/dashboard/orders" className="contents"><KpiCell label="Orders booked" value={data.orderCount} detail="Confirmed this month" className="cursor-pointer hover:bg-brand-soft/45" /></Link>}
+      {isStaffModuleEnabled("/dashboard/leads") && <Link href="/dashboard/leads" className="contents"><KpiCell label="Open leads" value={data.openLeads} detail="Awaiting conversion" tone="warning" className="cursor-pointer hover:bg-brand-soft/45" /></Link>}
+      {isStaffModuleEnabled("/dashboard/follow-ups") && <Link href="/dashboard/follow-ups" className="contents"><KpiCell label="Overdue follow-ups" value={data.overdueFollowUps} detail={data.overdueFollowUps ? "Needs attention" : "Nothing overdue"} tone={data.overdueFollowUps ? "danger" : "neutral"} className="cursor-pointer hover:bg-brand-soft/45" /></Link>}
     </KpiStrip>
 
     {progress != null && <section className="crm-surface p-5">
@@ -77,18 +81,23 @@ export function SalesDashboardWidgets() {
     </section>}
 
     <section><div className="mb-3"><h2 className="text-sm font-semibold text-foreground">Quick actions</h2><p className="mt-0.5 text-xs text-muted">Common sales workflows</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <QuickLink href="/dashboard/leads" icon={UserPlus} label="Add lead" />
-      <QuickLink href="/dashboard/follow-ups" icon={Clock3} label="Follow-ups" />
-      <QuickLink href="/dashboard/orders" icon={TrendingUp} label="Orders" />
-      <QuickLink href="/dashboard/products" icon={Target} label="Catalogue" />
-      <QuickLink href="/dashboard/demos" icon={CalendarClock} label="Book demo" />
-      <QuickLink href="/dashboard/route" icon={Navigation} label="My route" />
-      <QuickLink href="/dashboard/territory" icon={MapPin} label="Territory" />
-      <QuickLink href="/dashboard/attendance" icon={LogIn} label="Attendance" />
-      <QuickLink href="/dashboard/incentives" icon={IndianRupee} label="Incentives" />
+      {QUICK_LINKS.filter((link) => isStaffModuleEnabled(link.href)).map((link) => <QuickLink key={link.href} {...link} />)}
     </div></section>
   </div>;
 }
+
+const QUICK_LINKS = [
+  { href: "/dashboard/clients", icon: Building2, label: "Client Profile" },
+  { href: "/dashboard/leads", icon: UserPlus, label: "Add lead" },
+  { href: "/dashboard/follow-ups", icon: Clock3, label: "Follow-ups" },
+  { href: "/dashboard/orders", icon: TrendingUp, label: "Orders" },
+  { href: "/dashboard/products", icon: Target, label: "Catalogue" },
+  { href: "/dashboard/demos", icon: CalendarClock, label: "Book demo" },
+  { href: "/dashboard/route", icon: Navigation, label: "My route" },
+  { href: "/dashboard/territory", icon: MapPin, label: "Territory" },
+  { href: "/dashboard/attendance", icon: LogIn, label: "Attendance" },
+  { href: "/dashboard/incentives", icon: IndianRupee, label: "Incentives" },
+];
 
 function QuickLink({ href, icon: Icon, label }: { href: string; icon: typeof Target; label: string }) {
   return <Link href={href} className="crm-surface flex h-[72px] items-center gap-3 px-4 text-xs font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-brand/30"><span className="grid size-9 place-items-center rounded-lg bg-brand-soft text-brand"><Icon size={17} /></span>{label}</Link>;

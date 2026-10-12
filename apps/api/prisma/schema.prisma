@@ -459,6 +459,8 @@ model Client {
   area                      String?
   city                      String
   pincode                   String?
+  headquarter               String?
+  usedProducts              String?
   googleMapsUrl             String?
   latitude                  Decimal?          @db.Decimal(9, 6)
   longitude                 Decimal?          @db.Decimal(9, 6)

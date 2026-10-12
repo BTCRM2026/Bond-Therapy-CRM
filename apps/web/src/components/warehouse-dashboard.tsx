@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
+import { isStaffModuleEnabled } from "@/lib/staff-modules";
 
 type DashboardData = {
   pendingDispatch: number;
@@ -33,10 +34,14 @@ export function WarehouseDashboardWidgets() {
 
   return <div className="space-y-5">
     <KpiStrip columns={4}>
-      <Link href="/dashboard/dispatch" className="contents"><KpiCell label="Pending dispatch" value={data.pendingDispatch} detail="Ready to dispatch" className="cursor-pointer hover:bg-brand-soft/45" /></Link>
+      {isStaffModuleEnabled("/dashboard/dispatch")
+        ? <Link href="/dashboard/dispatch" className="contents"><KpiCell label="Pending dispatch" value={data.pendingDispatch} detail="Ready to dispatch" className="cursor-pointer hover:bg-brand-soft/45" /></Link>
+        : <KpiCell label="Pending dispatch" value={data.pendingDispatch} detail="Ready to dispatch" />}
       <KpiCell label="Dispatched today" value={data.dispatchedToday} detail="Orders moved" tone="success" />
       <KpiCell label="Received today" value={data.receivedToday} detail="Units received" />
-      <Link href="/dashboard/inventory" className="contents"><KpiCell label="Stock alerts" value={data.lowStockCount} detail="Low or out of stock" tone={data.lowStockCount ? "warning" : "neutral"} className="cursor-pointer hover:bg-brand-soft/45" /></Link>
+      {isStaffModuleEnabled("/dashboard/inventory")
+        ? <Link href="/dashboard/inventory" className="contents"><KpiCell label="Stock alerts" value={data.lowStockCount} detail="Low or out of stock" tone={data.lowStockCount ? "warning" : "neutral"} className="cursor-pointer hover:bg-brand-soft/45" /></Link>
+        : <KpiCell label="Stock alerts" value={data.lowStockCount} detail="Low or out of stock" tone={data.lowStockCount ? "warning" : "neutral"} />}
     </KpiStrip>
 
     {data.lowStockItems.length > 0 && <section className="crm-surface">

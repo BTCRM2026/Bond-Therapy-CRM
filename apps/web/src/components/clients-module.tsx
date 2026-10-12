@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { FilterMenu } from "@/components/ui/filter-menu";
 import { Input } from "@/components/ui/input";
+import { SuccessToast } from "@/components/ui/toast";
 
 type Client = {
   id: string;
@@ -41,6 +42,11 @@ type Client = {
   email: string | null;
   area: string | null;
   city: string;
+  state: string | null;
+  pincode: string | null;
+  fullAddress: string | null;
+  headquarter: string | null;
+  usedProducts: string | null;
   potential: string | null;
   overallRating: number | null;
   assignedSalesperson: { id: string; name: string } | null;
@@ -81,6 +87,8 @@ export function ClientsModule({
   const [search, setSearch] = useState("");
   const [clientType, setClientType] = useState("");
   const [category, setCategory] = useState("");
+  const [potential, setPotential] = useState("");
+  const [notice, setNotice] = useState("");
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
@@ -106,6 +114,7 @@ export function ClientsModule({
         if (search.trim()) params.set("search", search.trim());
         if (clientType) params.set("clientType", clientType);
         if (category) params.set("category", category);
+        if (potential) params.set("potential", potential);
         const response = await fetch(`/api/clients?${params}`, {
           cache: "no-store",
         });
@@ -123,15 +132,17 @@ export function ClientsModule({
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [page, search, clientType, category]);
+  }, [page, search, clientType, category, potential]);
   const clearFilters = () => {
     setSearch("");
     setClientType("");
     setCategory("");
+    setPotential("");
     setPage(1);
   };
   return (
     <>
+      {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
       {headerSlot &&
         createPortal(
           <Button onClick={() => setFormOpen(true)}>
@@ -142,7 +153,7 @@ export function ClientsModule({
           headerSlot,
         )}
       <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px_170px_auto]">
+        <div className={`grid gap-3 ${allSalons ? "sm:grid-cols-[minmax(0,1fr)_170px_170px_auto]" : "sm:grid-cols-[minmax(0,1fr)_190px_auto]"}`}>
           <label className="relative">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle"
@@ -155,13 +166,19 @@ export function ClientsModule({
                 setSearch(event.target.value);
                 setPage(1);
               }}
-              placeholder="Search salon, owner, phone or city"
+              placeholder={allSalons ? "Search salon, owner, phone or city" : "Search salon, owner, phone or HQ"}
               aria-label="Search clients"
             />
           </label>
-          <FilterMenu value={clientType} fullWidth showLabelOnMobile ariaLabel="Filter clients by type" onSelect={(value) => { setClientType(value); setPage(1); }} options={[{ key: "", label: "All client types" }, { key: "NEW_CLIENT", label: "New client" }, { key: "EXISTING_CLIENT", label: "Existing client" }]} />
-          <FilterMenu value={category} fullWidth showLabelOnMobile ariaLabel="Filter clients by category" onSelect={(value) => { setCategory(value); setPage(1); }} options={[{ key: "", label: "All categories" }, { key: "SALON", label: "Salon" }, { key: "UNISEX", label: "Unisex" }, { key: "STUDIO", label: "Studio" }, { key: "ACADEMY", label: "Academy" }]} />
-          {(search || clientType || category) && (
+          {allSalons ? (
+            <>
+              <FilterMenu value={clientType} fullWidth showLabelOnMobile ariaLabel="Filter clients by type" onSelect={(value) => { setClientType(value); setPage(1); }} options={[{ key: "", label: "All client types" }, { key: "NEW_CLIENT", label: "New client" }, { key: "EXISTING_CLIENT", label: "Existing client" }]} />
+              <FilterMenu value={category} fullWidth showLabelOnMobile ariaLabel="Filter clients by category" onSelect={(value) => { setCategory(value); setPage(1); }} options={[{ key: "", label: "All categories" }, { key: "SALON", label: "Salon" }, { key: "UNISEX", label: "Unisex" }, { key: "STUDIO", label: "Studio" }, { key: "ACADEMY", label: "Academy" }]} />
+            </>
+          ) : (
+            <FilterMenu value={potential} fullWidth showLabelOnMobile ariaLabel="Filter clients by potential" onSelect={(value) => { setPotential(value); setPage(1); }} options={[{ key: "", label: "All potential" }, { key: "HIGH", label: "High potential" }, { key: "MEDIUM", label: "Medium potential" }, { key: "LOW", label: "Low potential" }]} />
+          )}
+          {(search || clientType || category || potential) && (
             <Button variant="secondary" onClick={clearFilters}>
               <X size={15} />
               Clear
@@ -180,7 +197,7 @@ export function ClientsModule({
           <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5">
             <div>
               <p className="text-sm font-semibold text-foreground">
-                {allSalons ? "All salons" : "Assigned salons"}
+                {allSalons ? "All salons" : "My clients"}
               </p>
               <p className="mt-0.5 text-xs text-muted">
                 {data?.total ?? 0} relationship{data?.total === 1 ? "" : "s"}
@@ -193,6 +210,8 @@ export function ClientsModule({
               <div className="h-20 animate-pulse rounded-lg bg-background" />
               <div className="h-20 animate-pulse rounded-lg bg-background" />
             </div>
+          ) : data?.items.length && !allSalons ? (
+            <StaffClientList items={data.items} />
           ) : data?.items.length ? (
             <>
               <div className="hidden xl:block">
@@ -307,20 +326,21 @@ export function ClientsModule({
           )}
         </section>
       </div>
-      {formOpen && (
-        <ClientForm
-          onClose={() => setFormOpen(false)}
-          onSaved={async () => {
-            setFormOpen(false);
-            setPage(1);
-            const response = await fetch("/api/clients?page=1&pageSize=20", {
-              cache: "no-store",
-            });
-            if (response.ok)
-              setData((await response.json()) as ClientListResponse);
-          }}
-        />
-      )}
+      {formOpen && (() => {
+        const onSaved = async (salonName?: string) => {
+          setFormOpen(false);
+          setPage(1);
+          if (salonName) setNotice(`${salonName} was added to your client profiles.`);
+          const response = await fetch("/api/clients?page=1&pageSize=20", {
+            cache: "no-store",
+          });
+          if (response.ok)
+            setData((await response.json()) as ClientListResponse);
+        };
+        return allSalons
+          ? <ClientForm onClose={() => setFormOpen(false)} onSaved={onSaved} />
+          : <ClientProfileForm onClose={() => setFormOpen(false)} onSaved={onSaved} />;
+      })()}
     </>
   );
 }
@@ -420,11 +440,10 @@ function EmptyClients({ onAdd }: { onAdd: () => void }) {
     <div className="px-5 py-14 text-center">
       <Building2 className="mx-auto text-subtle" size={28} />
       <p className="mt-3 text-sm font-semibold text-foreground">
-        No salons assigned yet
+        No clients yet
       </p>
       <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted">
-        Add your first client relationship and Salon 360 will keep visits,
-        follow-ups and notes together.
+        Add your first client profile with the salon, owner and contact details.
       </p>
       <Button className="mt-5" onClick={onAdd}>
         <Plus size={15} />
@@ -821,6 +840,289 @@ function ClientForm({
     </div>
   );
 }
+const INDIAN_STATES = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"];
+
+const POTENTIAL_OPTIONS = [
+  { key: "HIGH", label: "High", active: "border-success bg-success-soft text-success", dot: "bg-success" },
+  { key: "MEDIUM", label: "Medium", active: "border-warning bg-warning-soft text-warning", dot: "bg-warning" },
+  { key: "LOW", label: "Low", active: "border-brand bg-brand-soft text-brand-dark", dot: "bg-brand" },
+] as const;
+
+function PotentialBadge({ value }: { value: string | null }) {
+  if (!value) return <span className="text-xs text-subtle">Not set</span>;
+  const tone = value === "HIGH" ? "bg-success-soft text-success" : value === "MEDIUM" ? "bg-warning-soft text-warning" : "bg-brand-soft text-brand-dark";
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone}`}>{pretty(value)}</span>;
+}
+
+function StaffClientList({ items }: { items: Client[] }) {
+  return (
+    <>
+      <div className="hidden xl:block">
+        <table className="w-full text-left text-[13px]">
+          <thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted">
+            <tr>
+              <th className="px-5 py-3">Salon</th>
+              <th className="px-4 py-3">Contact</th>
+              <th className="px-4 py-3">Head quarter</th>
+              <th className="px-4 py-3">Used products</th>
+              <th className="px-4 py-3">Potential</th>
+              <th className="px-5 py-3 text-right">Open</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {items.map((client) => (
+              <tr key={client.id} className="transition-colors hover:bg-brand-soft/40">
+                <td className="px-5 py-4">
+                  <Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-foreground hover:text-brand">{client.salonName}</Link>
+                  <p className="mt-0.5 text-xs text-muted">{client.ownerName ?? "Owner not added"}</p>
+                </td>
+                <td className="px-4 py-4 text-muted">{client.primaryContact}</td>
+                <td className="px-4 py-4 text-muted">
+                  <p className="text-foreground">{client.headquarter ?? client.city}</p>
+                  <p className="mt-0.5 text-xs">{[client.state, client.pincode].filter(Boolean).join(" · ") || "—"}</p>
+                </td>
+                <td className="max-w-[220px] px-4 py-4 text-muted"><p className="line-clamp-2">{client.usedProducts ?? "—"}</p></td>
+                <td className="px-4 py-4"><PotentialBadge value={client.potential} /></td>
+                <td className="px-5 py-4 text-right">
+                  <Link className="text-xs font-semibold text-brand hover:text-brand-dark" href={`/dashboard/clients/${client.id}`}>View profile <ChevronRight className="inline" size={14} /></Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="divide-y xl:hidden">
+        {items.map((client) => (
+          <article key={client.id} className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Link href={`/dashboard/clients/${client.id}`} className="block truncate text-sm font-semibold text-foreground hover:text-brand">{client.salonName}</Link>
+                <p className="mt-1 text-xs text-muted">{client.ownerName ?? "Owner not added"}</p>
+              </div>
+              <PotentialBadge value={client.potential} />
+            </div>
+            <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs">
+              <div><dt className="text-muted">Contact</dt><dd className="mt-1"><a className="font-medium text-foreground" href={`tel:${client.primaryContact}`}>{client.primaryContact}</a></dd></div>
+              <div><dt className="text-muted">Head quarter</dt><dd className="mt-1 font-medium text-foreground">{client.headquarter ?? client.city}</dd></div>
+              <div><dt className="text-muted">State</dt><dd className="mt-1 font-medium text-foreground">{client.state ?? "Not set"}{client.pincode ? ` · ${client.pincode}` : ""}</dd></div>
+              <div><dt className="text-muted">Used products</dt><dd className="mt-1 font-medium text-foreground">{client.usedProducts ?? "Not set"}</dd></div>
+            </dl>
+            <div className="mt-3 flex gap-2">
+              <a href={`tel:${client.primaryContact}`} className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border text-xs font-semibold text-foreground"><Phone size={14} />Call</a>
+              <Link href={`/dashboard/clients/${client.id}`} className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-brand text-xs font-semibold text-white">View profile</Link>
+            </div>
+          </article>
+        ))}
+      </div>
+    </>
+  );
+}
+
+type ProfileValues = { salonName: string; ownerName: string; primaryContact: string; fullAddress: string; state: string; pincode: string; headquarter: string; usedProducts: string; potential: string };
+const emptyProfile: ProfileValues = { salonName: "", ownerName: "", primaryContact: "", fullAddress: "", state: "", pincode: "", headquarter: "", usedProducts: "", potential: "" };
+
+function validateProfile(form: ProfileValues) {
+  const errors: Partial<Record<keyof ProfileValues, string>> = {};
+  if (form.salonName.trim().length < 2) errors.salonName = "Enter the salon name.";
+  if (form.ownerName.trim().length < 2) errors.ownerName = "Enter the owner name.";
+  if (form.primaryContact.replace(/\D/g, "").length < 10) errors.primaryContact = "Enter a valid contact number (at least 10 digits).";
+  if (form.pincode.trim() && !/^\d{6}$/.test(form.pincode.trim())) errors.pincode = "Pincode must be 6 digits.";
+  if (form.headquarter.trim().length < 2) errors.headquarter = "Enter the head quarter.";
+  if (!form.potential) errors.potential = "Select the potential.";
+  return errors;
+}
+
+function ClientProfileForm({ onClose, onSaved }: { onClose: () => void; onSaved: (salonName: string) => Promise<void> }) {
+  const [form, setForm] = useState(emptyProfile);
+  const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [duplicates, setDuplicates] = useState<Array<{ id: string; salonName: string; city: string; primaryContact: string }>>([]);
+  const errors = submitted ? validateProfile(form) : {};
+  const set = (key: keyof ProfileValues) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setForm((current) => ({ ...current, [key]: event.target.value }));
+    setDuplicates([]);
+  };
+  const inputClass = (key: keyof ProfileValues) => (errors[key] ? "border-danger focus:border-danger focus:ring-danger/10" : "");
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !saving) onClose(); };
+    document.addEventListener("keydown", onKey);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = previous; };
+  }, [onClose, saving]);
+
+  const submit = async (event: FormEvent, continueOnDuplicate = false) => {
+    event.preventDefault();
+    setSubmitted(true);
+    setError("");
+    if (Object.keys(validateProfile(form)).length) {
+      requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-profile-form] [aria-invalid='true']")?.focus());
+      return;
+    }
+    setSaving(true);
+    const text = (value: string) => value.trim() || undefined;
+    try {
+      const response = await fetch("/api/clients", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          salonName: form.salonName.trim(),
+          ownerName: form.ownerName.trim(),
+          primaryContact: form.primaryContact.trim(),
+          fullAddress: text(form.fullAddress),
+          state: text(form.state),
+          pincode: text(form.pincode),
+          headquarter: form.headquarter.trim(),
+          usedProducts: text(form.usedProducts),
+          potential: form.potential,
+          city: form.headquarter.trim(),
+          category: "SALON",
+          clientType: "NEW_CLIENT",
+          ...(continueOnDuplicate ? { continueOnDuplicate: true } : {}),
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.status === 409 && data && Array.isArray(data.candidates) && data.candidates.length) {
+        setDuplicates(data.candidates);
+        setSaving(false);
+        return;
+      }
+      if (!response.ok) throw new Error(messageFrom(data, "Unable to save this client. Please try again."));
+      await onSaved(form.salonName.trim());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to save this client. Please try again.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/45 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="client-profile-title">
+      <div className="flex max-h-[94dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.16)] sm:max-h-[calc(100dvh-48px)] sm:rounded-xl">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b px-4 py-4 sm:px-6">
+          <div className="min-w-0">
+            <h2 id="client-profile-title" className="text-lg font-semibold tracking-[-0.01em] text-foreground">Add client</h2>
+            <p className="mt-1 text-xs leading-5 text-muted">Fill in the salon details. The profile is saved to your account.</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={saving} className="grid size-10 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-background disabled:opacity-50 sm:size-8" aria-label="Close"><X size={18} /></button>
+        </div>
+        <form data-profile-form onSubmit={(event) => submit(event)} noValidate className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
+            <section className="space-y-4">
+              <ProfileHeading title="Salon details" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ProfileField label="Name of salon" required error={errors.salonName}>
+                  <Input value={form.salonName} onChange={set("salonName")} className={inputClass("salonName")} aria-invalid={Boolean(errors.salonName)} maxLength={160} autoComplete="off" autoFocus />
+                </ProfileField>
+                <ProfileField label="Name of owner" required error={errors.ownerName}>
+                  <Input value={form.ownerName} onChange={set("ownerName")} className={inputClass("ownerName")} aria-invalid={Boolean(errors.ownerName)} maxLength={120} autoComplete="off" />
+                </ProfileField>
+                <div className="sm:col-span-2">
+                  <ProfileField label="Contact number" required error={errors.primaryContact}>
+                    <Input value={form.primaryContact} onChange={set("primaryContact")} className={inputClass("primaryContact")} aria-invalid={Boolean(errors.primaryContact)} type="tel" inputMode="tel" maxLength={20} placeholder="e.g. 98765 43210" autoComplete="off" />
+                  </ProfileField>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <ProfileHeading title="Location" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <ProfileField label="Address">
+                    <textarea value={form.fullAddress} onChange={set("fullAddress")} rows={2} maxLength={500} className="w-full resize-none rounded-lg border bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10" autoComplete="off" />
+                  </ProfileField>
+                </div>
+                <ProfileField label="State">
+                  <Input value={form.state} onChange={set("state")} list="client-profile-states" maxLength={100} placeholder="Select or type" autoComplete="off" />
+                  <datalist id="client-profile-states">{INDIAN_STATES.map((name) => <option key={name} value={name} />)}</datalist>
+                </ProfileField>
+                <ProfileField label="Pincode" error={errors.pincode}>
+                  <Input value={form.pincode} onChange={set("pincode")} className={inputClass("pincode")} aria-invalid={Boolean(errors.pincode)} inputMode="numeric" maxLength={6} placeholder="6 digits" autoComplete="off" />
+                </ProfileField>
+                <div className="sm:col-span-2">
+                  <ProfileField label="Head quarter" required error={errors.headquarter}>
+                    <Input value={form.headquarter} onChange={set("headquarter")} className={inputClass("headquarter")} aria-invalid={Boolean(errors.headquarter)} maxLength={120} placeholder="e.g. Vadodara" autoComplete="off" />
+                  </ProfileField>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <ProfileHeading title="Business" />
+              <ProfileField label="Used product name" hint="Brands or products the salon uses today. Separate with commas.">
+                <Input value={form.usedProducts} onChange={set("usedProducts")} maxLength={300} placeholder="e.g. Keratin shampoo, hair spa cream" autoComplete="off" />
+              </ProfileField>
+              <div role="group" aria-labelledby="potential-label">
+                <p id="potential-label" className="mb-1.5 text-xs font-medium text-foreground">Potential <span className="text-danger">*</span></p>
+                <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Potential">
+                  {POTENTIAL_OPTIONS.map((option) => {
+                    const selected = form.potential === option.key;
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setForm((current) => ({ ...current, potential: option.key }))}
+                        className={`flex h-11 items-center justify-center gap-2 rounded-lg border text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/20 ${selected ? option.active : errors.potential ? "border-danger bg-white text-muted" : "bg-white text-muted hover:border-brand/30 hover:text-foreground"}`}
+                      >
+                        <span className={`size-2 rounded-full ${selected ? option.dot : "bg-border"}`} />
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {errors.potential && <p className="mt-1.5 text-xs text-danger" role="alert">{errors.potential}</p>}
+              </div>
+            </section>
+
+            {duplicates.length > 0 && (
+              <div className="rounded-lg border border-warning/30 bg-warning-soft/60 p-4" role="alert">
+                <p className="text-sm font-semibold text-foreground">A similar client already exists</p>
+                <ul className="mt-2 space-y-1 text-xs text-muted">
+                  {duplicates.map((item) => <li key={item.id}><span className="font-medium text-foreground">{item.salonName}</span> · {item.city} · {item.primaryContact}</li>)}
+                </ul>
+                <p className="mt-2 text-xs text-muted">Check the contact number or salon name, or save anyway if this is a different salon.</p>
+              </div>
+            )}
+            {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}
+          </div>
+          <div className="flex shrink-0 gap-2 border-t bg-white px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:items-center sm:justify-end sm:px-6">
+            <Button type="button" variant="secondary" className="flex-1 sm:flex-none" onClick={onClose} disabled={saving}>Cancel</Button>
+            {duplicates.length > 0 ? (
+              <Button type="button" className="flex-[2] sm:flex-none" disabled={saving} onClick={(event) => submit(event, true)}>
+                {saving && <LoaderCircle className="animate-spin" size={16} />}
+                {saving ? "Saving…" : "Save anyway"}
+              </Button>
+            ) : (
+              <Button type="submit" className="flex-[2] sm:flex-none" disabled={saving}>
+                {saving && <LoaderCircle className="animate-spin" size={16} />}
+                {saving ? "Saving…" : "Save client"}
+              </Button>
+            )}
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ProfileHeading({ title }: { title: string }) {
+  return <h3 className="border-b pb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{title}</h3>;
+}
+
+function ProfileField({ label, required = false, error, hint, children }: { label: string; required?: boolean; error?: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-medium text-foreground">{label}{required && <span className="text-danger"> *</span>}</span>
+      {children}
+      {error ? <span className="block text-xs text-danger" role="alert">{error}</span> : hint ? <span className="block text-xs text-subtle">{hint}</span> : null}
+    </label>
+  );
+}
+
 function Select({
   value,
   onChange,

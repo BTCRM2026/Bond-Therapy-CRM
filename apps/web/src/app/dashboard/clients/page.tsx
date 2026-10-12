@@ -18,5 +18,5 @@ export default async function ClientsPage() {
   const session = await requireSession(portal);
   const initial = await loadClients(portal);
   const admin = portal === "ADMIN";
-  return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} roleKey={session.roles[0]?.key} headerTitle="Salon 360" headerSubtitle={admin ? "Every salon relationship, history and growth opportunity" : "Your assigned salon relationships"} portal={portal}><ClientsModule initial={initial} allSalons={admin} /></DashboardShell>;
+  return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} roleKey={session.roles[0]?.key} headerTitle={admin ? "Salon 360" : "Client Profile"} headerSubtitle={admin ? "Every salon relationship, history and growth opportunity" : "Salon details for the clients you handle"} portal={portal}><ClientsModule initial={initial} allSalons={admin} /></DashboardShell>;
 }

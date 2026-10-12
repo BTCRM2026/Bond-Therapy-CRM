@@ -4,6 +4,7 @@ import { Activity, AlertTriangle, Award, Building2, CalendarClock, Clock3, FileC
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
+import { isStaffModuleEnabled } from "@/lib/staff-modules";
 import { cn } from "@/lib/utils";
 
 const SALES_ROLE_KEYS = new Set(["SALES_MANAGER", "SALES_EXECUTIVE"]);
@@ -17,7 +18,7 @@ function staffGroups(roleKey?: string) {
   const operations = isSales ? [
     { href: "/dashboard/follow-ups", label: "Follow-ups", icon: ListChecks, exact: false },
     { href: "/dashboard/leads", label: "Leads", icon: UserPlus, exact: false },
-    { href: "/dashboard/clients", label: "Clients", icon: Building2, exact: false },
+    { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
     { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart, exact: false },
     { href: "/dashboard/invoices", label: "Invoices", icon: ReceiptText, exact: false },
     { href: "/dashboard/products", label: "Products", icon: Package, exact: false },
@@ -25,11 +26,11 @@ function staffGroups(roleKey?: string) {
   ] : isAccounts ? [
     { href: "/dashboard/orders", label: "Order approvals", icon: FileCheck2, exact: false },
     { href: "/dashboard/invoices", label: "Invoices & payments", icon: ReceiptText, exact: false },
-    { href: "/dashboard/clients", label: "Customers", icon: Building2, exact: false },
+    { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
     { href: "/dashboard/products", label: "Product master", icon: Package, exact: false },
   ] : [
     ...(isWarehouse ? [{ href: "/dashboard/dispatch", label: "Dispatch", icon: Truck, exact: false }] : []),
-    { href: "/dashboard/clients", label: "Clients", icon: Building2, exact: false },
+    { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
     ...(isWarehouse ? [{ href: "/dashboard/inventory", label: "Inventory", icon: AlertTriangle, exact: false }] : []),
   ];
   const planning = isSales ? [
@@ -40,12 +41,13 @@ function staffGroups(roleKey?: string) {
     { href: "/dashboard/my-performance", label: "My Performance", icon: Award, exact: false },
     { href: "/dashboard/attendance", label: "Attendance", icon: Clock3, exact: false },
   ] : [];
+  const visible = <T extends { href: string }>(items: T[]) => items.filter((item) => isStaffModuleEnabled(item.href));
   return [
-    { label: "Overview", items: overview },
-    { label: isWarehouse ? "Warehouse" : isAccounts ? "Accounts & Billing" : "Sales & Clients", items: operations },
-    ...(planning.length ? [{ label: "Planning & Performance", items: planning }] : []),
-    { label: "Account", items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }] },
-  ];
+    { label: "Overview", items: visible(overview) },
+    { label: isWarehouse ? "Warehouse" : isAccounts ? "Accounts & Billing" : "Sales & Clients", items: visible(operations) },
+    { label: "Planning & Performance", items: visible(planning) },
+    { label: "Account", items: visible([{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }]) },
+  ].filter((group) => group.items.length > 0);
 }
 
 export function SidebarNav({ portal = "ADMIN", roleKey, distributionPartnerType, canManageStaff = false, onNavigate }: { portal?: PortalType; roleKey?: string; distributionPartnerType?: "SUPER_STOCKIST" | "DISTRIBUTOR"; canManageStaff?: boolean; onNavigate?: () => void }) {
