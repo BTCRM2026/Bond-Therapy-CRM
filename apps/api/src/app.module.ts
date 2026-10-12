@@ -26,6 +26,7 @@ import { DistributorStockModule } from './distributor-stock/distributor-stock.mo
 import { ReplenishmentModule } from './replenishment/replenishment.module.js';
 import { LettersModule } from './letters/letters.module.js';
 import { ExchangesModule } from './exchanges/exchanges.module.js';
+import { DailyReportsModule } from './daily-reports/daily-reports.module.js';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { ExchangesModule } from './exchanges/exchanges.module.js';
     ReplenishmentModule,
     LettersModule,
     ExchangesModule,
+    DailyReportsModule,
   ],
   controllers: [AppController],
 })

@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, AlertTriangle, Award, Building2, CalendarClock, Clock3, FileCheck2, FileText, IndianRupee, LayoutDashboard, ListChecks, MapPin, Navigation, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
+import { Activity, AlertTriangle, Award, Building2, CalendarClock, ClipboardList, Clock3, FileCheck2, FileText, IndianRupee, LayoutDashboard, ListChecks, MapPin, Navigation, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
@@ -19,6 +19,7 @@ function staffGroups(roleKey?: string) {
     { href: "/dashboard/follow-ups", label: "Follow-ups", icon: ListChecks, exact: false },
     { href: "/dashboard/leads", label: "Leads", icon: UserPlus, exact: false },
     { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
+    { href: "/dashboard/daily-report", label: "Daily Report", icon: ClipboardList, exact: false },
     { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart, exact: false },
     { href: "/dashboard/invoices", label: "Invoices", icon: ReceiptText, exact: false },
     { href: "/dashboard/products", label: "Products", icon: Package, exact: false },

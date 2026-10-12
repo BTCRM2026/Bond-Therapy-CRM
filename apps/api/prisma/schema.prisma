@@ -97,6 +97,8 @@ model User {
   territoryAssignmentsMade          TerritoryAssignment[]         @relation("TerritoryAssignmentCreator")
   routes                            Route[]                       @relation("RouteStaff")
   routeChangesMade                  RouteChangeLog[]              @relation("RouteChangeActor")
+  dailySalesReports                 DailySalesReport[]            @relation("DailySalesReportStaff")
+  coWorkedDailySalesReports         DailySalesReport[]            @relation("DailySalesReportCoworker")
   targetsCreated                    Target[]                      @relation("TargetCreator")
   incentiveRulesCreated             IncentiveRule[]               @relation("IncentiveRuleCreator")
   incentiveCalculations             IncentiveCalculation[]        @relation("IncentiveCalcOwner")
@@ -1400,20 +1402,75 @@ enum RouteChangeType {
 }
 
 model Route {
-  id        String           @id @default(cuid())
-  staffId   String
-  staff     User             @relation("RouteStaff", fields: [staffId], references: [id], onDelete: Cascade)
-  routeDate DateTime         @db.Date
-  status    RouteStatus      @default(DRAFT)
-  notes     String?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  stops     RouteStop[]
-  changes   RouteChangeLog[]
+  id               String            @id @default(cuid())
+  staffId          String
+  staff            User              @relation("RouteStaff", fields: [staffId], references: [id], onDelete: Cascade)
+  routeDate        DateTime          @db.Date
+  status           RouteStatus       @default(DRAFT)
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  stops            RouteStop[]
+  changes          RouteChangeLog[]
+  dailySalesReport DailySalesReport? @relation("DailySalesReportTomorrowRoute")
 
   @@unique([staffId, routeDate])
   @@index([staffId, routeDate])
   @@index([status])
+}
+
+enum DailyCallCustomerType {
+  EXISTING
+  NEW
+}
+
+enum DailyCallResult {
+  ORDER
+  NO_ORDER
+  FOLLOW_UP
+}
+
+model DailySalesReport {
+  id              String           @id @default(cuid())
+  staffId         String
+  staff           User             @relation("DailySalesReportStaff", fields: [staffId], references: [id], onDelete: Cascade)
+  reportDate      DateTime         @db.Date
+  headquarter     String?
+  workingTown     String
+  coworkerId      String?
+  coworker        User?            @relation("DailySalesReportCoworker", fields: [coworkerId], references: [id], onDelete: SetNull)
+  tomorrowTown    String
+  tomorrowRouteId String?          @unique
+  tomorrowRoute   Route?           @relation("DailySalesReportTomorrowRoute", fields: [tomorrowRouteId], references: [id], onDelete: SetNull)
+  noOrderReason   String?
+  submittedAt     DateTime         @default(now())
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  calls           DailySalesCall[]
+
+  @@unique([staffId, reportDate])
+  @@index([staffId, submittedAt])
+  @@index([coworkerId])
+}
+
+model DailySalesCall {
+  id              String                @id @default(cuid())
+  reportId        String
+  report          DailySalesReport      @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sequence        Int
+  customerName    String
+  customerType    DailyCallCustomerType
+  result          DailyCallResult
+  orderValue      Decimal?              @db.Decimal(12, 2)
+  remark          String?
+  visitPhoto      Bytes
+  photoMime       String
+  photoCapturedAt DateTime              @default(now())
+  createdAt       DateTime              @default(now())
+
+  @@index([reportId, sequence])
+  @@index([customerType])
+  @@index([result])
 }
 
 model RouteStop {

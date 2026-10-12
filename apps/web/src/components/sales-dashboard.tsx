@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarClock, CheckCircle2, Clock3, IndianRupee, LogIn, MapPin, Navigation, Target, TrendingUp, Trophy, UserPlus } from "lucide-react";
+import { Building2, CalendarClock, CheckCircle2, ClipboardList, Clock3, IndianRupee, LogIn, MapPin, Navigation, Target, TrendingUp, Trophy, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
@@ -88,6 +88,7 @@ export function SalesDashboardWidgets() {
 
 const QUICK_LINKS = [
   { href: "/dashboard/clients", icon: Building2, label: "Client Profile" },
+  { href: "/dashboard/daily-report", icon: ClipboardList, label: "Daily Report" },
   { href: "/dashboard/leads", icon: UserPlus, label: "Add lead" },
   { href: "/dashboard/follow-ups", icon: Clock3, label: "Follow-ups" },
   { href: "/dashboard/orders", icon: TrendingUp, label: "Orders" },

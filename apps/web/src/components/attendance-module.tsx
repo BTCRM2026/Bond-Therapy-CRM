@@ -1,6 +1,8 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, Clock3, FilePenLine, LogIn, LogOut, MapPin } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, ClipboardList, Clock3, FilePenLine, LogIn, LogOut, MapPin } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -14,6 +16,8 @@ type TodayRecord = { punchInAt: string | null; punchOutAt: string | null; punchI
 type MonthlyRecord = { date: string; punchInAt: string | null; punchOutAt: string | null; status: DayStatus; workingHours: number | null; isLate: boolean; isEarlyCheckout: boolean };
 type Monthly = { period: { month: number; year: number }; summary: { present: number; late: number; halfDay: number; absent: number; leave: number; holiday: number; weeklyOff: number; totalHours: number }; records: MonthlyRecord[] };
 type RequestItem = { id: string; status: "PENDING" | "APPROVED" | "REJECTED"; reason: string; date?: string; startDate?: string; endDate?: string };
+type DailyCallProof = { id: string; customerName: string; customerType: "EXISTING" | "NEW"; result: "ORDER" | "NO_ORDER" | "FOLLOW_UP"; orderValue: number | null; remark: string | null };
+type DailyActivity = { summary: { totalCalls: number; productiveCalls: number; totalValue: number; newCalls: number }; calls: DailyCallProof[] };
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const time = (value: string) => new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" }).format(new Date(value));
@@ -38,6 +42,8 @@ export function AttendanceModule() {
   const [monthly, setMonthly] = useState<Monthly | null>(null);
   const [corrections, setCorrections] = useState<RequestItem[]>([]);
   const [leaves, setLeaves] = useState<RequestItem[]>([]);
+  const [dailyActivity, setDailyActivity] = useState<DailyActivity | null>(null);
+  const [dailyReportAvailable, setDailyReportAvailable] = useState(false);
   const [modal, setModal] = useState<"correction" | "leave" | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -47,12 +53,13 @@ export function AttendanceModule() {
 
   const load = async (cancelled?: () => boolean) => {
     try {
-      const responses = await Promise.all([fetch("/api/attendance/today", { cache: "no-store" }), fetch("/api/attendance/monthly", { cache: "no-store" }), fetch("/api/attendance/corrections/mine", { cache: "no-store" }), fetch("/api/attendance/leave/mine", { cache: "no-store" })]);
+      const responses = await Promise.all([fetch("/api/attendance/today", { cache: "no-store" }), fetch("/api/attendance/monthly", { cache: "no-store" }), fetch("/api/attendance/corrections/mine", { cache: "no-store" }), fetch("/api/attendance/leave/mine", { cache: "no-store" }), fetch("/api/daily-reports/today", { cache: "no-store" })]);
       if (cancelled?.()) return;
       const data = await Promise.all(responses.map((response) => response.json().catch(() => null)));
-      const failed = responses.findIndex((response) => !response.ok);
+      const failed = responses.slice(0, 4).findIndex((response) => !response.ok);
       if (failed >= 0) throw new Error(messageFrom(data[failed], "Unable to load attendance data."));
       setToday(data[0] as TodayRecord); setMonthly(data[1] as Monthly); setCorrections(data[2] as RequestItem[]); setLeaves(data[3] as RequestItem[]); setError("");
+      if (responses[4].ok) { const reportData = data[4] as { report?: DailyActivity | null }; setDailyReportAvailable(true); setDailyActivity(reportData.report ?? null); }
     } catch (cause) { if (!cancelled?.()) setError(cause instanceof Error ? cause.message : "Unable to load attendance data."); }
     finally { if (!cancelled?.()) setLoading(false); }
   };
@@ -96,6 +103,17 @@ export function AttendanceModule() {
       <div className="grid gap-2 border-t bg-background/50 p-3 sm:grid-cols-2 sm:px-5"><Button variant="secondary" onClick={() => setModal("correction")}><FilePenLine size={15} />Request correction</Button><Button variant="secondary" onClick={() => setModal("leave")}><CalendarDays size={15} />Request leave</Button></div>
     </section>
 
+    {dailyReportAvailable && <section className="crm-surface overflow-hidden">
+      <div className="flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div className="flex items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"><ClipboardList size={17} /></span><div><h2 className="text-sm font-semibold text-foreground">Today&apos;s field activity</h2><p className="mt-0.5 text-xs text-muted">Call records and visit proofs from your daily report</p></div></div>
+        <Link href="/dashboard/daily-report" className="inline-flex h-9 items-center justify-center rounded-lg border bg-white px-3 text-xs font-semibold text-foreground hover:bg-background">{dailyActivity ? "Open report" : "Add daily report"}</Link>
+      </div>
+      {dailyActivity ? <>
+        <div className="grid grid-cols-3 divide-x border-b bg-background/45"><AttendanceMetric label="Calls" value={dailyActivity.summary.totalCalls} /><AttendanceMetric label="Orders" value={dailyActivity.summary.productiveCalls} /><AttendanceMetric label="Value" value={`₹${dailyActivity.summary.totalValue.toLocaleString("en-IN")}`} /></div>
+        <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3">{dailyActivity.calls.map((call, index) => <article key={call.id} className="overflow-hidden rounded-lg border bg-white"><div className="relative aspect-[16/10] bg-background"><Image src={`/api/daily-reports/calls/${call.id}/photo`} alt={`Call proof for ${call.customerName}`} fill sizes="(max-width: 640px) 100vw, 320px" className="object-cover" unoptimized /><span className="absolute left-2 top-2 rounded-md bg-foreground/80 px-2 py-1 text-[10px] font-semibold text-white">Call {index + 1}</span></div><div className="p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{call.customerName}</p><p className="mt-0.5 text-[11px] text-muted">{call.customerType === "NEW" ? "New customer" : "Existing customer"}</p></div><span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${call.result === "ORDER" ? "bg-success-soft text-success" : call.result === "FOLLOW_UP" ? "bg-warning-soft text-warning" : "bg-background text-muted"}`}>{pretty(call.result)}</span></div>{call.remark && <p className="mt-2 line-clamp-2 text-xs leading-4 text-muted">{call.remark}</p>}</div></article>)}</div>
+      </> : <div className="px-5 py-9 text-center"><Camera size={24} className="mx-auto text-subtle" /><p className="mt-2 text-sm font-semibold text-foreground">No call proofs added yet</p><p className="mt-1 text-xs text-muted">Submit today&apos;s calls to connect field work with attendance.</p></div>}
+    </section>}
+
     {monthly && <section className="crm-surface overflow-hidden">
       <div className="border-b px-4 py-3 sm:px-5"><p className="text-sm font-semibold text-foreground">{MONTHS[monthly.period.month - 1]} {monthly.period.year}</p><p className="mt-0.5 text-xs text-muted">{monthly.summary.present} present · {monthly.summary.totalHours} hours · {monthly.summary.absent} absent</p></div>
       {monthly.records.length ? <div className="divide-y">{monthly.records.map((record) => <div key={record.date} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div className="flex items-center gap-2"><p className="text-sm text-foreground">{dateLabel(record.date)}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusTone[record.status]}`}>{pretty(record.status)}</span></div><p className="text-xs text-muted">{record.punchInAt ? time(record.punchInAt) : "—"} – {record.punchOutAt ? time(record.punchOutAt) : "—"}{record.workingHours != null ? ` · ${record.workingHours.toFixed(2)}h` : ""}</p></div>)}</div> : <div className="px-5 py-8 text-center text-xs text-muted">No attendance entries yet this month.</div>}
@@ -106,6 +124,8 @@ export function AttendanceModule() {
     {modal === "leave" && <LeaveModal onClose={() => setModal(null)} onDone={async () => { setModal(null); await load(); setNotice("Leave request submitted."); }} />}
   </div>;
 }
+
+function AttendanceMetric({ label, value }: { label: string; value: string | number }) { return <div className="px-3 py-3 text-center sm:px-4"><p className="text-[10px] font-medium uppercase tracking-wide text-muted">{label}</p><p className="mt-1 text-sm font-semibold text-foreground">{value}</p></div>; }
 
 function RequestList({ title, items }: { title: string; items: RequestItem[] }) { return <section className="crm-surface overflow-hidden"><div className="border-b px-4 py-3"><h2 className="text-sm font-semibold text-foreground">{title}</h2></div>{items.length ? <div className="divide-y">{items.slice(0, 5).map((item) => <div key={item.id} className="flex items-start justify-between gap-3 px-4 py-3"><div><p className="text-xs font-medium text-foreground">{item.date ? dateLabel(item.date) : `${dateLabel(item.startDate!)} – ${dateLabel(item.endDate!)}`}</p><p className="mt-1 line-clamp-2 text-xs text-muted">{item.reason}</p></div><span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.status === "APPROVED" ? "bg-success-soft text-success" : item.status === "REJECTED" ? "bg-red-50 text-danger" : "bg-warning-soft text-warning"}`}>{pretty(item.status)}</span></div>)}</div> : <p className="px-4 py-6 text-center text-xs text-muted">No requests yet.</p>}</section>; }
 
