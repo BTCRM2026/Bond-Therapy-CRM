@@ -170,7 +170,6 @@ if (distributorLoginId && distributorEmail && distributorPassword) {
 
 }
 
-const titleCase = (value) => value.trim().toLowerCase().replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
 const categoryFor = (name) => {
   const value = name.toLowerCase();
   if (value.includes('conditionar') || value.includes('conditioner')) return 'CONDITIONER';
@@ -187,31 +186,75 @@ const categoryFor = (name) => {
 };
 const unitFor = (category) => category === 'KIT' ? 'kit' : ['SHAMPOO', 'CONDITIONER', 'MASK', 'OIL_SERUM', 'LIQUID', 'STYLING'].includes(category) ? 'bottle' : ['COLOR', 'DEVELOPER'].includes(category) ? 'tube' : 'piece';
 const catalogue = [
-  ['KERAFILL PRE SHAMPOO', 2500], ['HAIR KERAFILL TREATMENT', 16000], ['KERATIN POST MASK', 2500], ['KERA RECOVERY SHAMPOO', 1200], ['KERA RECOVERY CONDITIONAR', 1200],
-  ['STRAIGHT THERAPY A', 1700], ['STRAIGHT THERAPY B', 300], ['HYDRA ACTIVE SHAMPOO', 950], ['HYDRA ACTIVE CONDITIONAR', 950], ['HYDRA ACTIVE SHAMPOO', 2500],
-  ['HYDRA ACTIVE CONDITIONAR', 2500], ['REVITALIZING HAIR MASK', 1199], ['INJECTION REPAIR SHAMPOO', 900], ['INJECTION REPAIR MASK', 1050], ['INJECTION SMOOTHING SHAMPOO', 900],
-  ['INJECTION SMOOTHING MASK', 1050], ['INJECTION NUTRI OIL SHAMPOO', 900], ['INJECTION NUTRI OIL MASK', 1050], ['ONE STEP TREATMENT', 27000], ['SURGERY B1 BOND SHAPER', 15000],
-  ['SURGERY B2 BOND SMOOTHER', 15000], ['SURGERY B3 BOND PH', 15000], ['SURGERY B4 BOND LAMINIZER', 15000], ['SURGERY B PRO ACIDIC SHAMPOO', 1500], ['SURGERY B PRO ACIDIC MASK', 1500],
-  ['NEW BRAZILIAN S3', 15000], ['S PRO PROTEIN SHAMPOO', 2000], ['S PRO PROTEIN MASK', 1400], ['MULTI ACTION LIVING SPARY', 800], ['D PRO SHAMPOO', 1650],
-  ['D MIRACLE SCALP LIQUID', 700], ['D TREATMENT & HAIR MUD MASK', 1050], ['D MIRACLE ANTI PELLICULAIRE', 700], ['D PRO SHAMPOO', 700], ['ARGAN OIL', 1100],
-  ['S PRO PROTIN SHAMPOO', 800], ['S PRO PROTIN MASK', 800], ['S PRO SYRUM', 800], ['INJECTION REPAIR SHAMPOO', 2500], ['INJECTION NUTRI OIL SHAMPOO', 2500],
-  ['INJECTION NUTRI OIL MASK', 1700], ['INJECTION SMOOTHING SHAMPOO', 2500], ['INJECTION SMOOTHING MASK', 1700], ['INJECTION REPAIR MASK', 1700], ['GEN PRO HAIR COLOUR 2/0', 549],
-  ['GEN PRO HAIR COLOUR 3/0', 549], ['GEN PRO HAIR COLOUR 4/0', 549], ['GEN PRO HAIR COLOUR 5/0', 549], ['GEN PRO DEVELOPER', 650], ['MICROTOX', 2000],
-  ['MICROTOX SHAMPOO', 999], ['MICROTOX MASK', 999], ['BOND GOLDEN CAVIAE KIT', 9999], ['BOND PLEX KIT 100 ML', 9999], ['BOND REVIVAL LUXE 100ML X 3 NOS', 9999],
-  ['BOND REVIVAL LUXE 100ML', 3999],
+  ["Kerafill Pre Shampoo", "1000 ml", 2500],
+  ["Hair Kerafill Treatment", "1000 ml", 16000],
+  ["Keratin Post Mask", "1000 ml", 2500],
+  ["Kera Recovery Shampoo", "250 ml", 1200],
+  ["Kera Recovery Conditionar", "250 ml", 1200],
+  ["Straight Therapy A", "450 ml", 1700],
+  ["Straight Therapy B", "450 ml", 300],
+  ["Hydra Active Shampoo", "250 ml", 950],
+  ["Hydra Active Conditionar", "250 ml", 950],
+  ["Hydra Active Shampoo", "1000 ml", 2500],
+  ["Hydra Active Conditionar", "1000 ml", 2500],
+  ["Revitalizing Hair Mask", "800 gm", 1199],
+  ["Injection Repair Shampoo", "250 ml", 900],
+  ["Injection Repair Mask", "200 ml", 1050],
+  ["Injection Smoothing Shampoo", "250 ml", 900],
+  ["Injection Smoothing Mask", "200 ml", 1050],
+  ["Injection Nutri Oil Shampoo", "250 ml", 900],
+  ["Injection Nutri Oil Mask", "200 ml", 1050],
+  ["One Step Treatment", "1000 ml", 27000],
+  ["Surgery B1 Bond Shaper", "1 ltr", 15000],
+  ["Surgery B2 Bond Smoother", "500 ml", 15000],
+  ["Surgery B3 Bond PH", "1 ltr", 15000],
+  ["Surgery B4 Bond Laminizer", "1 ltr", 15000],
+  ["Surgery B Pro Acidic Shampoo", "250 ml", 1500],
+  ["Surgery B Pro Acidic Mask", "250 ml", 1500],
+  ["New Brazilian S3", "1 ltr", 15000],
+  ["S Pro Protein Shampoo", "1000 ml", 2000],
+  ["S Pro Protein Mask", "500 gm", 1400],
+  ["Multi Action Living Spary", "200 ml", 800],
+  ["D Pro Shampoo", "1 ltr", 1650],
+  ["D Miracle Scalp Liquid", "100 ml", 700],
+  ["D Treatment & Hair Mud Mask", "200 gm", 1050],
+  ["D Miracle Anti Pelliculaire", "100 ml", 700],
+  ["D Pro Shampoo", "250 ml", 700],
+  ["Argan Oil", "50 ml", 1100],
+  ["S Pro Protin Shampoo", "250 ml", 800],
+  ["S Pro Protin Mask", "250 ml", 800],
+  ["S Pro Syrum", "110 ml", 800],
+  ["Injection Repair Shampoo", "1000 ml", 2500],
+  ["Injection Nutri Oil Shampoo", "1000 ml", 2500],
+  ["Injection Nutri Oil Mask", "500 gm", 1700],
+  ["Injection Smoothing Shampoo", "1000 ml", 2500],
+  ["Injection Smoothing Mask", "500 gm", 1700],
+  ["Injection Repair Mask", "500 gm", 1700],
+  ["Gen Pro Hair Colour 2/0", "100 gm", 549],
+  ["Gen Pro Hair Colour 3/0", "100 gm", 549],
+  ["Gen Pro Hair Colour 4/0", "100 gm", 549],
+  ["Gen Pro Hair Colour 5/0", "100 gm", 549],
+  ["Gen Pro Developer", "1000 ml", 650],
+  ["Microtox", "1000 ml", 20000],
+  ["Microtox Shampoo", "250 ml", 999],
+  ["Microtox Mask", "200 gm", 999],
+  ["Bond Golden Caviae Kit", null, 9999],
+  ["Bond Plex Kit", "100 ml", 9999],
+  ["Bond Revival Luxe x 3 Nos", "300 ml", 9999],
+  ["Bond Revival Luxe", "100 ml", 3999],
 ];
 
 for (const sku of ['BT-SHM-001', 'BT-CND-001', 'BT-TRT-001', 'BT-CLR-001', 'BT-STY-001', 'BT-TL-001']) {
   await prisma.product.updateMany({ where: { sku }, data: { isActive: false } });
 }
-for (const [index, [rawName, unitPrice]] of catalogue.entries()) {
-  const name = titleCase(rawName);
+for (const [index, [name, variant, unitPrice]] of catalogue.entries()) {
+  const rawName = name;
   const category = categoryFor(rawName);
   const sku = `BT-CATALOG-${String(index + 1).padStart(3, '0')}`;
   await prisma.product.upsert({
     where: { sku },
-    update: { name, category, unit: unitFor(category), unitPrice, isActive: true },
-    create: { sku, name, category, unit: unitFor(category), unitPrice, stockOnHand: 0 },
+    update: { name, category, variant, unit: unitFor(category), unitPrice, isActive: true },
+    create: { sku, name, category, variant, unit: unitFor(category), unitPrice, stockOnHand: 0 },
   });
 }
 console.log(`Product catalogue ready: ${catalogue.length}`);

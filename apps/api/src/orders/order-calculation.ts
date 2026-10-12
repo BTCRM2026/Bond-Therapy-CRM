@@ -1,4 +1,4 @@
-type ProductForCalculation = { id: string; unitPrice: unknown; gstRate: unknown };
+type ProductForCalculation = { id: string; name?: string; variant?: string | null; unit?: string; unitPrice: unknown; gstRate: unknown };
 type RequestedItem = { productId: string; quantity: number };
 
 const paise = (value: unknown) => Math.round(Number(value || 0) * 100);
@@ -20,7 +20,7 @@ export function calculateOrder(items: RequestedItem[], products: ProductForCalcu
     const taxable = item.gross - discount;
     const gstRate = Number(item.product.gstRate ?? defaultGstRate);
     const tax = Math.round(taxable * gstRate / 100);
-    return { productId: item.productId, quantity: item.quantity, unitPrice: money(paise(item.product.unitPrice)), discountAmount: money(discount), taxableAmount: money(taxable), gstRate, taxAmount: money(tax), lineTotal: money(taxable + tax) };
+    return { productId: item.productId, productNameSnapshot: item.product.name ?? null, packageSnapshot: item.product.variant || item.product.unit || null, quantity: item.quantity, unitPrice: money(paise(item.product.unitPrice)), discountAmount: money(discount), taxableAmount: money(taxable), gstRate, taxAmount: money(tax), lineTotal: money(taxable + tax) };
   });
   const taxablePaise = calculated.reduce((sum, item) => sum + paise(item.taxableAmount), 0);
   const taxPaise = calculated.reduce((sum, item) => sum + paise(item.taxAmount), 0);

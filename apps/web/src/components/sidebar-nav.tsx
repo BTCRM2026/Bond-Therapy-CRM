@@ -20,6 +20,7 @@ function staffGroups(roleKey?: string) {
     { href: "/dashboard/leads", label: "Leads", icon: UserPlus, exact: false },
     { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
     { href: "/dashboard/daily-report", label: "Daily Report", icon: ClipboardList, exact: false },
+    { href: "/dashboard/order-form", label: "Order Form", icon: ShoppingCart, exact: false },
     { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart, exact: false },
     { href: "/dashboard/invoices", label: "Invoices", icon: ReceiptText, exact: false },
     { href: "/dashboard/products", label: "Products", icon: Package, exact: false },

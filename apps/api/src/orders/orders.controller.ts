@@ -20,6 +20,15 @@ export class OrdersController {
   @Get()
   list(@CurrentUser() actor: SessionUser, @Query() query: ListOrdersDto) { return this.orders.list(actor, query); }
 
+  @Get(':id/order-form.pdf')
+  async orderFormPdf(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Res() response: Response) {
+    const file = await this.orders.orderFormPdf(actor, id);
+    response.setHeader('content-type', 'application/pdf');
+    response.setHeader('content-disposition', `attachment; filename="${file.name}"`);
+    response.setHeader('cache-control', 'private, no-store');
+    response.send(file.buffer);
+  }
+
   @Get(':id')
   detail(@CurrentUser() actor: SessionUser, @Param('id') id: string) { return this.orders.detail(actor, id); }
 

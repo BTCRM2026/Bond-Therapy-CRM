@@ -7,6 +7,7 @@ import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateOrderDto, ListOrdersDto, UpdateOrderDto, UpdateOrderStatusDto } from './dto.js';
 import { calculateOrder } from './order-calculation.js';
+import { renderOrderForm } from './order-form-pdf.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const accountsRoles = new Set(['ACCOUNTS_BILLING']);
@@ -18,7 +19,7 @@ const orderInclude = {
   salesperson: { select: { id: true, name: true } },
   reviewedBy: { select: { id: true, name: true } },
   distributor: { select: { id: true, businessName: true } },
-  items: { include: { product: { select: { id: true, name: true, sku: true, unit: true, hsnCode: true, stockOnHand: true } } } },
+  items: { include: { product: { select: { id: true, name: true, sku: true, unit: true, variant: true, hsnCode: true, stockOnHand: true } } } },
   invoice: { select: { id: true, invoiceNumber: true, status: true, amountPaid: true, balanceDue: true } },
   deliveryProof: { select: { id: true, arrivalPhotoMime: true, deliveryPhotoMime: true } },
   distributorInvoiceAttachment: { select: { id: true, fileName: true, mime: true } },
@@ -78,6 +79,16 @@ export class OrdersService {
     if (!order) throw new NotFoundException('Order not found or you do not have access to it.');
     const activity = await this.prisma.auditLog.findMany({ where: { entity: 'ORDER', entityId: id }, include: { actor: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } });
     return { ...order, activity };
+  }
+
+  async orderFormPdf(actor: SessionUser, id: string) {
+    this.ensureAccess(actor);
+    const [order, branding] = await Promise.all([
+      this.prisma.order.findFirst({ where: { AND: [{ id }, this.visibility(actor)] }, include: orderInclude }),
+      this.prisma.billingSettings.findUnique({ where: { id: 'default' }, select: { logo: true } }),
+    ]);
+    if (!order) throw new NotFoundException('Order form not found or you do not have access to it.');
+    return { buffer: await renderOrderForm(order, branding?.logo ? Buffer.from(branding.logo) : undefined), name: `${order.orderNumber}-order-form.pdf` };
   }
 
   private async prepare(actor: SessionUser, dto: CreateOrderDto, allowAccounts = false) {

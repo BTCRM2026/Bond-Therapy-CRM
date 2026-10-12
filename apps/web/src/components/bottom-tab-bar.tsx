@@ -35,6 +35,7 @@ export function BottomTabBar({ portal = "ADMIN", roleKey, distributionPartnerTyp
           { href: "/dashboard/leads", label: "Leads", icon: UserPlus, exact: false },
           { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
           { href: "/dashboard/daily-report", label: "Report", icon: ClipboardList, exact: false },
+          { href: "/dashboard/order-form", label: "Orders", icon: ShoppingCart, exact: false },
           { href: "/dashboard/attendance", label: "Attendance", icon: Clock3, exact: false },
           { href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true },
         ]

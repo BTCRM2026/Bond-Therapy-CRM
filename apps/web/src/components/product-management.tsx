@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 import { SuccessToast } from "@/components/ui/toast";
 
-type Product = { id: string; sku?: string; name: string; category: string; unitPrice: string; hsnCode?: string | null; gstRate?: string | null; stockOnHand: number; isActive: boolean };
+type Product = { id: string; sku?: string; name: string; variant?: string | null; category: string; unitPrice: string; hsnCode?: string | null; gstRate?: string | null; stockOnHand: number; isActive: boolean };
 export type ProductListResponse = { items: Product[]; page: number; pageSize: number; total: number; hasMore: boolean };
 type ProductStats = { totalProducts: number; inStock: number; lowStock: number; outOfStock: number; inventoryValue: number };
 
@@ -148,8 +148,8 @@ export function ProductManagement({ initial }: { initial: ProductListResponse | 
         {error && <div className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger sm:mx-5" role="alert">{error}</div>}
 
         <div className="hidden max-h-[calc(100vh-290px)] overflow-auto lg:block">
-          <table className="w-full min-w-[840px] text-left text-sm [&_td:not(:first-child)]:text-center [&_th:not(:first-child)]:text-center">
-            <thead className="sticky top-0 z-10 border-b bg-background text-[12px] font-semibold text-muted"><tr><th className="px-5 py-3"><SortButton label="Product" column="name" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3">Category</th><th className="px-4 py-3"><SortButton label="MRP" column="unitPrice" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3"><SortButton label="Inventory" column="stockOnHand" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3">Stock status</th><th className="px-4 py-3">Catalogue</th><th className="px-5 py-3">Actions</th></tr></thead>
+          <table className="w-full min-w-[940px] text-left text-sm [&_td:not(:first-child)]:text-center [&_th:not(:first-child)]:text-center">
+            <thead className="sticky top-0 z-10 border-b bg-background text-[12px] font-semibold text-muted"><tr><th className="px-5 py-3"><SortButton label="Product" column="name" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Volume</th><th className="px-4 py-3"><SortButton label="MRP" column="unitPrice" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3"><SortButton label="Inventory" column="stockOnHand" sortBy={sortBy} direction={sortDirection} onSort={setSort} /></th><th className="px-4 py-3">Stock status</th><th className="px-4 py-3">Catalogue</th><th className="px-5 py-3">Actions</th></tr></thead>
             <tbody className="divide-y">
               {data?.items.map((product) => <ProductRow key={product.id} product={product} busy={busyId === product.id} onEdit={() => setEditor({ mode: "edit", product })} onToggleActive={() => toggleActive(product)} onDelete={() => remove(product)} />)}
             </tbody>
@@ -181,6 +181,7 @@ function ProductRow({ product, busy, onEdit, onToggleActive, onDelete }: RowProp
   return <tr className="transition-colors hover:bg-brand-soft/30">
     <td className={`border-l-2 px-5 py-3 ${product.stockOnHand <= 10 ? "border-l-warning" : "border-l-transparent"}`}><div><p className="font-semibold leading-5 text-foreground">{product.name}</p>{product.sku && <p className="mt-0.5 text-[11px] text-subtle">{product.sku}</p>}</div></td>
     <td className="px-4 py-3 text-muted">{pretty(product.category)}</td>
+    <td className="px-4 py-3 text-muted">{product.variant || "—"}</td>
     <td className="px-4 py-3 font-semibold tabular-nums text-foreground">{money(product.unitPrice)}</td>
     <td className="px-4 py-3"><StockCell stockOnHand={product.stockOnHand} /></td>
     <td className="px-4 py-3"><AvailabilityBadge stockOnHand={product.stockOnHand} /></td>
@@ -192,7 +193,8 @@ function ProductRow({ product, busy, onEdit, onToggleActive, onDelete }: RowProp
 function ProductCard({ product, busy, onEdit, onToggleActive, onDelete }: RowProps) {
   return <article className={`rounded-lg border bg-white p-3 ${product.stockOnHand <= 10 ? "border-l-2 border-l-warning" : ""}`}>
     <div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="break-words text-sm font-semibold leading-5 text-foreground">{product.name}</p>{product.sku && <p className="mt-0.5 text-[10px] text-subtle">{product.sku}</p>}<p className="mt-1 text-xs text-muted">{pretty(product.category)}</p></div><ProductActions product={product} busy={busy} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} /></div>
-    <dl className="mt-4 grid grid-cols-2 gap-4 border-t pt-3 text-xs">
+    <dl className="mt-4 grid grid-cols-3 gap-2 border-t pt-3 text-xs">
+      <div><dt className="text-muted">Volume</dt><dd className="mt-1 text-sm font-semibold text-foreground">{product.variant || "—"}</dd></div>
       <div><dt className="text-muted">MRP</dt><dd className="mt-1 text-sm font-semibold text-foreground">{money(product.unitPrice)}</dd></div>
       <div><dt className="text-muted">Quantity</dt><dd className="mt-1 text-sm font-semibold text-foreground">{product.stockOnHand}</dd></div>
     </dl>
@@ -226,9 +228,9 @@ function SortButton({ label, column, sortBy, direction, onSort }: { label: strin
   return <button type="button" onClick={() => onSort(column)} className={`inline-flex items-center gap-1.5 hover:text-foreground ${active ? "text-brand-dark" : "text-muted"}`}>{label}{active ? direction === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} /> : null}</button>;
 }
 
-type FormState = { name: string; category: string; unitPrice: string; stockOnHand: string; hsnCode: string; gstRate: string };
+type FormState = { name: string; variant: string; category: string; unitPrice: string; stockOnHand: string; hsnCode: string; gstRate: string };
 function toFormState(product?: Product): FormState {
-  return { name: product?.name ?? "", category: product?.category ?? "SHAMPOO", unitPrice: product?.unitPrice ?? "", stockOnHand: product ? String(product.stockOnHand) : "", hsnCode: product?.hsnCode ?? "", gstRate: product?.gstRate ?? "" };
+  return { name: product?.name ?? "", variant: product?.variant ?? "", category: product?.category ?? "SHAMPOO", unitPrice: product?.unitPrice ?? "", stockOnHand: product ? String(product.stockOnHand) : "", hsnCode: product?.hsnCode ?? "", gstRate: product?.gstRate ?? "" };
 }
 
 function ProductEditor({ mode, product, onClose, onSaved, onStockAdjusted }: { mode: "create" | "edit"; product?: Product; onClose: () => void; onSaved: (message: string) => Promise<void>; onStockAdjusted: () => void }) {
@@ -241,7 +243,7 @@ function ProductEditor({ mode, product, onClose, onSaved, onStockAdjusted }: { m
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError("");
     try {
-      const payload = { name: form.name, category: form.category, unitPrice: Number(form.unitPrice), hsnCode: form.hsnCode || undefined, gstRate: form.gstRate ? Number(form.gstRate) : undefined, ...(mode === "create" ? { stockOnHand: form.stockOnHand ? Number(form.stockOnHand) : 0 } : {}) };
+      const payload = { name: form.name, variant: form.variant.trim(), category: form.category, unitPrice: Number(form.unitPrice), hsnCode: form.hsnCode || undefined, gstRate: form.gstRate ? Number(form.gstRate) : undefined, ...(mode === "create" ? { stockOnHand: form.stockOnHand ? Number(form.stockOnHand) : 0 } : {}) };
       const response = await fetch(mode === "create" ? "/api/products" : `/api/products/${product?.id}`, { method: mode === "create" ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(messageFrom(data, `Unable to ${mode === "create" ? "add" : "update"} this product.`));
@@ -255,6 +257,7 @@ function ProductEditor({ mode, product, onClose, onSaved, onStockAdjusted }: { m
       <form onSubmit={submit} className="overflow-y-auto p-4 sm:p-5">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2"><Field label="Product name *"><Input value={form.name} onChange={set("name")} required minLength={2} maxLength={160} autoFocus /></Field><Field label="Category *"><select value={form.category} onChange={set("category")} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field></div>
+          <Field label="Volume / package size"><Input value={form.variant} onChange={set("variant")} maxLength={80} placeholder="e.g. 250 ml or 500 gm" /></Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Quantity *">
               <div className="flex items-center gap-2">
