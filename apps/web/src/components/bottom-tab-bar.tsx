@@ -64,7 +64,7 @@ export function BottomTabBar({ portal = "ADMIN", roleKey, distributionPartnerTyp
             key={item.href}
             href={item.href}
             className={cn(
-              "flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
+              "flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-center text-[10px] font-medium leading-[1.1] transition-colors sm:text-[11px]",
               active ? "text-brand" : "text-muted",
             )}
             aria-current={active ? "page" : undefined}

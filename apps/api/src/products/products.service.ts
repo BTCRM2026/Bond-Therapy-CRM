@@ -45,7 +45,7 @@ export class ProductsService {
     const filters: Prisma.ProductWhereInput[] = this.isAdmin(actor) ? [] : [{ isActive: true }];
     if (search) {
       const variants = [...new Set([search, titleCase(search), search.toLowerCase(), search.toUpperCase()])];
-      filters.push({ OR: variants.flatMap((value) => [{ name: { contains: value } }, { variant: { contains: value } }]) });
+      filters.push({ OR: variants.flatMap((value) => [{ name: { contains: value } }, { sku: { contains: value } }, { variant: { contains: value } }]) });
     }
     if (query.category) filters.push({ category: query.category });
     if (query.stockStatus === 'LOW') filters.push({ stockOnHand: { gt: 0, lte: 10 } });

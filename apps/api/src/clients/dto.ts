@@ -2,6 +2,11 @@ import { IsArray, IsBoolean, IsEmail, IsEnum, IsIn, IsInt, IsNumber, IsOptional,
 import { Type } from 'class-transformer';
 import { ClientActivityStatus, ClientActivityType, ClientCategory, ClientPotential, ClientStatus, ClientType, CustomerSegment, DemoOutcome, VisitOutcome } from '@prisma/client';
 
+const CLIENT_HEADQUARTERS = [
+  'Navsari', 'Surat', 'Vadodara', 'Ahmedabad One', 'Ahmedabad Two', 'Bhavnagar', 'Junagadh', 'Rajkot', 'Gandhinagar',
+  'Jaipur One', 'Jaipur Two', 'Indore', 'Technical: Vadodara', 'Technical: Ahmedabad', 'Technical: Rajkot', 'Technical: Jaipur',
+] as const;
+
 export class ListClientsDto {
   @IsOptional() @IsString() @MaxLength(120) search?: string;
   @IsOptional() @IsEnum(ClientStatus) status?: ClientStatus;
@@ -33,8 +38,8 @@ export class ClientDto {
   @IsOptional() @IsString() @MaxLength(120) area?: string;
   @IsString() @MinLength(2) @MaxLength(100) city!: string;
   @IsOptional() @IsString() @MaxLength(10) pincode?: string;
-  @IsOptional() @IsString() @MaxLength(120) headquarter?: string;
-  @IsOptional() @IsString() @MaxLength(300) usedProducts?: string;
+  @IsOptional() @IsString() @IsIn(CLIENT_HEADQUARTERS) @MaxLength(120) headquarter?: string;
+  @IsOptional() @IsString() @MaxLength(2000) usedProducts?: string;
   @IsOptional() @IsUrl({ require_protocol: true }) @MaxLength(500) googleMapsUrl?: string;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude?: number;

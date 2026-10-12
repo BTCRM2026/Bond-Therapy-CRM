@@ -2,7 +2,9 @@
 
 import {
   Building2,
+  Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -841,6 +843,12 @@ function ClientForm({
   );
 }
 const INDIAN_STATES = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"];
+const BUSINESS_HEADQUARTERS = ["Navsari", "Surat", "Vadodara", "Ahmedabad One", "Ahmedabad Two", "Bhavnagar", "Junagadh", "Rajkot", "Gandhinagar", "Jaipur One", "Jaipur Two", "Indore"];
+const TECHNICAL_HEADQUARTERS = ["Technical: Vadodara", "Technical: Ahmedabad", "Technical: Rajkot", "Technical: Jaipur"];
+
+function cityFromHeadquarter(headquarter: string) {
+  return headquarter.replace(/^Technical:\s*/, "").replace(/\s+(One|Two)$/, "");
+}
 
 const POTENTIAL_OPTIONS = [
   { key: "HIGH", label: "High", active: "border-success bg-success-soft text-success", dot: "bg-success" },
@@ -857,7 +865,7 @@ function PotentialBadge({ value }: { value: string | null }) {
 function StaffClientList({ items }: { items: Client[] }) {
   return (
     <>
-      <div className="hidden xl:block">
+      <div className="hidden lg:block">
         <table className="w-full text-left text-[13px]">
           <thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted">
             <tr>
@@ -891,7 +899,7 @@ function StaffClientList({ items }: { items: Client[] }) {
           </tbody>
         </table>
       </div>
-      <div className="divide-y xl:hidden">
+      <div className="divide-y lg:hidden">
         {items.map((client) => (
           <article key={client.id} className="p-4">
             <div className="flex items-start justify-between gap-3">
@@ -903,7 +911,7 @@ function StaffClientList({ items }: { items: Client[] }) {
             </div>
             <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs">
               <div><dt className="text-muted">Contact</dt><dd className="mt-1"><a className="font-medium text-foreground" href={`tel:${client.primaryContact}`}>{client.primaryContact}</a></dd></div>
-              <div><dt className="text-muted">Head quarter</dt><dd className="mt-1 font-medium text-foreground">{client.headquarter ?? client.city}</dd></div>
+              <div><dt className="text-muted">Headquarter</dt><dd className="mt-1 font-medium text-foreground">{client.headquarter ?? client.city}</dd></div>
               <div><dt className="text-muted">State</dt><dd className="mt-1 font-medium text-foreground">{client.state ?? "Not set"}{client.pincode ? ` · ${client.pincode}` : ""}</dd></div>
               <div><dt className="text-muted">Used products</dt><dd className="mt-1 font-medium text-foreground">{client.usedProducts ?? "Not set"}</dd></div>
             </dl>
@@ -919,6 +927,7 @@ function StaffClientList({ items }: { items: Client[] }) {
 }
 
 type ProfileValues = { salonName: string; ownerName: string; primaryContact: string; fullAddress: string; state: string; pincode: string; headquarter: string; usedProducts: string; potential: string };
+type CatalogueProduct = { id: string; name: string; sku: string; variant: string | null };
 const emptyProfile: ProfileValues = { salonName: "", ownerName: "", primaryContact: "", fullAddress: "", state: "", pincode: "", headquarter: "", usedProducts: "", potential: "" };
 
 function validateProfile(form: ProfileValues) {
@@ -927,7 +936,7 @@ function validateProfile(form: ProfileValues) {
   if (form.ownerName.trim().length < 2) errors.ownerName = "Enter the owner name.";
   if (form.primaryContact.replace(/\D/g, "").length < 10) errors.primaryContact = "Enter a valid contact number (at least 10 digits).";
   if (form.pincode.trim() && !/^\d{6}$/.test(form.pincode.trim())) errors.pincode = "Pincode must be 6 digits.";
-  if (form.headquarter.trim().length < 2) errors.headquarter = "Enter the head quarter.";
+  if (!form.headquarter) errors.headquarter = "Select a headquarter.";
   if (!form.potential) errors.potential = "Select the potential.";
   return errors;
 }
@@ -938,12 +947,18 @@ function ClientProfileForm({ onClose, onSaved }: { onClose: () => void; onSaved:
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [duplicates, setDuplicates] = useState<Array<{ id: string; salonName: string; city: string; primaryContact: string }>>([]);
+  const [selectedProducts, setSelectedProducts] = useState<CatalogueProduct[]>([]);
   const errors = submitted ? validateProfile(form) : {};
-  const set = (key: keyof ProfileValues) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const completedRequired = [form.salonName, form.ownerName, form.primaryContact, form.headquarter, form.potential].filter((value) => value.trim()).length;
+  const set = (key: keyof ProfileValues) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((current) => ({ ...current, [key]: event.target.value }));
     setDuplicates([]);
   };
   const inputClass = (key: keyof ProfileValues) => (errors[key] ? "border-danger focus:border-danger focus:ring-danger/10" : "");
+  const updateProducts = (products: CatalogueProduct[]) => {
+    setSelectedProducts(products);
+    setForm((current) => ({ ...current, usedProducts: products.map(productLabel).join(", ") }));
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !saving) onClose(); };
@@ -977,7 +992,7 @@ function ClientProfileForm({ onClose, onSaved }: { onClose: () => void; onSaved:
           headquarter: form.headquarter.trim(),
           usedProducts: text(form.usedProducts),
           potential: form.potential,
-          city: form.headquarter.trim(),
+          city: cityFromHeadquarter(form.headquarter.trim()),
           category: "SALON",
           clientType: "NEW_CLIENT",
           ...(continueOnDuplicate ? { continueOnDuplicate: true } : {}),
@@ -998,110 +1013,144 @@ function ClientProfileForm({ onClose, onSaved }: { onClose: () => void; onSaved:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/45 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="client-profile-title">
-      <div className="flex max-h-[94dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.16)] sm:max-h-[calc(100dvh-48px)] sm:rounded-xl">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b px-4 py-4 sm:px-6">
-          <div className="min-w-0">
-            <h2 id="client-profile-title" className="text-lg font-semibold tracking-[-0.01em] text-foreground">Add client</h2>
-            <p className="mt-1 text-xs leading-5 text-muted">Fill in the salon details. The profile is saved to your account.</p>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/45 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="client-profile-title" aria-describedby="client-profile-description">
+      <div className="flex max-h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl border bg-white shadow-[0_20px_48px_rgba(15,23,42,0.16)] sm:max-h-[calc(100dvh-48px)] sm:rounded-xl">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-4 sm:px-6 sm:py-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand-dark"><Building2 size={19} /></span>
+            <div className="min-w-0">
+              <h2 id="client-profile-title" className="text-lg font-semibold tracking-[-0.01em] text-foreground">Add client profile</h2>
+              <p id="client-profile-description" className="mt-0.5 text-xs leading-5 text-muted">Create a clear salon record for visits and follow-ups.</p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} disabled={saving} className="grid size-10 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-background disabled:opacity-50 sm:size-8" aria-label="Close"><X size={18} /></button>
+          <button type="button" onClick={onClose} disabled={saving} className="grid size-10 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-background hover:text-foreground disabled:opacity-50 sm:size-9" aria-label="Close"><X size={18} /></button>
         </div>
         <form data-profile-form onSubmit={(event) => submit(event)} noValidate className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
-            <section className="space-y-4">
-              <ProfileHeading title="Salon details" />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <ProfileField label="Name of salon" required error={errors.salonName}>
-                  <Input value={form.salonName} onChange={set("salonName")} className={inputClass("salonName")} aria-invalid={Boolean(errors.salonName)} maxLength={160} autoComplete="off" autoFocus />
-                </ProfileField>
-                <ProfileField label="Name of owner" required error={errors.ownerName}>
-                  <Input value={form.ownerName} onChange={set("ownerName")} className={inputClass("ownerName")} aria-invalid={Boolean(errors.ownerName)} maxLength={120} autoComplete="off" />
-                </ProfileField>
-                <div className="sm:col-span-2">
-                  <ProfileField label="Contact number" required error={errors.primaryContact}>
-                    <Input value={form.primaryContact} onChange={set("primaryContact")} className={inputClass("primaryContact")} aria-invalid={Boolean(errors.primaryContact)} type="tel" inputMode="tel" maxLength={20} placeholder="e.g. 98765 43210" autoComplete="off" />
-                  </ProfileField>
-                </div>
+          <div className="grid min-h-0 flex-1 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <aside className="hidden border-r bg-background/80 p-5 lg:block" aria-label="Client profile sections">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Profile details</p>
+              <div className="mt-4 space-y-1">
+                <ProfileSectionItem number="01" title="Salon details" detail="Identity and contact" />
+                <ProfileSectionItem number="02" title="Location" detail="Address and territory" />
+                <ProfileSectionItem number="03" title="Business" detail="Products and potential" />
               </div>
-            </section>
+              <div className="mt-6 rounded-lg border bg-white p-3">
+                <div className="flex items-center justify-between text-xs"><span className="font-medium text-foreground">Required details</span><span className="text-muted">{completedRequired}/5</span></div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border"><div className="h-full rounded-full bg-brand transition-[width] duration-200" style={{ width: `${completedRequired * 20}%` }} /></div>
+                <p className="mt-2 text-[11px] leading-4 text-muted">Optional details can be added now or updated later.</p>
+              </div>
+            </aside>
 
-            <section className="space-y-4">
-              <ProfileHeading title="Location" />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <ProfileField label="Address">
-                    <textarea value={form.fullAddress} onChange={set("fullAddress")} rows={2} maxLength={500} className="w-full resize-none rounded-lg border bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10" autoComplete="off" />
-                  </ProfileField>
-                </div>
-                <ProfileField label="State">
-                  <Input value={form.state} onChange={set("state")} list="client-profile-states" maxLength={100} placeholder="Select or type" autoComplete="off" />
-                  <datalist id="client-profile-states">{INDIAN_STATES.map((name) => <option key={name} value={name} />)}</datalist>
-                </ProfileField>
-                <ProfileField label="Pincode" error={errors.pincode}>
-                  <Input value={form.pincode} onChange={set("pincode")} className={inputClass("pincode")} aria-invalid={Boolean(errors.pincode)} inputMode="numeric" maxLength={6} placeholder="6 digits" autoComplete="off" />
-                </ProfileField>
-                <div className="sm:col-span-2">
-                  <ProfileField label="Head quarter" required error={errors.headquarter}>
-                    <Input value={form.headquarter} onChange={set("headquarter")} className={inputClass("headquarter")} aria-invalid={Boolean(errors.headquarter)} maxLength={120} placeholder="e.g. Vadodara" autoComplete="off" />
-                  </ProfileField>
-                </div>
+            <div className="min-h-0 overflow-y-auto overscroll-contain">
+              <div className="grid grid-cols-3 border-b bg-background/70 px-4 py-2.5 lg:hidden">
+                {['Salon', 'Location', 'Business'].map((label, index) => <div key={label} className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-muted"><span className="grid size-5 place-items-center rounded-full border bg-white text-[10px] text-foreground">{index + 1}</span>{label}</div>)}
               </div>
-            </section>
 
-            <section className="space-y-4">
-              <ProfileHeading title="Business" />
-              <ProfileField label="Used product name" hint="Brands or products the salon uses today. Separate with commas.">
-                <Input value={form.usedProducts} onChange={set("usedProducts")} maxLength={300} placeholder="e.g. Keratin shampoo, hair spa cream" autoComplete="off" />
-              </ProfileField>
-              <div role="group" aria-labelledby="potential-label">
-                <p id="potential-label" className="mb-1.5 text-xs font-medium text-foreground">Potential <span className="text-danger">*</span></p>
-                <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Potential">
-                  {POTENTIAL_OPTIONS.map((option) => {
-                    const selected = form.potential === option.key;
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        role="radio"
-                        aria-checked={selected}
-                        onClick={() => setForm((current) => ({ ...current, potential: option.key }))}
-                        className={`flex h-11 items-center justify-center gap-2 rounded-lg border text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/20 ${selected ? option.active : errors.potential ? "border-danger bg-white text-muted" : "bg-white text-muted hover:border-brand/30 hover:text-foreground"}`}
-                      >
-                        <span className={`size-2 rounded-full ${selected ? option.dot : "bg-border"}`} />
-                        {option.label}
-                      </button>
-                    );
-                  })}
+              <section className="space-y-4 border-b px-4 py-5 sm:px-6 sm:py-6">
+                <ProfileHeading title="Salon details" description="The main details used to identify and contact this client." />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <ProfileField label="Salon name" required error={errors.salonName}>
+                    <Input value={form.salonName} onChange={set("salonName")} className={inputClass("salonName")} aria-invalid={Boolean(errors.salonName)} maxLength={160} placeholder="Enter salon name" autoComplete="off" autoFocus />
+                  </ProfileField>
+                  <ProfileField label="Owner name" required error={errors.ownerName}>
+                    <Input value={form.ownerName} onChange={set("ownerName")} className={inputClass("ownerName")} aria-invalid={Boolean(errors.ownerName)} maxLength={120} placeholder="Enter owner name" autoComplete="off" />
+                  </ProfileField>
+                  <div className="sm:col-span-2">
+                    <ProfileField label="Primary contact number" required error={errors.primaryContact}>
+                      <Input value={form.primaryContact} onChange={set("primaryContact")} className={inputClass("primaryContact")} aria-invalid={Boolean(errors.primaryContact)} type="tel" inputMode="tel" maxLength={20} placeholder="e.g. 98765 43210" autoComplete="tel" />
+                    </ProfileField>
+                  </div>
                 </div>
-                {errors.potential && <p className="mt-1.5 text-xs text-danger" role="alert">{errors.potential}</p>}
-              </div>
-            </section>
+              </section>
 
-            {duplicates.length > 0 && (
-              <div className="rounded-lg border border-warning/30 bg-warning-soft/60 p-4" role="alert">
-                <p className="text-sm font-semibold text-foreground">A similar client already exists</p>
-                <ul className="mt-2 space-y-1 text-xs text-muted">
-                  {duplicates.map((item) => <li key={item.id}><span className="font-medium text-foreground">{item.salonName}</span> · {item.city} · {item.primaryContact}</li>)}
-                </ul>
-                <p className="mt-2 text-xs text-muted">Check the contact number or salon name, or save anyway if this is a different salon.</p>
-              </div>
-            )}
-            {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}
+              <section className="space-y-4 border-b px-4 py-5 sm:px-6 sm:py-6">
+                <ProfileHeading title="Location" description="Helps organise territory planning and salon visits." />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <ProfileField label="Full address">
+                      <textarea value={form.fullAddress} onChange={set("fullAddress")} rows={3} maxLength={500} placeholder="Building, street and area" className="w-full resize-none rounded-lg border bg-white px-3 py-2.5 text-sm leading-5 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10" autoComplete="street-address" />
+                    </ProfileField>
+                  </div>
+                  <ProfileField label="State">
+                    <Input value={form.state} onChange={set("state")} list="client-profile-states" maxLength={100} placeholder="Select or type state" autoComplete="address-level1" />
+                    <datalist id="client-profile-states">{INDIAN_STATES.map((name) => <option key={name} value={name} />)}</datalist>
+                  </ProfileField>
+                  <ProfileField label="Pincode" error={errors.pincode}>
+                    <Input value={form.pincode} onChange={set("pincode")} className={inputClass("pincode")} aria-invalid={Boolean(errors.pincode)} inputMode="numeric" maxLength={6} placeholder="6-digit pincode" autoComplete="postal-code" />
+                  </ProfileField>
+                  <div className="sm:col-span-2">
+                    <ProfileField label="Headquarter" required error={errors.headquarter} hint="Choose the business or technical headquarter responsible for this salon.">
+                      <select value={form.headquarter} onChange={set("headquarter")} className={`h-11 w-full rounded-lg border bg-white px-3 text-[13px] text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10 ${inputClass("headquarter")}`} aria-invalid={Boolean(errors.headquarter)}>
+                        <option value="">Select headquarter</option>
+                        <optgroup label="Business headquarters">
+                          {BUSINESS_HEADQUARTERS.map((name) => <option key={name} value={name}>{name}</option>)}
+                        </optgroup>
+                        <optgroup label="Technical headquarters">
+                          {TECHNICAL_HEADQUARTERS.map((name) => <option key={name} value={name}>{name}</option>)}
+                        </optgroup>
+                      </select>
+                    </ProfileField>
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+                <ProfileHeading title="Business profile" description="A quick view of current usage and growth opportunity." />
+                <CatalogueProductPicker value={selectedProducts} onChange={updateProducts} />
+                <div role="group" aria-labelledby="potential-label">
+                  <p id="potential-label" className="mb-2 text-xs font-medium text-foreground">Business potential <span className="text-danger">*</span></p>
+                  <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Business potential">
+                    {POTENTIAL_OPTIONS.map((option) => {
+                      const selected = form.potential === option.key;
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => setForm((current) => ({ ...current, potential: option.key }))}
+                          className={`flex h-11 items-center justify-center gap-2 rounded-lg border text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/20 ${selected ? option.active : errors.potential ? "border-danger bg-white text-muted" : "bg-white text-muted hover:border-brand/30 hover:text-foreground"}`}
+                        >
+                          <span className={`size-2 rounded-full ${selected ? option.dot : "bg-border"}`} />
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {errors.potential && <p className="mt-1.5 text-xs text-danger" role="alert">{errors.potential}</p>}
+                </div>
+              </section>
+
+              {(duplicates.length > 0 || error) && <div className="space-y-3 border-t px-4 py-4 sm:px-6">
+                {duplicates.length > 0 && (
+                  <div className="rounded-lg border border-warning/30 bg-warning-soft/60 p-4" role="alert">
+                    <p className="text-sm font-semibold text-foreground">A similar client already exists</p>
+                    <ul className="mt-2 space-y-1 text-xs text-muted">
+                      {duplicates.map((item) => <li key={item.id}><span className="font-medium text-foreground">{item.salonName}</span> · {item.city} · {item.primaryContact}</li>)}
+                    </ul>
+                    <p className="mt-2 text-xs text-muted">Check the contact number or salon name, or save anyway if this is a different salon.</p>
+                  </div>
+                )}
+                {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}
+              </div>}
+            </div>
           </div>
-          <div className="flex shrink-0 gap-2 border-t bg-white px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:items-center sm:justify-end sm:px-6">
-            <Button type="button" variant="secondary" className="flex-1 sm:flex-none" onClick={onClose} disabled={saving}>Cancel</Button>
-            {duplicates.length > 0 ? (
-              <Button type="button" className="flex-[2] sm:flex-none" disabled={saving} onClick={(event) => submit(event, true)}>
-                {saving && <LoaderCircle className="animate-spin" size={16} />}
-                {saving ? "Saving…" : "Save anyway"}
-              </Button>
-            ) : (
-              <Button type="submit" className="flex-[2] sm:flex-none" disabled={saving}>
-                {saving && <LoaderCircle className="animate-spin" size={16} />}
-                {saving ? "Saving…" : "Save client"}
-              </Button>
-            )}
+          <div className="flex shrink-0 items-center gap-2 border-t bg-white px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:justify-between sm:px-6">
+            <p className="hidden text-xs text-muted sm:block"><span className="text-danger">*</span> Required fields</p>
+            <div className="flex flex-1 gap-2 sm:flex-none">
+              <Button type="button" variant="secondary" className="flex-1 sm:flex-none" onClick={onClose} disabled={saving}>Cancel</Button>
+              {duplicates.length > 0 ? (
+                <Button type="button" className="flex-[2] sm:flex-none" disabled={saving} onClick={(event) => submit(event, true)}>
+                  {saving && <LoaderCircle className="animate-spin" size={16} />}
+                  {saving ? "Saving…" : "Save anyway"}
+                </Button>
+              ) : (
+                <Button type="submit" className="flex-[2] sm:flex-none" disabled={saving}>
+                  {saving && <LoaderCircle className="animate-spin" size={16} />}
+                  {saving ? "Saving…" : "Save client"}
+                </Button>
+              )}
+            </div>
           </div>
         </form>
       </div>
@@ -1109,8 +1158,87 @@ function ClientProfileForm({ onClose, onSaved }: { onClose: () => void; onSaved:
   );
 }
 
-function ProfileHeading({ title }: { title: string }) {
-  return <h3 className="border-b pb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{title}</h3>;
+function ProfileSectionItem({ number, title, detail }: { number: string; title: string; detail: string }) {
+  return <div className="flex gap-3 rounded-lg px-2 py-2.5"><span className="pt-0.5 text-[10px] font-semibold tracking-wide text-subtle">{number}</span><div><p className="text-xs font-semibold text-foreground">{title}</p><p className="mt-0.5 text-[11px] text-muted">{detail}</p></div></div>;
+}
+
+function ProfileHeading({ title, description }: { title: string; description: string }) {
+  return <div><h3 className="text-sm font-semibold text-foreground">{title}</h3><p className="mt-0.5 text-xs leading-5 text-muted">{description}</p></div>;
+}
+
+const productLabel = (product: CatalogueProduct) => product.variant ? `${product.name} (${product.variant})` : product.name;
+
+function CatalogueProductPicker({ value, onChange }: { value: CatalogueProduct[]; onChange: (products: CatalogueProduct[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [items, setItems] = useState<CatalogueProduct[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const params = new URLSearchParams({ page: "1", pageSize: "100", catalogueStatus: "ACTIVE", sortBy: "name", sortDirection: "asc" });
+        if (search.trim()) params.set("search", search.trim());
+        const response = await fetch(`/api/products?${params}`, { cache: "no-store" });
+        const data = await response.json().catch(() => null) as { items?: CatalogueProduct[]; message?: string } | null;
+        if (!response.ok) throw new Error(data?.message ?? "Unable to load products.");
+        if (!cancelled) setItems(data?.items ?? []);
+      } catch (cause) {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : "Unable to load products.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, search ? 250 : 0);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [open, search, reload]);
+
+  const toggle = (product: CatalogueProduct) => {
+    onChange(value.some((item) => item.id === product.id) ? value.filter((item) => item.id !== product.id) : [...value, product]);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-3">
+        <label className="text-xs font-medium text-foreground" htmlFor="client-product-search">Products currently used</label>
+        {value.length > 0 && <button type="button" onClick={() => onChange([])} className="text-[11px] font-semibold text-muted hover:text-foreground">Clear all</button>}
+      </div>
+      {value.length > 0 && <div className="flex flex-wrap gap-1.5 rounded-lg border bg-background/60 p-2.5" aria-label="Selected products">
+        {value.map((product) => <span key={product.id} className="inline-flex max-w-full items-center gap-1.5 rounded-md border bg-white px-2.5 py-1 text-xs font-medium text-foreground">
+          <span className="truncate">{productLabel(product)}</span>
+          <button type="button" onClick={() => toggle(product)} className="grid size-5 shrink-0 place-items-center rounded text-muted hover:bg-background hover:text-foreground" aria-label={`Remove ${productLabel(product)}`}><X size={12} /></button>
+        </span>)}
+      </div>}
+      <button type="button" onClick={() => setOpen((current) => !current)} className="flex h-11 w-full items-center justify-between rounded-lg border bg-white px-3 text-left text-[13px] transition-colors hover:border-brand/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/15" aria-expanded={open} aria-controls="client-product-picker">
+        <span className={value.length ? "font-medium text-foreground" : "text-subtle"}>{value.length ? `${value.length} product${value.length === 1 ? "" : "s"} selected` : "Search and select products"}</span>
+        <ChevronDown size={16} className={`shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div id="client-product-picker" className="overflow-hidden rounded-lg border bg-white shadow-[0_8px_24px_rgba(29,39,48,0.08)]">
+        <div className="relative border-b p-2.5">
+          <Search size={15} className="absolute left-5 top-1/2 -translate-y-1/2 text-subtle" />
+          <Input id="client-product-search" value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 pl-9" placeholder="Search product name or SKU" autoComplete="off" autoFocus />
+        </div>
+        <div className="max-h-52 overflow-y-auto overscroll-contain p-1.5" role="listbox" aria-label="Product catalogue" aria-multiselectable="true">
+          {loading ? <div className="space-y-1.5 p-1.5" aria-label="Loading products"><div className="h-10 animate-pulse rounded-md bg-background" /><div className="h-10 animate-pulse rounded-md bg-background" /><div className="h-10 animate-pulse rounded-md bg-background" /></div>
+            : error ? <div className="px-3 py-5 text-center"><p className="text-xs text-danger">{error}</p><button type="button" className="mt-2 text-xs font-semibold text-foreground" onClick={() => setReload((current) => current + 1)}>Try again</button></div>
+            : items.length ? items.map((product) => {
+              const selected = value.some((item) => item.id === product.id);
+              return <button key={product.id} type="button" role="option" aria-selected={selected} onClick={() => toggle(product)} className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors ${selected ? "bg-brand-soft" : "hover:bg-background"}`}>
+                <span className={`grid size-5 shrink-0 place-items-center rounded border ${selected ? "border-brand bg-brand text-white" : "bg-white text-transparent"}`}><Check size={13} /></span>
+                <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium text-foreground">{productLabel(product)}</span><span className="block truncate text-[11px] text-muted">SKU: {product.sku}</span></span>
+              </button>;
+            }) : <p className="px-3 py-8 text-center text-xs text-muted">No active products match your search.</p>}
+        </div>
+        <div className="flex items-center justify-between border-t bg-background/60 px-3 py-2"><span className="text-[11px] text-muted">Synced from Admin catalogue</span><button type="button" onClick={() => setOpen(false)} className="rounded-md px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-white">Done</button></div>
+      </div>}
+      <p className="text-xs text-subtle">Select every product currently used by this salon.</p>
+    </div>
+  );
 }
 
 function ProfileField({ label, required = false, error, hint, children }: { label: string; required?: boolean; error?: string; hint?: string; children: React.ReactNode }) {

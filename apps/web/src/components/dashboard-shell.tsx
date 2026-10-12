@@ -30,7 +30,7 @@ export function DashboardShell({
   return (
     <main className="crm-shell min-h-screen bg-background lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
       <DesktopSidebar userName={userName} roleName={roleName} roleKey={roleKey} distributionPartnerType={distributionPartnerType} portal={portal} canManageStaff={canManageStaff} />
-      <section className="min-w-0">
+      <section className="min-w-0 overflow-x-hidden">
         <header className="sticky top-0 z-30 flex h-[60px] items-center justify-between gap-3 border-b bg-white/95 px-4 shadow-[0_1px_0_rgba(26,31,26,0.04)] backdrop-blur sm:px-6 lg:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <MobileSidebarDrawer portal={portal} roleKey={roleKey} distributionPartnerType={distributionPartnerType} canManageStaff={canManageStaff} />
@@ -39,8 +39,8 @@ export function DashboardShell({
               <p className="hidden text-[11px] text-muted sm:block">{headerSubtitle}</p>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <div id="page-header-actions" className="flex items-center gap-2" />
+          <div className="flex min-w-0 shrink-0 items-center gap-2">
+            <div id="page-header-actions" className="flex min-w-0 items-center gap-2" />
             <NotificationCenter />
             <MobileNavigation userName={userName} roleName={roleName} />
           </div>

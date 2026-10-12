@@ -45,7 +45,7 @@ function staffGroups(roleKey?: string) {
   return [
     { label: "Overview", items: visible(overview) },
     { label: isWarehouse ? "Warehouse" : isAccounts ? "Accounts & Billing" : "Sales & Clients", items: visible(operations) },
-    { label: "Planning & Performance", items: visible(planning) },
+    { label: "Planning", items: visible(planning) },
     { label: "Account", items: visible([{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }]) },
   ].filter((group) => group.items.length > 0);
 }

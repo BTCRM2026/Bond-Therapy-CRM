@@ -15,7 +15,7 @@ describe('ProductsService search', () => {
     await service.list(actor, { page: 1, pageSize: 10, search: 'argan oil' } as never);
 
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { AND: [{ OR: expect.arrayContaining([{ name: { contains: 'Argan Oil' } }]) }] },
+      where: { AND: [{ OR: expect.arrayContaining([{ name: { contains: 'Argan Oil' } }, { sku: { contains: 'ARGAN OIL' } }]) }] },
     }));
   });
 
