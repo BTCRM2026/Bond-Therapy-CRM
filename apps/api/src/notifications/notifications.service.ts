@@ -15,6 +15,7 @@ export class NotificationsService {
     const isAdmin = user.portal === 'ADMIN' && user.roles.some((role) => role.key === 'SUPER_ADMIN');
     const isManager = user.portal === 'STAFF' && user.roles.some((role) => role.key === 'SALES_MANAGER');
     const isSales = user.portal === 'STAFF' && user.roles.some((role) => salesRoles.has(role.key));
+    if (isAdmin || user.portal === 'STAFF') await this.refreshStaffRequests(user, isAdmin);
     if (isAdmin) {
       await Promise.all([this.refreshExpiringAgreements(user), this.refreshLockedAccounts(user), this.refreshIncentivePendingApproval(user), this.refreshAttendanceRequests(user)]);
     } else if (isSales) {
@@ -22,6 +23,22 @@ export class NotificationsService {
       if (isManager) tasks.push(this.refreshIncentivePendingApproval(user), this.refreshAttendanceRequests(user));
       await Promise.all(tasks);
     }
+  }
+
+  // Admin: requests waiting for a decision. Staff: their own requests where the admin asked for more information.
+  private async refreshStaffRequests(user: SessionUser, isAdmin: boolean) {
+    const count = await this.prisma.staffRequest.count({ where: isAdmin ? { status: 'SUBMITTED' } : { requesterId: user.id, status: 'NEEDS_INFO' } });
+    const sourceKey = `staff_request_${isAdmin ? 'pending' : 'needs_info'}:${user.id}`;
+    if (!count) {
+      await this.prisma.notification.deleteMany({ where: { sourceKey } });
+      return;
+    }
+    const message = isAdmin ? `${count} request${count === 1 ? '' : 's'} waiting for your decision.` : `${count} request${count === 1 ? ' needs' : 's need'} your reply.`;
+    await this.prisma.notification.upsert({
+      where: { sourceKey },
+      create: { type: isAdmin ? 'STAFF_REQUEST_PENDING' : 'STAFF_REQUEST_NEEDS_INFO', severity: 'INFO', title: isAdmin ? 'Requests pending' : 'More information requested', message, sourceKey, portal: user.portal, recipientId: user.id },
+      update: { message, isRead: false },
+    });
   }
 
   private async refreshAttendanceRequests(user: SessionUser) {

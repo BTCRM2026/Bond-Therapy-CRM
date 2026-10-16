@@ -85,6 +85,28 @@ export class LettersController {
   }
 }
 
+// Staff portal, read-only: the signed-in staff member's own issued letters.
+@Controller('my-letters')
+@UseGuards(SessionGuard, PortalGuard)
+@Portals(PortalType.STAFF)
+export class MyLettersController {
+  constructor(private readonly letters: LettersService) {}
+
+  @Get()
+  list(@CurrentUser() actor: SessionUser) {
+    return this.letters.myLetters(actor);
+  }
+
+  @Get(':id/pdf')
+  async pdf(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Req() req: Request, @Res() response: Response) {
+    const { filename, buffer } = await this.letters.myPdf(actor, id, req.ip);
+    response.setHeader('content-type', 'application/pdf');
+    response.setHeader('content-disposition', `attachment; filename="${filename}"`);
+    response.setHeader('cache-control', 'private, no-store');
+    response.send(buffer);
+  }
+}
+
 @Controller('verify')
 export class LetterVerificationController {
   constructor(private readonly letters: LettersService) {}

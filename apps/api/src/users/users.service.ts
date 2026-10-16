@@ -139,6 +139,7 @@ export class UsersService {
               mobile: dto.mobile?.trim() ?? '',
               jobTitle: dto.jobTitle?.trim() || role.name,
               employmentType: dto.employmentType as EmploymentType,
+              isTechnician: role.key === 'SALES_EXECUTIVE' && dto.isTechnician === true,
               joiningDate: dateOnly(dto.joiningDate ?? new Date().toISOString().slice(0, 10)),
               dateOfBirth: dto.dateOfBirth ? dateOnly(dto.dateOfBirth) : null,
               shiftStart: optionalText(dto.shiftStart),
@@ -181,7 +182,7 @@ export class UsersService {
       if (duplicate) throw new BadRequestException('That email address is already in use.');
     }
 
-    const profileFields = ['mobile', 'jobTitle', 'employmentType', 'joiningDate', 'dateOfBirth', 'shiftStart', 'shiftEnd', 'bloodGroup', 'workLocation', 'residentialAddress', 'emergencyContactName', 'emergencyContactMobile'] as const;
+    const profileFields = ['mobile', 'jobTitle', 'employmentType', 'isTechnician', 'joiningDate', 'dateOfBirth', 'shiftStart', 'shiftEnd', 'bloodGroup', 'workLocation', 'residentialAddress', 'emergencyContactName', 'emergencyContactMobile'] as const;
     const hasProfileUpdate = profileFields.some((field) => dto[field] !== undefined);
 
     const user = await this.prisma.$transaction(async (tx) => {
@@ -189,11 +190,14 @@ export class UsersService {
         await tx.userRole.deleteMany({ where: { userId: id } });
         await tx.userRole.create({ data: { userId: id, roleId: role.id } });
       }
+      // Leaving the Sales Executive role also clears the technician mark.
+      if (!hasProfileUpdate && dto.roleKey && roleKey !== 'SALES_EXECUTIVE' && existing.staffProfile?.isTechnician) await tx.staffProfile.update({ where: { userId: id }, data: { isTechnician: false } });
       if (hasProfileUpdate) {
         const profileData = {
           mobile: dto.mobile?.trim(),
           jobTitle: dto.jobTitle?.trim(),
           employmentType: dto.employmentType as EmploymentType | undefined,
+          isTechnician: roleKey === 'SALES_EXECUTIVE' ? dto.isTechnician : false,
           joiningDate: dto.joiningDate ? dateOnly(dto.joiningDate) : undefined,
           dateOfBirth: dto.dateOfBirth ? dateOnly(dto.dateOfBirth) : dto.dateOfBirth,
           shiftStart: dto.shiftStart === undefined ? undefined : optionalText(dto.shiftStart),

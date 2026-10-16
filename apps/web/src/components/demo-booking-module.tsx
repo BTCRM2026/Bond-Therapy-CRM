@@ -167,7 +167,7 @@ function BookDemoForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
               </div>}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Trainer</span><select value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10"><option value="">Not yet assigned</option>{trainers.map((trainer) => <option key={trainer.id} value={trainer.id}>{trainer.name}</option>)}</select></label>
+            <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Technician</span><select value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10"><option value="">Not yet assigned</option>{trainers.map((trainer) => <option key={trainer.id} value={trainer.id}>{trainer.name}</option>)}</select></label>
             <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Preferred date & time</span><Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /></label>
           </div>
           <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Objective</span><Input value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="e.g. Bond repair range demo" maxLength={160} /></label>

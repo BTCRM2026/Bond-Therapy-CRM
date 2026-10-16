@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, AlertTriangle, Award, Building2, CalendarClock, ClipboardList, Clock3, FileCheck2, FileText, IndianRupee, LayoutDashboard, ListChecks, MapPin, Navigation, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
+import { Activity, AlertTriangle, Award, Building2, CalendarClock, ClipboardCheck, ClipboardList, Clock3, FileCheck2, FileText, IndianRupee, LayoutDashboard, ListChecks, MapPin, Navigation, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
@@ -14,14 +14,13 @@ function staffGroups(roleKey?: string) {
   const isSales = roleKey ? SALES_ROLE_KEYS.has(roleKey) : false;
   const isWarehouse = roleKey ? WAREHOUSE_ROLE_KEYS.has(roleKey) : false;
   const isAccounts = roleKey === "ACCOUNTS_BILLING";
-  const overview = [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }];
+  const overview = [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }, { href: "/dashboard/requests", label: "Requests", icon: ClipboardCheck, exact: false }];
   const operations = isSales ? [
     { href: "/dashboard/follow-ups", label: "Follow-ups", icon: ListChecks, exact: false },
     { href: "/dashboard/leads", label: "Leads", icon: UserPlus, exact: false },
     { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
     { href: "/dashboard/daily-report", label: "Daily Report", icon: ClipboardList, exact: false },
     { href: "/dashboard/order-form", label: "Order Form", icon: ShoppingCart, exact: false },
-    { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart, exact: false },
     { href: "/dashboard/invoices", label: "Invoices", icon: ReceiptText, exact: false },
     { href: "/dashboard/products", label: "Products", icon: Package, exact: false },
     { href: "/dashboard/demos", label: "Demo Booking", icon: CalendarClock, exact: false },
@@ -48,7 +47,7 @@ function staffGroups(roleKey?: string) {
     { label: "Overview", items: visible(overview) },
     { label: isWarehouse ? "Warehouse" : isAccounts ? "Accounts & Billing" : "Sales & Clients", items: visible(operations) },
     { label: "Planning", items: visible(planning) },
-    { label: "Account", items: visible([{ href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }]) },
+    { label: "Account", items: visible([{ href: "/dashboard/my-letters", label: "My Letters", icon: FileText, exact: false }, { href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true }]) },
   ].filter((group) => group.items.length > 0);
 }
 
@@ -56,12 +55,11 @@ export function SidebarNav({ portal = "ADMIN", roleKey, distributionPartnerType,
   const pathname = usePathname();
   const managementItems = [
     ...(canManageStaff ? [{ href: "/dashboard/staff", label: "Staff & Access", icon: UsersRound, exact: false }] : []),
+    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/requests", label: "Requests", icon: ClipboardCheck, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/clients", label: "Salon 360", icon: Building2, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/products", label: "Products", icon: Package, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/orders", label: "Order approvals", icon: FileCheck2, exact: false }, { href: "/dashboard/invoices", label: "Invoices & payments", icon: ReceiptText, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/territory-admin", label: "Territory Management", icon: MapPin, exact: false }] : []),
-    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/targets", label: "Target & Performance", icon: TrendingUp, exact: false }] : []),
-    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/incentive-rules", label: "Incentives", icon: IndianRupee, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/target-incentive", label: "Target & Incentive", icon: Award, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/attendance", label: "Attendance", icon: Clock3, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/field-activity", label: "Field Activity", icon: Activity, exact: false }] : []),

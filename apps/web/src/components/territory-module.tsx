@@ -58,7 +58,7 @@ export function TerritoryModule() {
       <aside className="space-y-3">
         <QuickLink href="/dashboard/route" icon={Route} label="View my routes" detail="Plan and manage visits" />
         <QuickLink href="/dashboard/route" icon={CalendarDays} label="Plan tomorrow's route" detail="Use eligible salons/accounts" />
-        <QuickLink href="/dashboard/performance" icon={ShieldCheck} label="View performance" detail="Revenue and activity" />
+        <QuickLink href="/dashboard/my-performance" icon={ShieldCheck} label="My performance" detail="Target, sales and incentive" />
       </aside>
     </div>
 

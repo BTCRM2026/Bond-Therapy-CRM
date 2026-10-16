@@ -27,6 +27,8 @@ import { ReplenishmentModule } from './replenishment/replenishment.module.js';
 import { LettersModule } from './letters/letters.module.js';
 import { ExchangesModule } from './exchanges/exchanges.module.js';
 import { DailyReportsModule } from './daily-reports/daily-reports.module.js';
+import { ChatModule } from './chat/chat.module.js';
+import { StaffRequestsModule } from './staff-requests/staff-requests.module.js';
 
 @Module({
   imports: [
@@ -57,6 +59,8 @@ import { DailyReportsModule } from './daily-reports/daily-reports.module.js';
     LettersModule,
     ExchangesModule,
     DailyReportsModule,
+    ChatModule,
+    StaffRequestsModule,
   ],
   controllers: [AppController],
 })

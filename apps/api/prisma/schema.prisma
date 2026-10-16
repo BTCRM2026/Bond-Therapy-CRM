@@ -75,6 +75,11 @@ model User {
   manager                           User?                         @relation("StaffManager", fields: [managerId], references: [id], onDelete: SetNull)
   teamMembers                       User[]                        @relation("StaffManager")
   staffProfile                      StaffProfile?
+  chatMemberships                   ChatMember[]                  @relation("ChatMemberUser")
+  chatMessages                      ChatMessage[]                 @relation("ChatMessageSender")
+  staffRequests                     StaffRequest[]                @relation("StaffRequestRequester")
+  staffRequestsDecided              StaffRequest[]                @relation("StaffRequestDecider")
+  staffRequestEvents                StaffRequestEvent[]           @relation("StaffRequestActor")
   clientsCreated                    Client[]                      @relation("ClientCreator")
   clientsAssigned                   Client[]                      @relation("ClientSalesperson")
   clientsTrained                    Client[]                      @relation("ClientTrainer")
@@ -138,6 +143,8 @@ model StaffProfile {
   mobile                 String
   jobTitle               String
   employmentType         EmploymentType @default(FULL_TIME)
+  // A technician is a sales-role staff member who can also be booked for product demos.
+  isTechnician           Boolean        @default(false)
   joiningDate            DateTime
   dateOfBirth            DateTime?
   shiftStart             String?
@@ -1817,4 +1824,95 @@ model HrLetterActivity {
   createdAt  DateTime        @default(now())
 
   @@index([letterId, createdAt])
+}
+
+enum ChatConversationType {
+  TEAM
+  DIRECT
+}
+
+model ChatConversation {
+  id            String               @id @default(cuid())
+  type          ChatConversationType
+  // "team" for the shared channel; "<lower user id>:<higher user id>" for a direct chat, so each pair has exactly one.
+  key           String               @unique
+  lastMessageAt DateTime             @default(now())
+  createdAt     DateTime             @default(now())
+  members       ChatMember[]
+  messages      ChatMessage[]
+}
+
+model ChatMember {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User             @relation("ChatMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime         @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User             @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  body           String
+  createdAt      DateTime         @default(now())
+  deletedAt      DateTime?
+
+  @@index([conversationId, createdAt])
+}
+
+enum StaffRequestStatus {
+  SUBMITTED
+  NEEDS_INFO
+  APPROVED
+  REJECTED
+}
+
+enum StaffRequestEventType {
+  SUBMITTED
+  INFO_REQUESTED
+  REPLIED
+  APPROVED
+  REJECTED
+}
+
+model StaffRequest {
+  id            String              @id @default(cuid())
+  requestNumber String              @unique
+  title         String
+  details       String
+  status        StaffRequestStatus  @default(SUBMITTED)
+  requesterId   String
+  requester     User                @relation("StaffRequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  decidedById   String?
+  decidedBy     User?               @relation("StaffRequestDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt     DateTime?
+  // Only filled by the admin for schemes and similar approvals, e.g. "10% on Brand X" or "Rs 5,000".
+  approvedValue String?
+  validUntil    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  events        StaffRequestEvent[]
+
+  @@index([requesterId, createdAt])
+  @@index([status, createdAt])
+}
+
+model StaffRequestEvent {
+  id        String                @id @default(cuid())
+  requestId String
+  request   StaffRequest          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorId   String
+  actor     User                  @relation("StaffRequestActor", fields: [actorId], references: [id], onDelete: Cascade)
+  type      StaffRequestEventType
+  comment   String?
+  createdAt DateTime              @default(now())
+
+  @@index([requestId, createdAt])
 }

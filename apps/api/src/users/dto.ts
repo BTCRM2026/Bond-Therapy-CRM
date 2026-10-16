@@ -1,4 +1,4 @@
-import { IsDateString, IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 const employmentTypes = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN'] as const;
 const bloodGroups = ['A_POSITIVE', 'A_NEGATIVE', 'B_POSITIVE', 'B_NEGATIVE', 'AB_POSITIVE', 'AB_NEGATIVE', 'O_POSITIVE', 'O_NEGATIVE'] as const;
@@ -88,6 +88,11 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   assignedDistributorId?: string;
+
+  // Sales Executives only: marks the person as a technician who can be booked for demos.
+  @IsOptional()
+  @IsBoolean()
+  isTechnician?: boolean;
 }
 
 export class UpdateUserDto {
@@ -116,6 +121,10 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   assignedDistributorId?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isTechnician?: boolean;
 
   @IsOptional()
   @Matches(phonePattern, { message: 'Enter a valid mobile number.' })

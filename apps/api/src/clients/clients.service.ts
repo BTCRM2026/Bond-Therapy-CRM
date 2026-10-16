@@ -5,6 +5,8 @@ import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ClientActivityDto, ClientDto, ListActivitiesDto, ListClientsDto, UpdateActivityStatusDto } from './dto.js';
 
+// Demo trainers: the Trainer role, plus Sales Executives marked as technicians.
+const trainerWhere = { status: 'ACTIVE' as const, OR: [{ roles: { some: { role: { key: 'DEMO_TEAM', isActive: true } } } }, { staffProfile: { isTechnician: true } }] };
 const managedRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE', 'ACCOUNTS_BILLING', 'WAREHOUSE', 'DEMO_TEAM']);
 const clientInclude = {
   assignedSalesperson: { select: { id: true, name: true, loginId: true } },
@@ -152,7 +154,7 @@ export class ClientsService {
       if (!salesperson) throw new ForbiddenException('Select an active sales team member.');
     }
     if (assignedTrainerId) {
-      const trainerUser = await this.prisma.user.findFirst({ where: { id: assignedTrainerId, status: 'ACTIVE', roles: { some: { role: { key: 'DEMO_TEAM', isActive: true } } } }, select: { id: true } });
+      const trainerUser = await this.prisma.user.findFirst({ where: { ...trainerWhere, id: assignedTrainerId }, select: { id: true } });
       if (!trainerUser) throw new ForbiddenException('Select an active trainer.');
     }
     if (dto.distributorId) {
@@ -252,7 +254,7 @@ export class ClientsService {
   async listTrainers(actor: SessionUser) {
     this.ensureAccess(actor);
     return this.prisma.user.findMany({
-      where: { status: 'ACTIVE', roles: { some: { role: { key: 'DEMO_TEAM', isActive: true } } } },
+      where: trainerWhere,
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     });

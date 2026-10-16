@@ -4,7 +4,7 @@ import { NotificationsService } from './notifications.service.js';
 
 describe('NotificationsService portal and account isolation', () => {
   it('lists only notifications owned by the signed-in user in the current portal', async () => {
-    const prisma = { notification: { findMany: vi.fn().mockResolvedValue([]) } };
+    const prisma = { notification: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn() }, staffRequest: { count: vi.fn().mockResolvedValue(0) } };
     const service = new NotificationsService(prisma as unknown as PrismaService);
     await service.list({ id: 'staff-1', portal: 'STAFF', roles: [] } as never);
     expect(prisma.notification.findMany).toHaveBeenCalledWith(expect.objectContaining({

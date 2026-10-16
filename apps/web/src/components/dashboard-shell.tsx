@@ -4,6 +4,7 @@ import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { MobileNavigation } from "@/components/mobile-navigation";
 import { MobileSidebarDrawer } from "@/components/mobile-sidebar-drawer";
 import { NotificationCenter } from "@/components/notification-center";
+import { TeamChat } from "@/components/team-chat";
 import type { PortalType } from "@/lib/portal-types";
 
 export function DashboardShell({
@@ -47,6 +48,7 @@ export function DashboardShell({
         </header>
         <div className="w-full p-4 pb-24 sm:p-5 sm:pb-24 lg:p-5 lg:pb-5">{children}</div>
         <BottomTabBar portal={portal} roleKey={roleKey} distributionPartnerType={distributionPartnerType} canManageStaff={canManageStaff} />
+        {portal !== "DISTRIBUTOR" && <TeamChat />}
       </section>
     </main>
   );

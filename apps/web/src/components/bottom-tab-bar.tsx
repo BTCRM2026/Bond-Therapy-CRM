@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Building2, ClipboardList, Clock3, LayoutDashboard, ListChecks, Package, Settings, ShoppingCart, Truck, UserPlus, UsersRound } from "lucide-react";
+import { AlertTriangle, Building2, ClipboardList, LayoutDashboard, Package, Settings, ShoppingCart, Truck, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
@@ -30,25 +30,21 @@ export function BottomTabBar({ portal = "ADMIN", roleKey, distributionPartnerTyp
         ]
     : (isSales
       ? [
-          { href: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
-          { href: "/dashboard/follow-ups", label: "Follow-ups", icon: ListChecks, exact: false },
-          { href: "/dashboard/leads", label: "Leads", icon: UserPlus, exact: false },
+          { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
           { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
-          { href: "/dashboard/daily-report", label: "Report", icon: ClipboardList, exact: false },
-          { href: "/dashboard/order-form", label: "Orders", icon: ShoppingCart, exact: false },
-          { href: "/dashboard/attendance", label: "Attendance", icon: Clock3, exact: false },
-          { href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true },
+          { href: "/dashboard/daily-report", label: "Daily Report", icon: ClipboardList, exact: false },
+          { href: "/dashboard/order-form", label: "Order Form", icon: ShoppingCart, exact: false },
         ]
       : isWarehouse
         ? [
-            { href: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
+            { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
             { href: "/dashboard/dispatch", label: "Dispatch", icon: Truck, exact: false },
             { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
             { href: "/dashboard/inventory", label: "Inventory", icon: AlertTriangle, exact: false },
             { href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true },
           ]
         : [
-            { href: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
+            { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
             { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
             { href: "/dashboard/settings", label: "Settings", icon: Settings, exact: true },
           ]).filter((item) => isStaffModuleEnabled(item.href));

@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarClock, CheckCircle2, ClipboardList, Clock3, IndianRupee, LogIn, MapPin, Navigation, ShoppingCart, Target, Trophy, UserPlus } from "lucide-react";
+import { Building2, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardList, Clock3, IndianRupee, LogIn, MapPin, Navigation, ShoppingCart, Target, Trophy, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
@@ -61,7 +61,7 @@ export function SalesDashboardWidgets() {
     <KpiStrip columns={kpiCount}>
       <KpiCell label="Revenue achieved" value={money(data.achieved)} detail={`${MONTHS[data.period.month - 1]} ${data.period.year}`} tone="success" />
       {optionalKpis === 0 && <KpiCell label="Monthly target" value={data.target ? money(data.target) : "Not set"} detail={`${MONTHS[data.period.month - 1]} ${data.period.year}`} />}
-      {isStaffModuleEnabled("/dashboard/orders") && <Link href="/dashboard/orders" className="contents"><KpiCell label="Orders booked" value={data.orderCount} detail="Confirmed this month" className="cursor-pointer hover:bg-brand-soft/45" /></Link>}
+      {isStaffModuleEnabled("/dashboard/orders") && <KpiCell label="Orders booked" value={data.orderCount} detail="Confirmed this month" />}
       {isStaffModuleEnabled("/dashboard/leads") && <Link href="/dashboard/leads" className="contents"><KpiCell label="Open leads" value={data.openLeads} detail="Awaiting conversion" tone="warning" className="cursor-pointer hover:bg-brand-soft/45" /></Link>}
       {isStaffModuleEnabled("/dashboard/follow-ups") && <Link href="/dashboard/follow-ups" className="contents"><KpiCell label="Overdue follow-ups" value={data.overdueFollowUps} detail={data.overdueFollowUps ? "Needs attention" : "Nothing overdue"} tone={data.overdueFollowUps ? "danger" : "neutral"} className="cursor-pointer hover:bg-brand-soft/45" /></Link>}
     </KpiStrip>
@@ -92,6 +92,7 @@ const QUICK_LINKS = [
   { href: "/dashboard/leads", icon: UserPlus, label: "Add lead" },
   { href: "/dashboard/follow-ups", icon: Clock3, label: "Follow-ups" },
   { href: "/dashboard/order-form", icon: ShoppingCart, label: "Order Form" },
+  { href: "/dashboard/requests", icon: ClipboardCheck, label: "Requests" },
   { href: "/dashboard/products", icon: Target, label: "Catalogue" },
   { href: "/dashboard/demos", icon: CalendarClock, label: "Book demo" },
   { href: "/dashboard/route", icon: Navigation, label: "My route" },

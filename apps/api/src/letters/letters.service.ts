@@ -1,12 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { HrLetterStatus, Prisma } from '@prisma/client';
+import type { HrLetter } from '@prisma/client';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateHrLetterDto, HrLetterActionDto, ListHrLettersDto } from './dto.js';
 import { COMPENSATION_LETTER_TYPES, LETTER_FIELDS, LETTER_LABELS, SALARY_COMPONENTS, type LetterType } from './letter-types.js';
 import { renderLetterPdf } from './letter-pdf.js';
+
+const FINAL_STATUSES: HrLetterStatus[] = ['GENERATED', 'SENT', 'ACKNOWLEDGED'];
 
 const letterInclude = {
   staffUser: { select: { id: true, name: true } },
@@ -184,12 +187,44 @@ export class LettersService {
     return { deleted: true };
   }
 
+  private renderPdf(letter: HrLetter, preview: boolean) {
+    return renderLetterPdf({ letterNumber: letter.letterNumber, type: letter.type as LetterType, recipientName: letter.recipientName, recipientDesignation: letter.recipientDesignation, recipientDepartment: letter.recipientDepartment, issuedDate: letter.issuedDate, details: letter.details as Record<string, string>, snapshot: letter.snapshot as LetterSnapshot, verificationToken: letter.verificationToken, version: letter.version, preview: preview && !FINAL_STATUSES.includes(letter.status) });
+  }
+
+  private filename(letter: HrLetter) {
+    return `${letter.letterNumber.replaceAll('/', '-')}-v${letter.version}.pdf`;
+  }
+
   async pdf(actor: SessionUser, id: string, preview = false) {
     const letter = await this.detail(actor, id);
-    if (!preview && !['GENERATED', 'SENT', 'ACKNOWLEDGED'].includes(letter.status)) throw new BadRequestException('Approve and generate the final document before downloading it.');
-    const buffer = await renderLetterPdf({ letterNumber: letter.letterNumber, type: letter.type as LetterType, recipientName: letter.recipientName, recipientDesignation: letter.recipientDesignation, recipientDepartment: letter.recipientDepartment, issuedDate: letter.issuedDate, details: letter.details as Record<string, string>, snapshot: letter.snapshot as LetterSnapshot, verificationToken: letter.verificationToken, version: letter.version, preview: preview && !['GENERATED', 'SENT', 'ACKNOWLEDGED'].includes(letter.status) });
+    if (!preview && !FINAL_STATUSES.includes(letter.status)) throw new BadRequestException('Approve and generate the final document before downloading it.');
+    const buffer = await this.renderPdf(letter, preview);
     await recordAudit(this.prisma, { actorId: actor.id, action: preview ? 'HR_DOCUMENT_PREVIEWED' : 'HR_DOCUMENT_DOWNLOADED', entity: 'HR_LETTER', entityId: id, details: { letterNumber: letter.letterNumber, version: letter.version } });
-    return { filename: `${letter.letterNumber.replaceAll('/', '-')}-v${letter.version}.pdf`, buffer };
+    return { filename: this.filename(letter), buffer };
+  }
+
+  // Staff portal: a member of staff sees only final letters issued to them (never drafts, pending or superseded ones) and can only download them.
+  private ensureStaff(actor: SessionUser) {
+    if (actor.portal !== 'STAFF') throw new ForbiddenException('My Letters is available in the staff portal.');
+  }
+
+  async myLetters(actor: SessionUser) {
+    this.ensureStaff(actor);
+    const letters = await this.prisma.hrLetter.findMany({
+      where: { staffUserId: actor.id, status: { in: FINAL_STATUSES } },
+      orderBy: [{ issuedDate: 'desc' }, { createdAt: 'desc' }],
+      select: { id: true, letterNumber: true, type: true, issuedDate: true, version: true, status: true, generatedAt: true },
+    });
+    return letters.map((letter) => ({ ...letter, typeLabel: LETTER_LABELS[letter.type as LetterType] ?? letter.type }));
+  }
+
+  async myPdf(actor: SessionUser, id: string, ipAddress?: string) {
+    this.ensureStaff(actor);
+    const letter = await this.prisma.hrLetter.findFirst({ where: { id, staffUserId: actor.id, status: { in: FINAL_STATUSES } } });
+    if (!letter) throw new NotFoundException('Letter not found.');
+    const buffer = await this.renderPdf(letter, false);
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'HR_DOCUMENT_DOWNLOADED', entity: 'HR_LETTER', entityId: id, details: { letterNumber: letter.letterNumber, version: letter.version, by: 'recipient' }, ipAddress });
+    return { filename: this.filename(letter), buffer };
   }
 
   async verify(token: string) {
