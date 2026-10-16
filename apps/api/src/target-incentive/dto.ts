@@ -19,15 +19,16 @@ export class SlabDto {
 export class UpsertPlanDto {
   @IsString() @MinLength(1) staffId!: string;
   @Type(() => Number) @IsInt() @Min(2020) @Max(2100) targetYear!: number;
-  @Type(() => Number) @Min(0) annualTarget!: number;
+  @Type(() => Number) @Min(1, { message: 'Annual target is required and must be greater than zero.' }) annualTarget!: number;
   @IsEnum(AnnualDistributionType) distributionType!: AnnualDistributionType;
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(12) @ValidateNested({ each: true }) @Type(() => SeasonDto) seasons?: SeasonDto[];
 
-  @IsEnum(TargetIncentiveType) incentiveType!: TargetIncentiveType;
-  @IsEnum(IncentiveBasis) calculationBasis!: IncentiveBasis;
+  // The whole incentive block is optional: omit incentiveType to save a target without an incentive.
+  @IsOptional() @IsEnum(TargetIncentiveType) incentiveType?: TargetIncentiveType;
+  @IsOptional() @IsEnum(IncentiveBasis) calculationBasis?: IncentiveBasis;
   @IsOptional() @Type(() => Number) @Min(0) @Max(100) percentValue?: number;
   @IsOptional() @Type(() => Number) @Min(0) fixedAmount?: number;
-  @Type(() => Number) @Min(0) @Max(1000) minAchievementPercent!: number;
+  @IsOptional() @Type(() => Number) @Min(0) @Max(1000) minAchievementPercent?: number;
   @IsOptional() @IsArray() @ArrayMaxSize(20) @ValidateNested({ each: true }) @Type(() => SlabDto) slabs?: SlabDto[];
 }
 

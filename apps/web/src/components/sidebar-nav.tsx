@@ -14,7 +14,7 @@ function staffGroups(roleKey?: string) {
   const isSales = roleKey ? SALES_ROLE_KEYS.has(roleKey) : false;
   const isWarehouse = roleKey ? WAREHOUSE_ROLE_KEYS.has(roleKey) : false;
   const isAccounts = roleKey === "ACCOUNTS_BILLING";
-  const overview = [{ href: "/dashboard", label: "My workspace", icon: LayoutDashboard, exact: true }];
+  const overview = [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }];
   const operations = isSales ? [
     { href: "/dashboard/follow-ups", label: "Follow-ups", icon: ListChecks, exact: false },
     { href: "/dashboard/leads", label: "Leads", icon: UserPlus, exact: false },

@@ -104,8 +104,8 @@ export class TargetIncentiveService {
         ? {
             incentiveType: plan.incentiveConfig.incentiveType,
             calculationBasis: plan.incentiveConfig.calculationBasis,
-            percentValue: plan.incentiveConfig.percentValue ? Number(plan.incentiveConfig.percentValue) : null,
-            fixedAmount: plan.incentiveConfig.fixedAmount ? Number(plan.incentiveConfig.fixedAmount) : null,
+            percentValue: plan.incentiveConfig.percentValue != null ? Number(plan.incentiveConfig.percentValue) : null,
+            fixedAmount: plan.incentiveConfig.fixedAmount != null ? Number(plan.incentiveConfig.fixedAmount) : null,
             minAchievementPercent: Number(plan.incentiveConfig.minAchievementPercent),
             slabs: plan.incentiveConfig.slabs.map((s) => ({ id: s.id, minAchievementPercent: Number(s.minAchievementPercent), maxAchievementPercent: s.maxAchievementPercent ? Number(s.maxAchievementPercent) : null, valueType: s.valueType, value: Number(s.value) })),
           }
@@ -172,15 +172,15 @@ export class TargetIncentiveService {
         ? await tx.annualTargetPlan.update({ where: { id: wasExisting.id }, data: { annualTarget: dto.annualTarget, distributionType: dto.distributionType, seasons: seasonsJson, isActive: true } })
         : await tx.annualTargetPlan.create({ data: { staffId: dto.staffId, targetYear: dto.targetYear, annualTarget: dto.annualTarget, distributionType: dto.distributionType, seasons: seasonsJson, createdById: actor.id } });
 
-      await tx.targetIncentiveConfig.upsert({
-        where: { planId: savedPlan.id },
-        create: { planId: savedPlan.id, incentiveType: dto.incentiveType, calculationBasis: dto.calculationBasis, percentValue: dto.percentValue ?? null, fixedAmount: dto.fixedAmount ?? null, minAchievementPercent: dto.minAchievementPercent },
-        update: { incentiveType: dto.incentiveType, calculationBasis: dto.calculationBasis, percentValue: dto.percentValue ?? null, fixedAmount: dto.fixedAmount ?? null, minAchievementPercent: dto.minAchievementPercent },
-      });
-      const config = await tx.targetIncentiveConfig.findUniqueOrThrow({ where: { planId: savedPlan.id } });
-      await tx.targetIncentiveSlab.deleteMany({ where: { configId: config.id } });
-      if (dto.incentiveType === 'SLAB' && dto.slabs?.length) {
-        await tx.targetIncentiveSlab.createMany({ data: dto.slabs.map((s) => ({ configId: config.id, minAchievementPercent: s.minAchievementPercent, maxAchievementPercent: s.maxAchievementPercent ?? null, valueType: s.valueType, value: s.value })) });
+      if (!dto.incentiveType) {
+        await tx.targetIncentiveConfig.deleteMany({ where: { planId: savedPlan.id } });
+      } else {
+        const incentive = { incentiveType: dto.incentiveType, calculationBasis: dto.calculationBasis ?? 'TOTAL_ELIGIBLE_SALES', percentValue: dto.incentiveType === 'PERCENTAGE' ? dto.percentValue ?? null : null, fixedAmount: dto.incentiveType === 'FIXED' ? dto.fixedAmount ?? null : null, minAchievementPercent: dto.minAchievementPercent ?? 100 };
+        const config = await tx.targetIncentiveConfig.upsert({ where: { planId: savedPlan.id }, create: { planId: savedPlan.id, ...incentive }, update: incentive });
+        await tx.targetIncentiveSlab.deleteMany({ where: { configId: config.id } });
+        if (dto.incentiveType === 'SLAB' && dto.slabs?.length) {
+          await tx.targetIncentiveSlab.createMany({ data: dto.slabs.map((s) => ({ configId: config.id, minAchievementPercent: s.minAchievementPercent, maxAchievementPercent: s.maxAchievementPercent ?? null, valueType: s.valueType, value: s.value })) });
+        }
       }
 
       await this.generateTargets(tx, savedPlan, actor.id);
