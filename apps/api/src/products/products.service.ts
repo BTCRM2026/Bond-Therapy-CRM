@@ -12,6 +12,7 @@ const movementInclude = {
   recordedBy: { select: { id: true, name: true } },
 } satisfies Prisma.StockMovementInclude;
 
+const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const titleCase = (value: string) => value.trim().toLowerCase().replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
 const internalSku = () => `BT-${randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`;
 
@@ -42,22 +43,42 @@ export class ProductsService {
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(200, Math.max(1, Number(query.pageSize) || 100));
     const search = query.search?.trim();
+    // Sales staff see the stock held by their assigned distributor, not the central warehouse. Everyone else sees central stock.
+    const distributorScoped = actor.portal === 'STAFF' && actor.roles.some((role) => salesRoles.has(role.key));
+    const distributorId = distributorScoped ? actor.assignedDistributorId : null;
     const filters: Prisma.ProductWhereInput[] = this.isAdmin(actor) ? [] : [{ isActive: true }];
     if (search) {
       const variants = [...new Set([search, titleCase(search), search.toLowerCase(), search.toUpperCase()])];
       filters.push({ OR: variants.flatMap((value) => [{ name: { contains: value } }, { sku: { contains: value } }, { variant: { contains: value } }]) });
     }
     if (query.category) filters.push({ category: query.category });
-    if (query.stockStatus === 'LOW') filters.push({ stockOnHand: { gt: 0, lte: 10 } });
-    if (query.stockStatus === 'OUT') filters.push({ stockOnHand: { lte: 0 } });
+    if (distributorScoped) {
+      const held = (quantity: Prisma.IntFilter) => ({ distributorStock: { some: { distributorId: distributorId ?? '', quantityOnHand: quantity } } }) satisfies Prisma.ProductWhereInput;
+      if (query.stockStatus === 'LOW') filters.push(held({ gt: 0, lte: 10 }));
+      if (query.stockStatus === 'OUT') filters.push({ NOT: held({ gt: 0 }) });
+    } else {
+      if (query.stockStatus === 'LOW') filters.push({ stockOnHand: { gt: 0, lte: 10 } });
+      if (query.stockStatus === 'OUT') filters.push({ stockOnHand: { lte: 0 } });
+    }
     if (query.catalogueStatus) filters.push({ isActive: query.catalogueStatus === 'ACTIVE' });
     const where = { AND: filters } satisfies Prisma.ProductWhereInput;
     const orderBy = { [query.sortBy]: query.sortDirection } satisfies Prisma.ProductOrderByWithRelationInput;
-    const [items, total] = await this.prisma.$transaction([
+    const [products, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({ where, orderBy, skip: (page - 1) * pageSize, take: pageSize }),
       this.prisma.product.count({ where }),
     ]);
-    return { items, page, pageSize, total, hasMore: page * pageSize < total };
+    if (!distributorScoped) return { items: products, page, pageSize, total, hasMore: page * pageSize < total, stockScope: { kind: 'CENTRAL' as const, distributorName: null } };
+
+    const [distributor, held] = distributorId
+      ? await Promise.all([
+          this.prisma.distributor.findUnique({ where: { id: distributorId }, select: { businessName: true } }),
+          this.prisma.distributorStock.findMany({ where: { distributorId, productId: { in: products.map((product) => product.id) } }, select: { productId: true, quantityOnHand: true } }),
+        ])
+      : [null, []];
+    const quantities = new Map(held.map((row) => [row.productId, row.quantityOnHand]));
+    // stockOnHand now carries the distributor's quantity so existing screens keep working; no distributor means nothing is shown as available.
+    const items = products.map((product) => ({ ...product, stockOnHand: quantities.get(product.id) ?? 0 }));
+    return { items, page, pageSize, total, hasMore: page * pageSize < total, stockScope: { kind: 'DISTRIBUTOR' as const, distributorName: distributor?.businessName ?? null } };
   }
 
   async stats(actor: SessionUser) {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './login.dto.js';
@@ -6,7 +6,7 @@ import { parsePortal, PORTAL_HEADER, portalCookieName } from '../common/portal.j
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
-import { ChangePasswordDto, UpdateProfileDto } from './profile.dto.js';
+import { ChangePasswordDto, StaffDetailsDto, UpdateProfileDto } from './profile.dto.js';
 
 @Controller('auth')
 export class AuthController {
@@ -36,7 +36,15 @@ export class AuthController {
   @Patch('profile')
   @UseGuards(SessionGuard)
   updateProfile(@Body() dto: UpdateProfileDto, @CurrentUser() user: SessionUser, @Req() request: Request) {
+    // Staff details are submitted once through staff-details and then managed by an administrator.
+    if (user.portal === 'STAFF') throw new ForbiddenException('Your personal details are managed by an administrator.');
     return this.auth.updateProfile(user.id, dto, request.ip);
+  }
+
+  @Patch('staff-details')
+  @UseGuards(SessionGuard)
+  submitStaffDetails(@Body() dto: StaffDetailsDto, @CurrentUser() user: SessionUser, @Req() request: Request) {
+    return this.auth.submitStaffDetails(user, dto, request.ip);
   }
 
   @Post('change-password')

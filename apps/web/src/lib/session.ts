@@ -33,6 +33,7 @@ export type SessionUser = {
     residentialAddress: string | null;
     emergencyContactName: string | null;
     emergencyContactMobile: string | null;
+    detailsSubmittedAt: string | null;
   } | null;
 };
 

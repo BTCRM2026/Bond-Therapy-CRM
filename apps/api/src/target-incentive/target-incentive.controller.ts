@@ -7,7 +7,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
-import { PerformanceQueryDto, UpsertPlanDto } from './dto.js';
+import { PerformanceQueryDto, TrendQueryDto, UpsertPlanDto } from './dto.js';
 import { TargetIncentiveService } from './target-incentive.service.js';
 
 @Controller('target-incentive')
@@ -27,6 +27,9 @@ export class TargetIncentiveController {
 
   @Delete('plans/:id')
   deactivatePlan(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Req() req: Request) { return this.targetIncentive.deactivatePlan(actor, id, req.ip); }
+
+  @Get('me/trend')
+  myTrend(@CurrentUser() actor: SessionUser, @Query() query: TrendQueryDto) { return this.targetIncentive.myTrend(actor, query.year); }
 
   @Get('me')
   myPerformance(@CurrentUser() actor: SessionUser, @Query() query: PerformanceQueryDto) { return this.targetIncentive.myPerformance(actor, query); }

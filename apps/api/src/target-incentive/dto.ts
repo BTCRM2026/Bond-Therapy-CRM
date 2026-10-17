@@ -37,3 +37,7 @@ export class PerformanceQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(2020) @Max(2100) year?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) index?: number;
 }
+
+export class TrendQueryDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(2020) @Max(2100) year?: number;
+}

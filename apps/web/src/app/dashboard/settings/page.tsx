@@ -1,5 +1,6 @@
 import { DashboardShell } from "@/components/dashboard-shell";
 import { ProfileSettings } from "@/components/profile-settings";
+import { StaffProfileSettings } from "@/components/staff-profile-settings";
 import { requireSession } from "@/lib/session";
 import { cookies } from "next/headers";
 import { BillingSettings, type BillingSettingsData } from "@/components/billing-settings";
@@ -21,11 +22,13 @@ export default async function SettingsPage() {
       roleName={roleName}
       roleKey={session.roles[0]?.key}
       headerTitle="Settings"
-      headerSubtitle={canManageBilling ? "Profile, security, and company-wide billing controls" : "Profile and account security"}
+      headerSubtitle={canManageBilling ? "Profile, security, and company-wide billing controls" : session.portal === "STAFF" ? "Your personal and employment details" : "Profile and account security"}
       portal={session.portal}
       canManageStaff={session.permissions.includes("admin.staff.manage")}
     >
-      <div className="space-y-5"><ProfileSettings
+      {session.portal === "STAFF" && session.profile
+        ? <StaffProfileSettings user={{ name: session.name, email: session.email, loginId: session.loginId, department: session.department, manager: session.manager, roleName, profile: session.profile }} />
+        : <div className="space-y-5"><ProfileSettings
         initialProfile={{
           name: session.name,
           email: session.email,
@@ -39,7 +42,7 @@ export default async function SettingsPage() {
           staffProfile: session.profile,
         }}
         canChangePassword={session.portal === "ADMIN"}
-      />{canManageBilling && <BillingSettings initial={billingSettings} />}</div>
+      />{canManageBilling && <BillingSettings initial={billingSettings} />}</div>}
     </DashboardShell>
   );
 }

@@ -4,7 +4,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LoginDto } from './login.dto.js';
 import { hashPassword, verifyPassword } from './password.js';
-import type { ChangePasswordDto, UpdateProfileDto } from './profile.dto.js';
+import type { ChangePasswordDto, StaffDetailsDto, UpdateProfileDto } from './profile.dto.js';
+
+const PLACEHOLDER_EMAIL = /@pending\.bondtherapy\.local$/i;
 
 const SESSION_HOURS = 8;
 const REMEMBER_DAYS = 30;
@@ -161,6 +163,29 @@ export class AuthService {
       }),
     ]);
     return user;
+  }
+
+  // One-time submission: once saved, only an administrator can change these details (from Staff & Access).
+  async submitStaffDetails(user: { id: string; portal: PortalType }, dto: StaffDetailsDto, ipAddress?: string) {
+    if (user.portal !== 'STAFF') throw new ForbiddenException('Personal details are submitted from the staff portal.');
+    const profile = await this.prisma.staffProfile.findUnique({ where: { userId: user.id }, select: { detailsSubmittedAt: true } });
+    if (!profile) throw new BadRequestException('Your staff record is incomplete. Please contact an administrator.');
+    if (profile.detailsSubmittedAt) throw new ForbiddenException('Your details are locked. Please contact an administrator to change them.');
+    const email = dto.email.trim().toLowerCase();
+    if (PLACEHOLDER_EMAIL.test(email)) throw new BadRequestException('Enter your own email address.');
+    const dateOfBirth = new Date(`${dto.dateOfBirth.slice(0, 10)}T00:00:00.000Z`);
+    if (Number.isNaN(dateOfBirth.getTime()) || dateOfBirth > new Date() || dateOfBirth.getUTCFullYear() < 1930) throw new BadRequestException('Enter a valid date of birth.');
+    if (await this.prisma.user.findFirst({ where: { email, NOT: { id: user.id } }, select: { id: true } })) throw new BadRequestException('That email address is already in use.');
+
+    const [, saved] = await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: user.id }, data: { email } }),
+      this.prisma.staffProfile.update({
+        where: { userId: user.id },
+        data: { mobile: dto.mobile.trim(), dateOfBirth, bloodGroup: dto.bloodGroup ?? null, residentialAddress: dto.residentialAddress.trim(), emergencyContactName: dto.emergencyContactName.trim(), emergencyContactMobile: dto.emergencyContactMobile.trim(), detailsSubmittedAt: new Date() },
+      }),
+      this.prisma.auditLog.create({ data: { actorId: user.id, action: 'STAFF_DETAILS_SUBMIT', entity: 'USER', entityId: user.id, ipAddress } }),
+    ]);
+    return saved;
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto, portal: PortalType, ipAddress?: string) {

@@ -207,6 +207,27 @@ export class TargetIncentiveService {
     return { deactivated: true };
   }
 
+  // Month-by-month target and sales for the year, for the charts. One order query, bucketed by month.
+  async myTrend(actor: SessionUser, year?: number) {
+    this.ensureAccess(actor);
+    const now = new Date();
+    const y = year ?? now.getUTCFullYear();
+    const plan = await this.prisma.annualTargetPlan.findFirst({ where: { staffId: actor.id, targetYear: y, isActive: true }, select: { id: true, annualTarget: true } });
+    if (!plan) return { hasPlan: false as const, year: y };
+    const [targets, orders] = await Promise.all([
+      this.prisma.target.findMany({ where: { annualPlanId: plan.id, period: 'MONTHLY', periodYear: y }, select: { periodIndex: true, targetValue: true } }),
+      this.prisma.order.findMany({ where: { salespersonId: actor.id, createdAt: { gte: new Date(Date.UTC(y, 0, 1)), lt: new Date(Date.UTC(y + 1, 0, 1)) }, status: { in: [...fulfilmentStatuses] } }, select: { createdAt: true, totalAmount: true } }),
+    ]);
+    const actual = new Array<number>(12).fill(0);
+    for (const order of orders) actual[order.createdAt.getUTCMonth()] += Number(order.totalAmount);
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const target = Number(targets.find((row) => row.periodIndex === i + 1)?.targetValue ?? 0);
+      return { month: i + 1, target, actual: round2(actual[i]!), achievementPercent: target > 0 ? round2((actual[i]! / target) * 100) : 0 };
+    });
+    const currentMonth = y < now.getUTCFullYear() ? 12 : y > now.getUTCFullYear() ? 0 : now.getUTCMonth() + 1;
+    return { hasPlan: true as const, year: y, annualTarget: Number(plan.annualTarget), currentMonth, months };
+  }
+
   async myPerformance(actor: SessionUser, query: PerformanceQueryDto) {
     this.ensureAccess(actor);
     const now = new Date();
