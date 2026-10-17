@@ -1,20 +1,19 @@
 "use client";
 
-import { AlertTriangle, ArrowDown, ArrowUp, Calendar, Camera, CheckCircle2, Clock3, LoaderCircle, MapPin, Plus, RotateCcw, Star, Trash2 } from "lucide-react";
-import Image from "next/image";
+import { AlertTriangle, ArrowDown, ArrowUp, Calendar, CheckCircle2, Clock3, LoaderCircle, MapPin, Plus, RotateCcw, Star, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FormError } from "@/components/ui/field";
 import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
+import { CameraCapture } from "@/components/ui/camera-capture";
 import { Modal } from "@/components/ui/modal";
 import { SuccessToast } from "@/components/ui/toast";
-import { prepareImageFile } from "@/lib/invoice-file";
 
 type Salon = { id: string; salonName: string; city: string; area: string | null; potential: string | null; beat: { id: string; name: string } | null };
 type Activity = { id: string; checkInAt: string | null; checkOutAt: string | null; visitOutcome: string | null; status: string; note: string | null };
 type RouteStop = { id: string; clientId: string; sequence: number; plannedTime: string | null; status: "PLANNED" | "VISITED" | "UNABLE_TO_MEET" | "RESCHEDULED" | "REMOVED"; note: string | null; client: { id: string; salonName: string; city: string; area: string | null; primaryContact: string; potential: string | null; latitude: string | null; longitude: string | null }; activity: Activity | null };
-type RouteData = { id: string | null; staffId: string; routeDate: string; status: "DRAFT" | "PLANNED" | "IN_PROGRESS" | "PARTIALLY_COMPLETED" | "COMPLETED" | "CANCELLED"; notes: string | null; stops: RouteStop[] };
+type RouteData = { id: string | null; staffId: string; routeDate: string; status: "DRAFT" | "PLANNED" | "IN_PROGRESS" | "PARTIALLY_COMPLETED" | "COMPLETED" | "CANCELLED"; notes: string | null; stops: RouteStop[]; visitRadiusMeters?: number };
 
 const OUTCOMES = [
   { value: "PRODUCTIVE", label: "Productive" },
@@ -42,7 +41,6 @@ export function RoutePlanner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [visiting, setVisiting] = useState<RouteStop | null>(null);
   const [starting, setStarting] = useState<RouteStop | null>(null);
   const [resolving, setResolving] = useState<{ stop: RouteStop; mode: "UNABLE_TO_MEET" | "RESCHEDULED" } | null>(null);
 
@@ -98,6 +96,18 @@ export function RoutePlanner() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to remove this stop."); }
   };
 
+  // Leaving a salon is one tap: only the time is recorded.
+  const checkOut = async (stop: RouteStop) => {
+    setError("");
+    try {
+      const response = await fetch(`/api/routes/${today}/stops/${stop.id}/complete`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(messageFrom(data, "Unable to check out."));
+      await load();
+      setNotice(`Checked out of ${stop.client.salonName}.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to check out."); }
+  };
+
   if (loading) return <div className="space-y-3"><div className="h-11 w-56 animate-pulse rounded-lg bg-background" /><div className="h-64 animate-pulse rounded-xl bg-background" /></div>;
 
   const activeDate = tab === "today" ? today : tomorrow;
@@ -114,10 +124,9 @@ export function RoutePlanner() {
 
     {route && (tab === "tomorrow"
       ? <RouteBuilder date={activeDate} route={route} salons={salons} onSave={saveStops} onSubmit={() => submitRoute(activeDate)} />
-      : <TodayRoute date={activeDate} route={route} salons={salons} onSave={saveStops} onStart={setStarting} onComplete={setVisiting} onResolve={(stop, mode) => setResolving({ stop, mode })} onRemove={(stopId) => removeStop(activeDate, stopId)} />)}
+      : <TodayRoute date={activeDate} route={route} salons={salons} onSave={saveStops} onStart={setStarting} onComplete={checkOut} onResolve={(stop, mode) => setResolving({ stop, mode })} onRemove={(stopId) => removeStop(activeDate, stopId)} />)}
 
-    {starting && <StartVisitModal stop={starting} date={today} onClose={() => setStarting(null)} onDone={async () => { setStarting(null); await load(); setNotice("Visit check-in recorded."); }} />}
-    {visiting && <CompleteVisitModal stop={visiting} date={today} onClose={() => setVisiting(null)} onDone={async () => { setVisiting(null); await load(); setNotice("Visit recorded."); }} />}
+    {starting && <StartVisitModal stop={starting} date={today} radius={routes[today]?.visitRadiusMeters ?? 100} onClose={() => setStarting(null)} onDone={async () => { setStarting(null); await load(); setNotice("Checked in. Your attendance for today has started."); }} />}
     {resolving && <ResolveStopModal stop={resolving.stop} mode={resolving.mode} onClose={() => setResolving(null)} onConfirm={(reason, rescheduleDate) => resolveStop(today, resolving.stop.id, resolving.mode, reason, rescheduleDate)} />}
   </div>;
 }
@@ -173,7 +182,7 @@ function RouteBuilder({ date, route, salons, onSave, onSubmit }: { date: string;
   </section>;
 }
 
-function TodayRoute({ date, route, salons, onSave, onStart, onComplete, onResolve, onRemove }: { date: string; route: RouteData; salons: Salon[]; onSave: (date: string, stops: Array<{ clientId: string; plannedTime: string | null }>) => Promise<void>; onStart: (stop: RouteStop) => void; onComplete: (stop: RouteStop) => void; onResolve: (stop: RouteStop, mode: "UNABLE_TO_MEET" | "RESCHEDULED") => void; onRemove: (stopId: string) => void }) {
+function TodayRoute({ date, route, salons, onSave, onStart, onComplete, onResolve, onRemove }: { date: string; route: RouteData; salons: Salon[]; onSave: (date: string, stops: Array<{ clientId: string; plannedTime: string | null }>) => Promise<void>; onStart: (stop: RouteStop) => void; onComplete: (stop: RouteStop) => Promise<void>; onResolve: (stop: RouteStop, mode: "UNABLE_TO_MEET" | "RESCHEDULED") => void; onRemove: (stopId: string) => void }) {
   const [picking, setPicking] = useState(false);
   const stops = activeStops(route);
   const available = salons.filter((salon) => !stops.some((stop) => stop.clientId === salon.id));
@@ -195,8 +204,9 @@ function TodayRoute({ date, route, salons, onSave, onStart, onComplete, onResolv
   </section>;
 }
 
-function TodayStopRow({ stop, onStart, onComplete, onUnableToMeet, onReschedule, onRemove }: { stop: RouteStop; onStart: () => void; onComplete: () => void; onUnableToMeet: () => void; onReschedule: () => void; onRemove: () => void }) {
+function TodayStopRow({ stop, onStart, onComplete, onUnableToMeet, onReschedule, onRemove }: { stop: RouteStop; onStart: () => void; onComplete: () => Promise<void>; onUnableToMeet: () => void; onReschedule: () => void; onRemove: () => void }) {
   const [open, setOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const started = Boolean(stop.activity?.checkInAt) && !stop.activity?.checkOutAt;
   return <div className="p-4 sm:px-5">
     <div className="flex items-start justify-between gap-3">
@@ -204,13 +214,14 @@ function TodayStopRow({ stop, onStart, onComplete, onUnableToMeet, onReschedule,
       {stop.status === "PLANNED" && <button type="button" onClick={() => setOpen((v) => !v)} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-background" aria-label="More actions"><Clock3 size={15} /></button>}
     </div>
     {stop.status === "PLANNED" && <div className="mt-3 flex flex-wrap gap-2">
-      {!started ? <Button type="button" className="h-9 px-3" onClick={onStart}><MapPin size={14} />Start visit</Button> : <Button type="button" className="h-9 px-3" onClick={onComplete}><CheckCircle2 size={14} />Complete visit</Button>}
+      {!started ? <Button type="button" className="h-9 px-3" onClick={onStart}><MapPin size={14} />I’ve arrived</Button> : <Button type="button" className="h-9 px-3" disabled={leaving} onClick={async () => { setLeaving(true); try { await onComplete(); } finally { setLeaving(false); } }}>{leaving ? <LoaderCircle className="animate-spin" size={14} /> : <CheckCircle2 size={14} />}{leaving ? "Checking out…" : "Check out"}</Button>}
       {open && <>
         <Button type="button" variant="secondary" className="h-9 px-3" onClick={onUnableToMeet}><AlertTriangle size={14} />Unable to meet</Button>
         <Button type="button" variant="secondary" className="h-9 px-3" onClick={onReschedule}><RotateCcw size={14} />Reschedule</Button>
         <button type="button" onClick={onRemove} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-danger hover:bg-red-50"><Trash2 size={14} />Remove</button>
       </>}
     </div>}
+    {stop.activity?.checkInAt && <p className="mt-2 text-xs text-muted">Arrived <span className="font-medium text-foreground">{timeOf(stop.activity.checkInAt)}</span>{stop.activity.checkOutAt && <> · Left <span className="font-medium text-foreground">{timeOf(stop.activity.checkOutAt)}</span></>}</p>}
     {stop.status === "VISITED" && stop.activity?.visitOutcome && <p className="mt-2 text-xs text-muted">Outcome: <span className="font-medium text-foreground">{OUTCOMES.find((o) => o.value === stop.activity?.visitOutcome)?.label ?? stop.activity.visitOutcome}</span></p>}
     {(stop.status === "UNABLE_TO_MEET" || stop.status === "RESCHEDULED") && stop.note && <p className="mt-2 text-xs text-muted">Reason: {stop.note}</p>}
   </div>;
@@ -230,105 +241,76 @@ function StopStatusBadge({ stop }: { stop: RouteStop }) {
   return <span className="inline-flex rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold text-muted">Pending</span>;
 }
 
-function VisitPhotoCapture({ photo, label, onChange, onError }: { photo: File | null; label: string; onChange: (file: File | null) => void; onError: (message: string) => void }) {
-  const [preparing, setPreparing] = useState(false);
-  const preview = useMemo(() => photo ? URL.createObjectURL(photo) : "", [photo]);
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-  const select = async (file?: File) => {
-    if (!file) return;
-    setPreparing(true); onError("");
-    const prepared = await prepareImageFile(file, 1280, 0.72, 300 * 1024);
-    if (prepared.size > 8 * 1024 * 1024) { onChange(null); onError("This camera photo could not be optimized. Please retake it."); }
-    else onChange(prepared);
-    setPreparing(false);
-  };
-  const input = <input type="file" accept="image/jpeg,image/png,image/webp" capture="user" className="sr-only" onChange={(event) => void select(event.target.files?.[0])} />;
-  if (!photo) return <label className="block cursor-pointer rounded-xl border border-dashed bg-background p-5 text-center transition-colors hover:border-brand/40 hover:bg-brand-soft/20"><span className="mx-auto grid size-11 place-items-center rounded-full border bg-white text-brand"><Camera size={20} /></span><span className="mt-3 block text-sm font-semibold text-foreground">{preparing ? "Optimizing photo…" : label}</span><span className="mt-1 block text-xs text-muted">Front camera · automatically resized for fast upload</span>{input}</label>;
-  return <div className="grid gap-3 rounded-xl border bg-background p-3 sm:grid-cols-[96px_1fr] sm:items-center">
-    <div className="relative h-32 overflow-hidden rounded-lg bg-white sm:h-24"><Image src={preview} alt="Visit selfie preview" fill sizes="96px" className="object-cover" unoptimized /></div>
-    <div className="min-w-0"><div className="flex items-center gap-2 text-success"><CheckCircle2 size={16} /><p className="text-sm font-semibold">Photo ready</p></div><p className="mt-1 text-xs text-muted">Optimized to {(photo.size / 1024).toFixed(0)} KB for a faster upload.</p><div className="mt-3 flex flex-wrap gap-2"><label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border bg-white px-3 text-xs font-semibold hover:bg-background"><Camera size={14} />Retake{input}</label><button type="button" onClick={() => onChange(null)} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-danger hover:bg-red-50"><Trash2 size={14} />Remove</button></div></div>
-  </div>;
-}
+const distanceMeters = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+  const rad = (degrees: number) => degrees * Math.PI / 180;
+  const a = Math.sin(rad(lat2 - lat1) / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lng2 - lng1) / 2) ** 2;
+  return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+};
+const MAX_ACCURACY = 100;
+type Position = { latitude: number; longitude: number; accuracy: number };
 
-function CompleteVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; date: string; onClose: () => void; onDone: () => Promise<void> }) {
-  const [outcome, setOutcome] = useState<string>("PRODUCTIVE");
-  const [personMet, setPersonMet] = useState("");
-  const [sampleGiven, setSampleGiven] = useState(false);
-  const [nextAction, setNextAction] = useState("");
-  const [note, setNote] = useState("");
+// Strict arrival: the phone must be within the salon's saved radius, with a usable GPS fix, and a selfie taken on the spot.
+function StartVisitModal({ stop, date, radius, onClose, onDone }: { stop: RouteStop; date: string; radius: number; onClose: () => void; onDone: () => Promise<void> }) {
   const [photo, setPhoto] = useState<File | null>(null);
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationStatus, setLocationStatus] = useState("Locating…");
+  const [captureToken, setCaptureToken] = useState("");
+  const [position, setPosition] = useState<Position | null>(null);
+  const [gpsMessage, setGpsMessage] = useState("Finding your location…");
+  const [salonPoint, setSalonPoint] = useState<{ latitude: number; longitude: number } | null>(stop.client.latitude != null && stop.client.longitude != null ? { latitude: Number(stop.client.latitude), longitude: Number(stop.client.longitude) } : null);
+  const [savingLocation, setSavingLocation] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    if (!navigator.geolocation) { const timer = window.setTimeout(() => setLocationStatus("Location is not supported on this device."), 0); return () => window.clearTimeout(timer); }
-    navigator.geolocation.getCurrentPosition(({ coords }) => {
-      setLocation({ latitude: coords.latitude, longitude: coords.longitude });
-      if (stop.client.latitude == null || stop.client.longitude == null) setLocationStatus("Salon location not set — GPS distance will be recorded without verification.");
-      else setLocationStatus("Location captured. The server will verify your distance from the salon.");
-    }, () => setLocationStatus("Allow location access to complete this visit."), { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 });
-  }, [stop.client.latitude, stop.client.longitude]);
+    if (!navigator.geolocation) { const timer = window.setTimeout(() => setGpsMessage("Location is not supported on this device."), 0); return () => window.clearTimeout(timer); }
+    const watch = navigator.geolocation.watchPosition(
+      ({ coords }) => { setPosition({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy }); setGpsMessage(""); },
+      () => setGpsMessage("Allow location access to check in at the salon."),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+    return () => navigator.geolocation.clearWatch(watch);
+  }, []);
+
+  const accurate = position ? position.accuracy <= MAX_ACCURACY : false;
+  const distance = position && salonPoint ? distanceMeters(salonPoint.latitude, salonPoint.longitude, position.latitude, position.longitude) : null;
+  const within = distance != null && distance <= radius;
+  const ready = Boolean(photo && position && accurate && within);
+
+  const saveSalonLocation = async () => {
+    if (!position || !accurate) return;
+    setSavingLocation(true); setError("");
+    try {
+      const response = await fetch(`/api/routes/${date}/stops/${stop.id}/salon-location`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ latitude: position.latitude, longitude: position.longitude, accuracy: position.accuracy }) });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(messageFrom(data, "Unable to save the salon location."));
+      setSalonPoint({ latitude: position.latitude, longitude: position.longitude });
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save the salon location."); }
+    finally { setSavingLocation(false); }
+  };
+
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); if (!photo || !location) return; setSaving(true); setError("");
+    event.preventDefault(); if (!photo || !position || !ready) return; setSaving(true); setError("");
     try {
       const form = new FormData();
-      form.append("photo", photo);
-      form.append("latitude", String(location.latitude));
-      form.append("longitude", String(location.longitude));
-      form.append("outcome", outcome);
-      if (personMet) form.append("personMet", personMet);
-      form.append("sampleGiven", sampleGiven ? "true" : "false");
-      if (nextAction) form.append("nextAction", nextAction);
-      if (note) form.append("note", note);
-      const response = await fetch(`/api/routes/${date}/stops/${stop.id}/complete`, { method: "POST", body: form });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(messageFrom(data, "Unable to record this visit."));
-      await onDone();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to record this visit."); setSaving(false); }
-  };
-  return <Modal title="Complete visit" subtitle={stop.client.salonName} onClose={onClose}>
-    <form onSubmit={submit} className="space-y-4">
-      <div className={`flex items-start gap-2 rounded-lg border p-3 text-xs ${location ? "border-success/20 bg-success-soft/50 text-success" : "border-warning/20 bg-warning-soft/50 text-warning"}`}><MapPin className="mt-0.5 shrink-0" size={15} /><span>{locationStatus}</span></div>
-      <VisitPhotoCapture photo={photo} label="Take check-out selfie" onChange={setPhoto} onError={setError} />
-      <Field label="Outcome *"><select value={outcome} onChange={(e) => setOutcome(e.target.value)} className="h-11 w-full rounded-lg border bg-white px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:h-10">{OUTCOMES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
-      <Field label="Person met"><Input value={personMet} onChange={(e) => setPersonMet(e.target.value)} maxLength={120} placeholder="e.g. Owner, Manager" /></Field>
-      <label className="flex items-center gap-2.5 rounded-lg border bg-background px-3 py-2.5"><input type="checkbox" checked={sampleGiven} onChange={(e) => setSampleGiven(e.target.checked)} className="size-4 accent-[var(--brand)]" /><span className="text-xs font-medium text-foreground">Sample given during this visit</span></label>
-      <Field label="Next action"><Input value={nextAction} onChange={(e) => setNextAction(e.target.value)} maxLength={300} placeholder="e.g. Send quotation by Friday" /></Field>
-      <Field label="Notes"><textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} rows={3} className="w-full resize-y rounded-lg border bg-white px-3 py-2.5 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/10" /></Field>
-      {error && <FormError message={error} />}
-      <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving || !photo || !location}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Saving…" : "Complete visit"}</Button></div>
-    </form>
-  </Modal>;
-}
-
-function StartVisitModal({ stop, date, onClose, onDone }: { stop: RouteStop; date: string; onClose: () => void; onDone: () => Promise<void> }) {
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationStatus, setLocationStatus] = useState("Locating…");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    if (!navigator.geolocation) { const timer = window.setTimeout(() => setLocationStatus("Location is not supported on this device."), 0); return () => window.clearTimeout(timer); }
-    navigator.geolocation.getCurrentPosition(({ coords }) => {
-      setLocation({ latitude: coords.latitude, longitude: coords.longitude });
-      if (stop.client.latitude == null || stop.client.longitude == null) setLocationStatus("Salon location not set — GPS distance will be recorded without verification.");
-      else setLocationStatus("Location captured. The server will verify your distance from the salon.");
-    }, () => setLocationStatus("Allow location access to start this visit."), { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 });
-  }, [stop.client.latitude, stop.client.longitude]);
-  const submit = async (event: FormEvent) => {
-    event.preventDefault(); if (!photo || !location) return; setSaving(true); setError("");
-    try {
-      const form = new FormData(); form.append("photo", photo); form.append("latitude", String(location.latitude)); form.append("longitude", String(location.longitude));
+      form.append("photo", photo); form.append("captureToken", captureToken); form.append("latitude", String(position.latitude)); form.append("longitude", String(position.longitude)); form.append("accuracy", String(Math.round(position.accuracy)));
       const response = await fetch(`/api/routes/${date}/stops/${stop.id}/start`, { method: "POST", body: form }); const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(messageFrom(data, "Unable to start this visit.")); await onDone();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to start this visit."); setSaving(false); }
+      if (!response.ok) throw new Error(messageFrom(data, "Unable to check in.")); await onDone();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to check in."); setSaving(false); }
   };
-  return <Modal title="Start visit" subtitle={stop.client.salonName} onClose={onClose}><form onSubmit={submit} className="space-y-4">
-    <div className={`flex items-start gap-2 rounded-lg border p-3 text-xs ${location ? "border-success/20 bg-success-soft/50 text-success" : "border-warning/20 bg-warning-soft/50 text-warning"}`}><MapPin className="mt-0.5 shrink-0" size={15} /><span>{locationStatus}</span></div>
-    <VisitPhotoCapture photo={photo} label="Take check-in selfie" onChange={setPhoto} onError={setError} />
+
+  const panel = (tone: "ok" | "bad" | "warn", message: string) => <div className={`flex items-start gap-2 rounded-lg border p-3 text-xs ${tone === "ok" ? "border-success/20 bg-success-soft/50 text-success" : tone === "bad" ? "border-red-200 bg-red-50 text-danger" : "border-warning/20 bg-warning-soft/50 text-warning"}`} role="status" aria-live="polite"><MapPin className="mt-0.5 shrink-0" size={15} /><span>{message}</span></div>;
+
+  return <Modal title="Check in at salon" subtitle={stop.client.salonName} onClose={onClose}><form onSubmit={submit} className="space-y-4">
+    {gpsMessage && panel("warn", gpsMessage)}
+    {!gpsMessage && position && !accurate && panel("warn", `Your GPS signal is weak (about ${Math.round(position.accuracy)} m off). Step outside or wait a few seconds for a better fix.`)}
+    {!gpsMessage && position && accurate && !salonPoint && <div className="space-y-2.5">
+      {panel("warn", "This salon has no saved location yet. Stand at the salon and save its location once; later visits are matched against it.")}
+      <Button type="button" variant="secondary" className="w-full" disabled={savingLocation} onClick={saveSalonLocation}>{savingLocation ? <LoaderCircle className="animate-spin" size={16} /> : <MapPin size={16} />}{savingLocation ? "Saving…" : "Save salon location here"}</Button>
+    </div>}
+    {!gpsMessage && position && accurate && salonPoint && distance != null && (within
+      ? panel("ok", `You are at the salon (about ${distance} m away). You can check in.`)
+      : panel("bad", `You are about ${distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${distance} m`} from the salon. Move within ${radius} m to check in.`))}
+    <CameraCapture photo={photo} purpose="VISIT_CHECK_IN" scopeId={stop.id} facing="user" label="Take arrival selfie" hint="Opens the front camera. Gallery photos are not accepted." onChange={(file, token) => { setPhoto(file); setCaptureToken(token); }} onError={setError} />
     {error && <FormError message={error} />}
-    <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving || !photo || !location}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Starting…" : "Start visit"}</Button></div>
+    <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving || !ready}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Checking in…" : "I’ve arrived"}</Button></div>
   </form></Modal>;
 }
 

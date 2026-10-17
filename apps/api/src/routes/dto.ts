@@ -19,20 +19,29 @@ export class StopStatusDto {
   @IsOptional() @IsString() rescheduleDate?: string;
 }
 
+// Check-out is only a time stamp: no photo and no GPS are required.
 export class CompleteVisitDto {
-  @IsEnum(VisitOutcome) outcome!: VisitOutcome;
+  @IsOptional() @IsEnum(VisitOutcome) outcome?: VisitOutcome;
   @IsOptional() @IsString() @MaxLength(160) personMet?: string;
   @IsOptional() @IsString() @MaxLength(160) purpose?: string;
   @IsOptional() @IsString() @MaxLength(1000) note?: string;
   @IsOptional() @IsIn(['true', 'false']) sampleGiven?: 'true' | 'false';
   @IsOptional() @IsString() @MaxLength(300) nextAction?: string;
-  @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude!: number;
-  @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude!: number;
 }
 
+// Arrival must be matched to the salon's saved location; accuracy is the GPS error reported by the phone, in metres.
 export class StartVisitDto {
+  // The one-time pass issued when the in-app camera opened.
+  @IsOptional() @IsString() @MaxLength(100) captureToken?: string;
   @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude!: number;
   @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude!: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) accuracy?: number;
+}
+
+export class SalonLocationDto {
+  @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude!: number;
+  @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude!: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) accuracy?: number;
 }
 
 export class AdminVisitsDto {

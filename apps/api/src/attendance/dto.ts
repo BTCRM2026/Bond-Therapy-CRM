@@ -9,6 +9,7 @@ export class AttendanceMonthQueryDto {
 export class PunchDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) accuracy?: number;
 }
 
 export class RequestCorrectionDto {

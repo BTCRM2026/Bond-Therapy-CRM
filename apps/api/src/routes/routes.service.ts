@@ -1,9 +1,17 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { markFieldWorked } from '../attendance/field-attendance.js';
+import { assertLiveCameraPhoto } from '../captures/live-photo.js';
+import { CapturesService } from '../captures/captures.service.js';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { AdminVisitsDto, CompleteVisitDto, SaveRouteDto, StartVisitDto, StopStatusDto } from './dto.js';
+import type { AdminVisitsDto, CompleteVisitDto, SalonLocationDto, SaveRouteDto, StartVisitDto, StopStatusDto } from './dto.js';
+
+// Arrival must be within this distance of the salon's saved location unless an administrator has set another radius.
+export const DEFAULT_VISIT_RADIUS_METERS = 100;
+// A phone reporting a worse GPS error than this cannot prove where the staff member is.
+export const MAX_GPS_ACCURACY_METERS = 100;
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const stopInclude = {
@@ -14,7 +22,7 @@ const routeInclude = { stops: { orderBy: { sequence: 'asc' }, include: stopInclu
 
 @Injectable()
 export class RoutesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly captures: CapturesService) {}
 
   private isAdmin(actor: SessionUser) {
     return actor.portal === 'ADMIN' && actor.roles.some((role) => role.key === 'SUPER_ADMIN');
@@ -41,6 +49,14 @@ export class RoutesService {
     return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   }
 
+  private istDateKey(at = new Date()) {
+    return new Date(at.getTime() + 330 * 60 * 1000).toISOString().slice(0, 10);
+  }
+
+  private checkAccuracy(accuracy?: number) {
+    if (accuracy != null && accuracy > MAX_GPS_ACCURACY_METERS) throw new BadRequestException(`Your GPS signal is too weak (about ${Math.round(accuracy)} m off). Step outside or wait a few seconds, then try again.`);
+  }
+
   async assignedSalons(actor: SessionUser) {
     this.ensureAccess(actor);
     return this.prisma.client.findMany({
@@ -65,8 +81,10 @@ export class RoutesService {
   async getRoute(actor: SessionUser, dateStr: string) {
     this.ensureAccess(actor);
     const { date, route } = await this.findOwnedRoute(actor, dateStr);
-    if (route) return route;
-    return { id: null, staffId: actor.id, routeDate: date, status: 'DRAFT' as const, notes: null, stops: [] };
+    const settings = await this.prisma.operationsSettings.findUnique({ where: { id: 'default' }, select: { visitRadiusMeters: true } });
+    const visitRadiusMeters = settings?.visitRadiusMeters ?? DEFAULT_VISIT_RADIUS_METERS;
+    if (route) return { ...route, visitRadiusMeters };
+    return { id: null, staffId: actor.id, routeDate: date, status: 'DRAFT' as const, notes: null, stops: [], visitRadiusMeters };
   }
 
   async saveRoute(actor: SessionUser, dateStr: string, dto: SaveRouteDto, ipAddress?: string) {
@@ -161,20 +179,30 @@ export class RoutesService {
 
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) throw new BadRequestException('Capture a JPG, PNG, or WebP photo.');
     if (file.size > 8 * 1024 * 1024) throw new BadRequestException('Photo must be 8 MB or smaller.');
+    if (dateStr !== this.istDateKey()) throw new BadRequestException('You can check in only on the day of the route.');
+    if (stop.client.latitude == null || stop.client.longitude == null) throw new BadRequestException(`${stop.client.salonName} has no saved location yet. Save the salon location first, then check in.`);
+    this.checkAccuracy(dto.accuracy);
     const settings = await this.prisma.operationsSettings.findUnique({ where: { id: 'default' }, select: { visitRadiusMeters: true } });
-    const hasSalonLocation = stop.client.latitude != null && stop.client.longitude != null;
-    const distanceMeters = hasSalonLocation ? this.haversineMeters(Number(stop.client.latitude), Number(stop.client.longitude), dto.latitude, dto.longitude) : null;
-    const gpsVerified = distanceMeters == null ? null : distanceMeters <= (settings?.visitRadiusMeters ?? 150);
+    const radius = settings?.visitRadiusMeters ?? DEFAULT_VISIT_RADIUS_METERS;
+    const distanceMeters = this.haversineMeters(Number(stop.client.latitude), Number(stop.client.longitude), dto.latitude, dto.longitude);
+    if (distanceMeters > radius) throw new BadRequestException(`You are about ${distanceMeters} m from ${stop.client.salonName}. Move within ${radius} m of the salon to check in.`);
+    const gpsVerified = true;
+    // The arrival photo must come from the in-app camera, must be new, and its camera pass is used up only now that every other check has passed.
+    const photoHash = assertLiveCameraPhoto(file.buffer);
+    const reused = await this.prisma.visitProof.findFirst({ where: { checkInPhotoHash: photoHash, ...(stop.activity ? { NOT: { activityId: stop.activity.id } } : {}) }, select: { id: true } });
+    if (reused) throw new BadRequestException('This photo has already been used for another visit. Take a new photo at the salon.');
+    await this.captures.consume(actor.id, dto.captureToken, 'VISIT_CHECK_IN', stopId);
     const activity = await this.prisma.$transaction(async (tx) => {
       const visit = stop.activity ?? await tx.clientActivity.create({ data: { clientId: stop.clientId, type: 'VISIT', status: 'OPEN', createdById: actor.id, routeStopId: stop.id, checkInAt: new Date() } });
       await tx.visitProof.upsert({
         where: { activityId: visit.id },
-        create: { activityId: visit.id, checkInPhoto: file.buffer, checkInPhotoMime: file.mimetype, checkInLatitude: dto.latitude, checkInLongitude: dto.longitude, distanceMeters, gpsVerified },
-        update: { checkInPhoto: file.buffer, checkInPhotoMime: file.mimetype, checkInLatitude: dto.latitude, checkInLongitude: dto.longitude, distanceMeters, gpsVerified, capturedAt: new Date() },
+        create: { activityId: visit.id, checkInPhoto: file.buffer, checkInPhotoMime: file.mimetype, checkInPhotoHash: photoHash, checkInLatitude: dto.latitude, checkInLongitude: dto.longitude, distanceMeters, gpsVerified },
+        update: { checkInPhoto: file.buffer, checkInPhotoMime: file.mimetype, checkInPhotoHash: photoHash, checkInLatitude: dto.latitude, checkInLongitude: dto.longitude, distanceMeters, gpsVerified, capturedAt: new Date() },
       });
       if (route.status === 'DRAFT' || route.status === 'PLANNED') await tx.route.update({ where: { id: route.id }, data: { status: 'IN_PROGRESS' } });
       return visit;
     });
+    await markFieldWorked(this.prisma, actor.id, new Date());
     await this.recordAudit(actor, 'ROUTE_VISIT_START', stopId, { distanceMeters, gpsVerified, mimeType: file.mimetype }, ipAddress);
     return activity;
   }
@@ -236,32 +264,28 @@ export class RoutesService {
     return stop;
   }
 
-  async completeVisit(actor: SessionUser, dateStr: string, stopId: string, dto: CompleteVisitDto, file: { buffer: Buffer; mimetype: string; size: number }, ipAddress?: string) {
+  // Check-out records only the time: no photo and no GPS, so leaving a salon is a single tap.
+  async completeVisit(actor: SessionUser, dateStr: string, stopId: string, dto: CompleteVisitDto, ipAddress?: string) {
     this.ensureAccess(actor);
     const { route } = await this.findOwnedRoute(actor, dateStr);
     if (!route) throw new NotFoundException('Route not found.');
     const stop = route.stops.find((item) => item.id === stopId);
     if (!stop) throw new NotFoundException('Route stop not found.');
 
-    if (!stop.activity?.visitProof) throw new BadRequestException('Start the visit with GPS and a check-in selfie before completing it.');
-    if (stop.activity.status === 'COMPLETED') throw new BadRequestException('This visit has already been completed.');
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) throw new BadRequestException('Capture a JPG, PNG, or WebP photo.');
-    if (file.size > 8 * 1024 * 1024) throw new BadRequestException('Photo must be 8 MB or smaller.');
+    if (!stop.activity?.visitProof) throw new BadRequestException('Check in at the salon before checking out.');
+    if (stop.activity.status === 'COMPLETED') throw new BadRequestException('You have already checked out of this visit.');
     const activity = stop.activity;
-    const settings = await this.prisma.operationsSettings.findUnique({ where: { id: 'default' }, select: { visitRadiusMeters: true } });
-    const hasSalonLocation = stop.client.latitude != null && stop.client.longitude != null;
-    const checkOutDistanceMeters = hasSalonLocation ? this.haversineMeters(Number(stop.client.latitude), Number(stop.client.longitude), dto.latitude, dto.longitude) : null;
-    const checkOutGpsVerified = checkOutDistanceMeters == null ? null : checkOutDistanceMeters <= (settings?.visitRadiusMeters ?? 50);
+    const now = new Date();
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.visitProof.update({ where: { activityId: activity.id }, data: { checkOutPhoto: file.buffer, checkOutPhotoMime: file.mimetype, checkOutLatitude: dto.latitude, checkOutLongitude: dto.longitude, checkOutDistanceMeters, checkOutGpsVerified, checkedOutAt: new Date() } });
+      await tx.visitProof.update({ where: { activityId: activity.id }, data: { checkedOutAt: now } });
       return tx.clientActivity.update({
         where: { id: activity.id },
         data: {
           status: 'COMPLETED',
-          completedAt: new Date(),
-          checkOutAt: new Date(),
-          visitOutcome: dto.outcome,
+          completedAt: now,
+          checkOutAt: now,
+          visitOutcome: dto.outcome ?? activity.visitOutcome,
           personMet: dto.personMet?.trim() || activity.personMet,
           purpose: dto.purpose?.trim() || activity.purpose,
           note: dto.note?.trim() || activity.note,
@@ -272,8 +296,23 @@ export class RoutesService {
     });
     await this.prisma.routeStop.update({ where: { id: stopId }, data: { status: 'VISITED' } });
     await this.recomputeRouteStatus(route.id);
-    await this.recordAudit(actor, 'ROUTE_VISIT_COMPLETE', stopId, { outcome: dto.outcome, checkOutDistanceMeters, checkOutGpsVerified }, ipAddress);
+    await markFieldWorked(this.prisma, actor.id, now);
+    await this.recordAudit(actor, 'ROUTE_VISIT_COMPLETE', stopId, { outcome: dto.outcome ?? null }, ipAddress);
     return updated;
+  }
+
+  // One-time fallback for salons that have no saved location: the staff member stands at the salon and saves it.
+  // Once saved it is locked; only an administrator can change it (same rule as the client profile).
+  async setSalonLocation(actor: SessionUser, dateStr: string, stopId: string, dto: SalonLocationDto, ipAddress?: string) {
+    this.ensureAccess(actor);
+    const { route } = await this.findOwnedRoute(actor, dateStr);
+    const stop = route?.stops.find((item) => item.id === stopId);
+    if (!stop) throw new NotFoundException('Route stop not found.');
+    if (stop.client.latitude != null && stop.client.longitude != null) throw new BadRequestException('This salon already has a saved location. Ask an administrator if it needs to change.');
+    this.checkAccuracy(dto.accuracy);
+    await this.prisma.client.update({ where: { id: stop.clientId }, data: { latitude: dto.latitude, longitude: dto.longitude, locationSetAt: new Date(), locationSetById: actor.id } });
+    await this.recordAudit(actor, 'ROUTE_SALON_LOCATION_SET', stopId, { clientId: stop.clientId, latitude: dto.latitude, longitude: dto.longitude }, ipAddress);
+    return { latitude: dto.latitude, longitude: dto.longitude };
   }
 
   private async recomputeRouteStatus(routeId: string) {

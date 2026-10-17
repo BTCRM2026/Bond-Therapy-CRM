@@ -29,6 +29,8 @@ import { ExchangesModule } from './exchanges/exchanges.module.js';
 import { DailyReportsModule } from './daily-reports/daily-reports.module.js';
 import { ChatModule } from './chat/chat.module.js';
 import { StaffRequestsModule } from './staff-requests/staff-requests.module.js';
+import { LeaveModule } from './leave/leave.module.js';
+import { CapturesModule } from './captures/captures.module.js';
 
 @Module({
   imports: [
@@ -61,6 +63,8 @@ import { StaffRequestsModule } from './staff-requests/staff-requests.module.js';
     DailyReportsModule,
     ChatModule,
     StaffRequestsModule,
+    LeaveModule,
+    CapturesModule,
   ],
   controllers: [AppController],
 })

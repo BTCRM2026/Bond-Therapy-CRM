@@ -8,7 +8,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
-import { AdminVisitsDto, CompleteVisitDto, SaveRouteDto, StartVisitDto, StopStatusDto } from './dto.js';
+import { AdminVisitsDto, CompleteVisitDto, SalonLocationDto, SaveRouteDto, StartVisitDto, StopStatusDto } from './dto.js';
 import { RoutesService } from './routes.service.js';
 
 @Controller('routes')
@@ -58,9 +58,12 @@ export class RoutesController {
   }
 
   @Post(':date/stops/:stopId/complete')
-  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 8 * 1024 * 1024, files: 1 } }))
-  complete(@CurrentUser() actor: SessionUser, @Param('date') date: string, @Param('stopId') stopId: string, @Body() dto: CompleteVisitDto, @UploadedFile() file: { buffer: Buffer; mimetype: string; size: number } | undefined, @Req() req: Request) {
-    if (!file) throw new BadRequestException('Capture a check-out selfie before completing the visit.');
-    return this.routes.completeVisit(actor, date, stopId, dto, file, req.ip);
+  complete(@CurrentUser() actor: SessionUser, @Param('date') date: string, @Param('stopId') stopId: string, @Body() dto: CompleteVisitDto, @Req() req: Request) {
+    return this.routes.completeVisit(actor, date, stopId, dto, req.ip);
+  }
+
+  @Post(':date/stops/:stopId/salon-location')
+  salonLocation(@CurrentUser() actor: SessionUser, @Param('date') date: string, @Param('stopId') stopId: string, @Body() dto: SalonLocationDto, @Req() req: Request) {
+    return this.routes.setSalonLocation(actor, date, stopId, dto, req.ip);
   }
 }

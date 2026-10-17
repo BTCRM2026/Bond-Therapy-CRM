@@ -33,8 +33,8 @@ export function MobileSidebarDrawer({ portal, roleKey, distributionPartnerType, 
           <aside role="dialog" aria-modal="true" aria-label="Portal navigation" className="relative flex h-full min-h-0 w-[min(92vw,320px)] flex-col overflow-hidden border-r bg-sidebar px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))] shadow-[16px_0_40px_rgba(26,31,26,0.12)]">
             <div className="flex min-h-14 items-center justify-between border-b px-2 pb-4">
               <SidebarBrand />
-              <button type="button" onClick={() => setOpen(false)} className="grid size-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-background" aria-label="Close navigation">
-                <X size={18} />
+              <button type="button" onClick={() => setOpen(false)} className="grid size-11 shrink-0 place-items-center rounded-lg border bg-white text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:bg-brand-soft active:bg-brand-soft/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30" aria-label="Close navigation">
+                <X size={19} strokeWidth={2} />
               </button>
             </div>
             <SidebarNav portal={portal} roleKey={roleKey} distributionPartnerType={distributionPartnerType} canManageStaff={canManageStaff} onNavigate={() => setOpen(false)} />

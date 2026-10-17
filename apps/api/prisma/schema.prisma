@@ -80,6 +80,7 @@ model User {
   staffRequests                     StaffRequest[]                @relation("StaffRequestRequester")
   staffRequestsDecided              StaffRequest[]                @relation("StaffRequestDecider")
   staffRequestEvents                StaffRequestEvent[]           @relation("StaffRequestActor")
+  photoCaptures                     PhotoCapture[]
   clientsCreated                    Client[]                      @relation("ClientCreator")
   clientsAssigned                   Client[]                      @relation("ClientSalesperson")
   clientsTrained                    Client[]                      @relation("ClientTrainer")
@@ -578,6 +579,8 @@ model VisitProof {
   activity               ClientActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
   checkInPhoto           Bytes
   checkInPhotoMime       String
+  // SHA-256 of the arrival photo; the same photo can never be accepted for a second visit.
+  checkInPhotoHash       String?
   checkInLatitude        Decimal        @db.Decimal(9, 6)
   checkInLongitude       Decimal        @db.Decimal(9, 6)
   distanceMeters         Int?
@@ -592,6 +595,7 @@ model VisitProof {
   checkedOutAt           DateTime?
 
   @@index([gpsVerified, capturedAt])
+  @@index([checkInPhotoHash])
 }
 
 enum LeadSource {
@@ -1143,6 +1147,8 @@ model AttendanceRecord {
   punchOutLongitude Decimal?  @db.Decimal(9, 6)
   punchInVerified   Boolean?
   punchOutVerified  Boolean?
+  // True when the day was recorded from GPS-verified salon visits rather than an office punch; such days are never marked "late".
+  fromVisits        Boolean   @default(false)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -1198,6 +1204,12 @@ model LeaveRequest {
   reviewedBy   User?       @relation("LeaveReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   reviewedAt   DateTime?
   reviewNote   String?
+  // Chargeable leave days (weekly offs and holidays excluded). Paid/unpaid are fixed when the request is approved:
+  // each calendar month allows 1 paid leave, every other day is unpaid and deducted from salary.
+  totalDays    Int         @default(0)
+  paidDays     Int         @default(0)
+  unpaidDays   Int         @default(0)
+  breakdown    Json?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -1454,6 +1466,8 @@ model DailySalesReport {
   tomorrowRouteId String?          @unique
   tomorrowRoute   Route?           @relation("DailySalesReportTomorrowRoute", fields: [tomorrowRouteId], references: [id], onDelete: SetNull)
   noOrderReason   String?
+  // Temporary: salon names planned for tomorrow that do not have a client profile yet.
+  tomorrowExtraStops Json?
   submittedAt     DateTime         @default(now())
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -1477,9 +1491,13 @@ model DailySalesCall {
   visitPhoto      Bytes
   photoMime       String
   photoCapturedAt DateTime              @default(now())
+  // The GPS-verified salon visit this call was filled from (its check-in photo is reused).
+  visitActivityId String?               @unique
+  photoHash       String?
   createdAt       DateTime              @default(now())
 
   @@index([reportId, sequence])
+  @@index([photoHash])
   @@index([customerType])
   @@index([result])
 }
@@ -1917,4 +1935,20 @@ model StaffRequestEvent {
   createdAt DateTime              @default(now())
 
   @@index([requestId, createdAt])
+}
+
+// A one-time pass issued when the in-app camera opens. A photo is accepted only together with a fresh, unused pass
+// for the same person and purpose, so photos cannot be posted without going through the camera screen.
+model PhotoCapture {
+  id        String    @id
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   String
+  scopeId   String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
 }

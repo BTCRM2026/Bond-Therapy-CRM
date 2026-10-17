@@ -14,6 +14,12 @@ export class NotificationsController {
     return this.notifications.list(user);
   }
 
+  // Declared before ':id' so "read-all" is not treated as a notification id.
+  @Patch('read-all')
+  markAllRead(@CurrentUser() user: SessionUser) {
+    return this.notifications.markAllRead(user);
+  }
+
   @Patch(':id')
   markRead(@Param('id') id: string, @CurrentUser() user: SessionUser) {
     return this.notifications.markRead(id, user);

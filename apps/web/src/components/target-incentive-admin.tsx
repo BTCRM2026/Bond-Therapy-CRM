@@ -102,7 +102,7 @@ export function TargetIncentiveAdmin() {
     <KpiStrip columns={3}>
       <KpiCell label="Sales staff" value={total} detail="Managers and executives" />
       <KpiCell label="Target assigned" value={assigned} detail={total ? `${Math.round((assigned / total) * 100)}% covered` : undefined} tone="success" />
-      <KpiCell label="Awaiting target" value={total - assigned} detail={total - assigned ? "Assign a target to start tracking" : "Everyone has a target"} tone={total - assigned ? "warning" : "neutral"} />
+      <KpiCell label="Awaiting target" value={total - assigned} detail={total - assigned ? "Assign a target to start tracking" : "Everyone has a target"} tone={total - assigned ? "warning" : "neutral"} className="col-span-2 sm:col-span-1" />
     </KpiStrip>
 
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

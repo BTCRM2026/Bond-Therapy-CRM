@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { IncentiveCalcStatus } from '@prisma/client';
+import type { IncentiveCalcStatus, PortalType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { SessionUser } from '../common/session.util.js';
 
@@ -25,6 +25,14 @@ export class NotificationsService {
     }
   }
 
+  // Count-style alerts are re-created on every refresh. Only mark one unread again when its text actually changes,
+  // otherwise a notification the user already read would pop back to unread each time the list loads.
+  private async notifyOnChange(data: { type: string; severity: 'INFO' | 'WARNING' | 'CRITICAL'; title: string; message: string; sourceKey: string; portal: PortalType; recipientId: string }) {
+    const existing = await this.prisma.notification.findUnique({ where: { sourceKey: data.sourceKey }, select: { message: true } });
+    if (!existing) await this.prisma.notification.create({ data });
+    else if (existing.message !== data.message) await this.prisma.notification.update({ where: { sourceKey: data.sourceKey }, data: { message: data.message, isRead: false } });
+  }
+
   // Admin: requests waiting for a decision. Staff: their own requests where the admin asked for more information.
   private async refreshStaffRequests(user: SessionUser, isAdmin: boolean) {
     const count = await this.prisma.staffRequest.count({ where: isAdmin ? { status: 'SUBMITTED' } : { requesterId: user.id, status: 'NEEDS_INFO' } });
@@ -34,11 +42,7 @@ export class NotificationsService {
       return;
     }
     const message = isAdmin ? `${count} request${count === 1 ? '' : 's'} waiting for your decision.` : `${count} request${count === 1 ? ' needs' : 's need'} your reply.`;
-    await this.prisma.notification.upsert({
-      where: { sourceKey },
-      create: { type: isAdmin ? 'STAFF_REQUEST_PENDING' : 'STAFF_REQUEST_NEEDS_INFO', severity: 'INFO', title: isAdmin ? 'Requests pending' : 'More information requested', message, sourceKey, portal: user.portal, recipientId: user.id },
-      update: { message, isRead: false },
-    });
+    await this.notifyOnChange({ type: isAdmin ? 'STAFF_REQUEST_PENDING' : 'STAFF_REQUEST_NEEDS_INFO', severity: 'INFO', title: isAdmin ? 'Requests pending' : 'More information requested', message, sourceKey, portal: user.portal, recipientId: user.id });
   }
 
   private async refreshAttendanceRequests(user: SessionUser) {
@@ -59,11 +63,7 @@ export class NotificationsService {
         continue;
       }
       const message = `${item.count} ${item.label}${item.count === 1 ? '' : 's'} waiting for review.`;
-      await this.prisma.notification.upsert({
-        where: { sourceKey: `${item.type.toLowerCase()}:${user.id}` },
-        create: { type: item.type, severity: 'INFO', title: item.title, message, sourceKey: `${item.type.toLowerCase()}:${user.id}`, portal: user.portal, recipientId: user.id },
-        update: { message, isRead: false },
-      });
+      await this.notifyOnChange({ type: item.type, severity: 'INFO', title: item.title, message, sourceKey: `${item.type.toLowerCase()}:${user.id}`, portal: user.portal, recipientId: user.id });
     }
   }
 
@@ -164,6 +164,11 @@ export class NotificationsService {
       orderBy: [{ isRead: 'asc' }, { createdAt: 'desc' }],
       take: 50,
     });
+  }
+
+  async markAllRead(user: SessionUser) {
+    const result = await this.prisma.notification.updateMany({ where: { recipientId: user.id, portal: user.portal, isRead: false }, data: { isRead: true } });
+    return { updated: result.count };
   }
 
   async markRead(id: string, user: SessionUser) {

@@ -7,6 +7,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
+import { LeaveService } from '../leave/leave.service.js';
 import { AttendanceService } from './attendance.service.js';
 import { AdminAttendanceListDto, AttendanceMonthQueryDto, HolidayDto, PunchDto, RequestCorrectionDto, RequestLeaveDto, ReviewRequestDto, UpdateOperationsSettingsDto } from './dto.js';
 
@@ -14,7 +15,7 @@ import { AdminAttendanceListDto, AttendanceMonthQueryDto, HolidayDto, PunchDto, 
 @UseGuards(SessionGuard, PortalGuard, RolesGuard)
 @Portals(PortalType.ADMIN, PortalType.STAFF)
 export class AttendanceController {
-  constructor(private readonly attendance: AttendanceService) {}
+  constructor(private readonly attendance: AttendanceService, private readonly leave: LeaveService) {}
 
   @Get('today')
   today(@CurrentUser() actor: SessionUser) { return this.attendance.today(actor); }
@@ -41,7 +42,7 @@ export class AttendanceController {
   reviewCorrection(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: ReviewRequestDto, @Req() req: Request) { return this.attendance.reviewCorrection(actor, id, dto, req.ip); }
 
   @Post('leave')
-  requestLeave(@CurrentUser() actor: SessionUser, @Body() dto: RequestLeaveDto, @Req() req: Request) { return this.attendance.requestLeave(actor, dto, req.ip); }
+  requestLeave(@CurrentUser() actor: SessionUser, @Body() dto: RequestLeaveDto, @Req() req: Request) { return this.leave.create(actor, dto, req.ip); }
 
   @Get('leave/mine')
   myLeave(@CurrentUser() actor: SessionUser) { return this.attendance.myLeaveRequests(actor); }
@@ -50,7 +51,7 @@ export class AttendanceController {
   listLeave(@CurrentUser() actor: SessionUser, @Query('status') status?: string) { return this.attendance.listLeaveRequests(actor, status); }
 
   @Patch('leave/:id/review')
-  reviewLeave(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: ReviewRequestDto, @Req() req: Request) { return this.attendance.reviewLeave(actor, id, dto, req.ip); }
+  reviewLeave(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: ReviewRequestDto, @Req() req: Request) { return this.leave.review(actor, id, dto, req.ip); }
 
   @Get('holidays')
   listHolidays(@CurrentUser() actor: SessionUser) { return this.attendance.listHolidays(actor); }

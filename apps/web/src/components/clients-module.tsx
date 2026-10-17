@@ -948,6 +948,22 @@ function ClientProfileForm({ onClose, onSaved }: { onClose: () => void; onSaved:
   const [error, setError] = useState("");
   const [duplicates, setDuplicates] = useState<Array<{ id: string; salonName: string; city: string; primaryContact: string }>>([]);
   const [selectedProducts, setSelectedProducts] = useState<CatalogueProduct[]>([]);
+  // The salon's GPS point: every later visit is matched against it, so it is captured on the spot and confirmed by the staff member.
+  const [gps, setGps] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [atSalon, setAtSalon] = useState(false);
+  const gpsWeak = gps ? gps.accuracy > 100 : false;
+  const gpsProblem = !submitted ? "" : !gps ? "Capture the salon location while you are at the salon." : gpsWeak ? "The GPS signal is too weak. Recapture it in an open area." : !atSalon ? "Confirm that you are at the salon and this is its location." : "";
+  const captureLocation = () => {
+    if (!navigator.geolocation) { setLocationError("GPS is not supported on this device."); return; }
+    setLocating(true); setLocationError(""); setAtSalon(false);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => { setGps({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy }); setLocating(false); },
+      () => { setLocationError("Allow location access and try again while you are at the salon."); setLocating(false); },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
+  };
   const errors = submitted ? validateProfile(form) : {};
   const completedRequired = [form.salonName, form.ownerName, form.primaryContact, form.headquarter, form.potential].filter((value) => value.trim()).length;
   const set = (key: keyof ProfileValues) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -976,6 +992,10 @@ function ClientProfileForm({ onClose, onSaved }: { onClose: () => void; onSaved:
       requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-profile-form] [aria-invalid='true']")?.focus());
       return;
     }
+    if (!gps || gps.accuracy > 100 || !atSalon) {
+      requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-salon-gps]")?.scrollIntoView({ block: "center", behavior: "smooth" }));
+      return;
+    }
     setSaving(true);
     const text = (value: string) => value.trim() || undefined;
     try {
@@ -995,6 +1015,8 @@ function ClientProfileForm({ onClose, onSaved }: { onClose: () => void; onSaved:
           city: cityFromHeadquarter(form.headquarter.trim()),
           category: "SALON",
           clientType: "NEW_CLIENT",
+          latitude: gps.latitude,
+          longitude: gps.longitude,
           ...(continueOnDuplicate ? { continueOnDuplicate: true } : {}),
         }),
       });
@@ -1064,7 +1086,7 @@ function ClientProfileForm({ onClose, onSaved }: { onClose: () => void; onSaved:
               </section>
 
               <section className="space-y-4 border-b px-4 py-5 sm:px-6 sm:py-6">
-                <ProfileHeading title="Location" description="Helps organise territory planning and salon visits." />
+                <ProfileHeading title="Location" description="Address, headquarter and the salon’s GPS point for verifying visits." />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <ProfileField label="Full address">
@@ -1090,6 +1112,23 @@ function ClientProfileForm({ onClose, onSaved }: { onClose: () => void; onSaved:
                         </optgroup>
                       </select>
                     </ProfileField>
+                  </div>
+                  <div className="sm:col-span-2" data-salon-gps>
+                    <div className={`rounded-xl border p-4 ${gps && !gpsWeak && atSalon ? "border-success/25 bg-success-soft/35" : gpsProblem ? "border-danger/40 bg-red-50/40" : "bg-background"}`}>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span className={`grid size-10 shrink-0 place-items-center rounded-lg border bg-white ${gps && !gpsWeak ? "text-success" : "text-muted"}`}>{gps && !gpsWeak ? <CheckCircle2 size={19} /> : <MapPin size={19} />}</span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground">Salon GPS location <span className="text-danger">*</span></p>
+                            <p className="mt-0.5 text-xs leading-5 text-muted">{gps ? `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)} · accuracy ±${Math.round(gps.accuracy)} m` : "Capture this while you are standing at the salon. Every later visit is matched against this point."}</p>
+                          </div>
+                        </div>
+                        <Button type="button" variant="secondary" className="shrink-0" onClick={captureLocation} disabled={locating}>{locating ? <LoaderCircle className="animate-spin" size={16} /> : <MapPin size={16} />}{locating ? "Capturing…" : gps ? "Recapture" : "Capture location"}</Button>
+                      </div>
+                      {gps && !gpsWeak && <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg border bg-white px-3 py-2.5"><input type="checkbox" checked={atSalon} onChange={(event) => setAtSalon(event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-[var(--brand)]" /><span className="text-xs leading-5 text-foreground">I am at the salon and this is its location. It will be used to verify all future visits.</span></label>}
+                      {gpsWeak && <p className="mt-3 text-xs text-warning">The GPS signal is weak (±{Math.round(gps!.accuracy)} m). Step outside or wait a few seconds, then recapture.</p>}
+                      {(locationError || gpsProblem) && <p className="mt-3 text-xs text-danger" role="alert">{locationError || gpsProblem}</p>}
+                    </div>
                   </div>
                 </div>
               </section>

@@ -4,7 +4,7 @@ import type { CorrectionStatus, Department, LeaveStatus } from '@prisma/client';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { AdminAttendanceListDto, HolidayDto, PunchDto, RequestCorrectionDto, RequestLeaveDto, ReviewRequestDto, UpdateOperationsSettingsDto } from './dto.js';
+import type { AdminAttendanceListDto, HolidayDto, PunchDto, RequestCorrectionDto, ReviewRequestDto, UpdateOperationsSettingsDto } from './dto.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -69,14 +69,15 @@ export class AttendanceService {
     return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   }
 
-  private classifyDay(date: Date, record: { punchInAt: Date | null; punchOutAt: Date | null } | null, ctx: { shiftStart: string | null; shiftEnd: string | null; isHoliday: boolean; isOnLeave: boolean; isWeeklyOff: boolean; lateThresholdMinutes: number; halfDayThresholdHours: number; isFuture: boolean }) {
+  private classifyDay(date: Date, record: { punchInAt: Date | null; punchOutAt: Date | null; fromVisits?: boolean } | null, ctx: { shiftStart: string | null; shiftEnd: string | null; isHoliday: boolean; isOnLeave: boolean; isWeeklyOff: boolean; lateThresholdMinutes: number; halfDayThresholdHours: number; isFuture: boolean }) {
     if (ctx.isHoliday) return { status: 'HOLIDAY' as DayStatus, workingHours: null as number | null, isLate: false, isEarlyCheckout: false };
     if (ctx.isWeeklyOff) return { status: 'WEEKLY_OFF' as DayStatus, workingHours: null, isLate: false, isEarlyCheckout: false };
     if (ctx.isOnLeave) return { status: 'LEAVE' as DayStatus, workingHours: null, isLate: false, isEarlyCheckout: false };
     if (record?.punchInAt) {
       const workingHours = record.punchOutAt ? Math.round(((record.punchOutAt.getTime() - record.punchInAt.getTime()) / 3600000) * 100) / 100 : null;
       let isLate = false;
-      if (ctx.shiftStart) {
+      // Field days recorded from salon visits have no fixed arrival time, so they are never late.
+      if (ctx.shiftStart && !record.fromVisits) {
         const [h, m] = ctx.shiftStart.split(':').map(Number);
         const shiftStartMinutes = h * 60 + m;
         const punchInMinutes = this.indiaMinutes(record.punchInAt);
@@ -109,30 +110,55 @@ export class AttendanceService {
   async today(actor: SessionUser) {
     this.ensureAccess(actor);
     const date = this.todayKey();
-    const [record, settings] = await Promise.all([this.prisma.attendanceRecord.findUnique({ where: { userId_date: { userId: actor.id, date } } }), this.settings()]);
+    const dayStart = new Date(date.getTime() - 330 * 60 * 1000);
+    const [record, settings, visitCount] = await Promise.all([
+      this.prisma.attendanceRecord.findUnique({ where: { userId_date: { userId: actor.id, date } } }),
+      this.settings(),
+      this.prisma.clientActivity.count({ where: { createdById: actor.id, type: 'VISIT', checkInAt: { gte: dayStart, lt: new Date(dayStart.getTime() + 86_400_000) } } }),
+    ]);
     const ctx = await this.dayContext(actor.id, date, settings);
     const classified = this.classifyDay(date, record, { ...ctx, lateThresholdMinutes: settings.lateThresholdMinutes, halfDayThresholdHours: Number(settings.halfDayThresholdHours), isFuture: true });
-    return { punchInAt: record?.punchInAt ?? null, punchOutAt: record?.punchOutAt ?? null, punchInVerified: record?.punchInVerified ?? null, punchOutVerified: record?.punchOutVerified ?? null, ...classified };
+    return {
+      punchInAt: record?.punchInAt ?? null,
+      punchOutAt: record?.punchOutAt ?? null,
+      punchInVerified: record?.punchInVerified ?? null,
+      punchOutVerified: record?.punchOutVerified ?? null,
+      // Office work is recorded with a GPS point; salon visits are recorded without one on the attendance row.
+      officeCheckedIn: record?.punchInLatitude != null,
+      officeCheckedOut: record?.punchOutLatitude != null,
+      visitCount,
+      halfDayThresholdHours: Number(settings.halfDayThresholdHours),
+      ...classified,
+    };
+  }
+
+  // Office work counts as a working day, so it must be recorded at the saved office location with a usable GPS fix.
+  private async verifyOffice(dto: PunchDto) {
+    const settings = await this.settings();
+    if (settings.officeLatitude == null || settings.officeLongitude == null) throw new BadRequestException('The office location has not been set yet. Please ask an administrator to set it.');
+    if (dto.latitude == null || dto.longitude == null) throw new BadRequestException('Allow location access to record office work.');
+    if (dto.accuracy != null && dto.accuracy > 100) throw new BadRequestException(`Your GPS signal is too weak (about ${Math.round(dto.accuracy)} m off). Step outside or wait a few seconds, then try again.`);
+    const radius = settings.officeRadiusMeters ?? 200;
+    const distance = this.haversineMeters(Number(settings.officeLatitude), Number(settings.officeLongitude), dto.latitude, dto.longitude);
+    if (distance > radius) throw new BadRequestException(`You are about ${distance} m from the office. Move within ${radius} m to record office work.`);
+    return distance;
   }
 
   async punchIn(actor: SessionUser, dto: PunchDto, ipAddress?: string) {
     this.ensureAccess(actor);
     const date = this.todayKey();
     const existing = await this.prisma.attendanceRecord.findUnique({ where: { userId_date: { userId: actor.id, date } } });
-    if (existing?.punchInAt) throw new ConflictException('You have already punched in today.');
-    const settings = await this.settings();
-    let verified: boolean | null = null;
-    let distance: number | null = null;
-    if (settings.officeLatitude != null && settings.officeLongitude != null && dto.latitude != null && dto.longitude != null) {
-      distance = this.haversineMeters(Number(settings.officeLatitude), Number(settings.officeLongitude), dto.latitude, dto.longitude);
-      verified = distance <= (settings.officeRadiusMeters ?? 500);
-    }
+    if (existing?.punchInLatitude != null) throw new ConflictException('You have already checked in at the office today.');
+    const distance = await this.verifyOffice(dto);
+    const now = new Date();
+    // Visits may already have opened the day; the earliest activity stays the start of the day.
+    const start = existing?.punchInAt && existing.punchInAt < now ? existing.punchInAt : now;
     const record = await this.prisma.attendanceRecord.upsert({
       where: { userId_date: { userId: actor.id, date } },
-      create: { userId: actor.id, date, punchInAt: new Date(), punchInLatitude: dto.latitude ?? null, punchInLongitude: dto.longitude ?? null, punchInVerified: verified },
-      update: { punchInAt: new Date(), punchInLatitude: dto.latitude ?? null, punchInLongitude: dto.longitude ?? null, punchInVerified: verified },
+      create: { userId: actor.id, date, punchInAt: now, punchInLatitude: dto.latitude!, punchInLongitude: dto.longitude!, punchInVerified: true },
+      update: { punchInAt: start, punchInLatitude: dto.latitude!, punchInLongitude: dto.longitude!, punchInVerified: true },
     });
-    await recordAudit(this.prisma, { actorId: actor.id, action: 'ATTENDANCE_PUNCH_IN', entity: 'ATTENDANCE_RECORD', entityId: record.id, details: { verified, distance }, ipAddress });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'ATTENDANCE_PUNCH_IN', entity: 'ATTENDANCE_RECORD', entityId: record.id, details: { verified: true, distance, kind: 'OFFICE' }, ipAddress });
     return this.today(actor);
   }
 
@@ -140,16 +166,13 @@ export class AttendanceService {
     this.ensureAccess(actor);
     const date = this.todayKey();
     const existing = await this.prisma.attendanceRecord.findUnique({ where: { userId_date: { userId: actor.id, date } } });
-    if (!existing?.punchInAt) throw new ConflictException('Punch in before you punch out.');
-    if (existing.punchOutAt) throw new ConflictException('You have already punched out today.');
-    const settings = await this.settings();
-    let verified: boolean | null = null;
-    if (settings.officeLatitude != null && settings.officeLongitude != null && dto.latitude != null && dto.longitude != null) {
-      const distance = this.haversineMeters(Number(settings.officeLatitude), Number(settings.officeLongitude), dto.latitude, dto.longitude);
-      verified = distance <= (settings.officeRadiusMeters ?? 500);
-    }
-    const record = await this.prisma.attendanceRecord.update({ where: { userId_date: { userId: actor.id, date } }, data: { punchOutAt: new Date(), punchOutLatitude: dto.latitude ?? null, punchOutLongitude: dto.longitude ?? null, punchOutVerified: verified } });
-    await recordAudit(this.prisma, { actorId: actor.id, action: 'ATTENDANCE_PUNCH_OUT', entity: 'ATTENDANCE_RECORD', entityId: record.id, details: { verified }, ipAddress });
+    if (existing?.punchInLatitude == null) throw new ConflictException('Check in at the office before you check out.');
+    if (existing.punchOutLatitude != null) throw new ConflictException('You have already checked out of the office today.');
+    const distance = await this.verifyOffice(dto);
+    const now = new Date();
+    const end = existing.punchOutAt && existing.punchOutAt > now ? existing.punchOutAt : now;
+    const record = await this.prisma.attendanceRecord.update({ where: { userId_date: { userId: actor.id, date } }, data: { punchOutAt: end, punchOutLatitude: dto.latitude!, punchOutLongitude: dto.longitude!, punchOutVerified: true } });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'ATTENDANCE_PUNCH_OUT', entity: 'ATTENDANCE_RECORD', entityId: record.id, details: { verified: true, distance, kind: 'OFFICE' }, ipAddress });
     return this.today(actor);
   }
 
@@ -243,16 +266,6 @@ export class AttendanceService {
     return updated;
   }
 
-  async requestLeave(actor: SessionUser, dto: RequestLeaveDto, ipAddress?: string) {
-    this.ensureAccess(actor);
-    const startDate = this.dateKey(dto.startDate);
-    const endDate = this.dateKey(dto.endDate);
-    if (endDate < startDate) throw new BadRequestException('End date must be on or after the start date.');
-    const request = await this.prisma.leaveRequest.create({ data: { userId: actor.id, startDate, endDate, reason: dto.reason.trim() } });
-    await recordAudit(this.prisma, { actorId: actor.id, action: 'LEAVE_REQUEST', entity: 'LEAVE_REQUEST', entityId: request.id, details: { startDate: dto.startDate, endDate: dto.endDate }, ipAddress });
-    return request;
-  }
-
   async myLeaveRequests(actor: SessionUser) {
     this.ensureAccess(actor);
     return this.prisma.leaveRequest.findMany({ where: { userId: actor.id }, orderBy: { createdAt: 'desc' }, take: 50 });
@@ -264,20 +277,6 @@ export class AttendanceService {
     if (status) where.status = status as LeaveStatus;
     if (!this.isAdmin(actor)) where.user = { managerId: actor.id };
     return this.prisma.leaveRequest.findMany({ where, include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' }, take: 100 });
-  }
-
-  async reviewLeave(actor: SessionUser, id: string, dto: ReviewRequestDto, ipAddress?: string) {
-    this.ensureReviewerAccess(actor);
-    const request = await this.prisma.leaveRequest.findUnique({ where: { id } });
-    if (!request) throw new NotFoundException('Leave request not found.');
-    if (request.status !== 'PENDING') throw new BadRequestException('This request has already been reviewed.');
-    if (!this.isAdmin(actor)) {
-      const member = await this.prisma.user.findFirst({ where: { id: request.userId, managerId: actor.id } });
-      if (!member) throw new ForbiddenException('You can only review requests for your own team.');
-    }
-    const updated = await this.prisma.leaveRequest.update({ where: { id }, data: { status: dto.status, reviewedById: actor.id, reviewedAt: new Date(), reviewNote: dto.reviewNote?.trim() || null } });
-    await recordAudit(this.prisma, { actorId: actor.id, action: dto.status === 'APPROVED' ? 'LEAVE_APPROVE' : 'LEAVE_REJECT', entity: 'LEAVE_REQUEST', entityId: id, details: { userId: request.userId }, ipAddress });
-    return updated;
   }
 
   async listHolidays(actor: SessionUser) {

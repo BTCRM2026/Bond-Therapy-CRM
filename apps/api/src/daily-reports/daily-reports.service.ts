@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { CapturesService } from '../captures/captures.service.js';
+import { assertLiveCameraPhoto } from '../captures/live-photo.js';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -9,14 +11,14 @@ import type { SaveDailyReportDto } from './dto.js';
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const standardTowns = ['Navsari', 'Surat', 'Vadodara', 'Ahmedabad', 'Bhavnagar', 'Junagadh', 'Rajkot', 'Gandhinagar', 'Jaipur', 'Indore'];
 const reportInclude = {
-  calls: { orderBy: { sequence: 'asc' }, select: { id: true, sequence: true, customerName: true, customerType: true, result: true, orderValue: true, remark: true, photoMime: true, photoCapturedAt: true, createdAt: true } },
+  calls: { orderBy: { sequence: 'asc' }, select: { id: true, sequence: true, visitActivityId: true, customerName: true, customerType: true, result: true, orderValue: true, remark: true, photoMime: true, photoCapturedAt: true, createdAt: true } },
   coworker: { select: { id: true, name: true } },
   tomorrowRoute: { include: { stops: { where: { status: { not: 'REMOVED' } }, orderBy: { sequence: 'asc' }, include: { client: { select: { id: true, salonName: true, city: true, area: true } } } } } },
 } satisfies Prisma.DailySalesReportInclude;
 
 @Injectable()
 export class DailyReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly captures: CapturesService) {}
 
   private ensureAccess(actor: SessionUser) {
     if (actor.portal !== 'STAFF' || !actor.roles.some((role) => salesRoles.has(role.key))) throw new ForbiddenException('Daily reports are available only to the sales team.');
@@ -69,6 +71,16 @@ export class DailyReportsService {
     return { headquarter: profile?.workLocation?.trim() || territoryTowns[0] || null, towns, clients, coworkers };
   }
 
+  // Salon visits checked in today with a GPS-verified arrival; the report is filled from these.
+  private async todayVisits(actor: SessionUser, date: Date) {
+    const rows = await this.prisma.clientActivity.findMany({
+      where: { type: 'VISIT', createdById: actor.id, checkInAt: { not: null }, routeStop: { is: { route: { staffId: actor.id, routeDate: date } } }, visitProof: { is: { gpsVerified: true } } },
+      select: { id: true, clientId: true, checkInAt: true, checkOutAt: true, client: { select: { salonName: true, city: true } }, routeStop: { select: { id: true } }, visitProof: { select: { distanceMeters: true } } },
+      orderBy: { checkInAt: 'asc' },
+    });
+    return rows.map((row) => ({ activityId: row.id, stopId: row.routeStop?.id ?? null, clientId: row.clientId, salonName: row.client.salonName, city: row.client.city, checkInAt: row.checkInAt, checkOutAt: row.checkOutAt, distanceMeters: row.visitProof?.distanceMeters ?? null }));
+  }
+
   async today(actor: SessionUser) {
     this.ensureAccess(actor);
     const date = this.dateFromKey(this.dateKey());
@@ -81,8 +93,10 @@ export class DailyReportsService {
       this.prisma.dailySalesCall.count({ where: { customerType: 'NEW', report: { staffId: actor.id, reportDate: { gte: monthStart, lt: monthEnd } } } }),
       this.prisma.target.findFirst({ where: { scope: 'STAFF', scopeId: actor.id, metric: 'CALLS', period: 'MONTHLY', periodYear: date.getUTCFullYear(), periodIndex: date.getUTCMonth() + 1 }, select: { targetValue: true } }),
     ]);
+    const visits = await this.todayVisits(actor, date);
     return {
       date: this.dateKey(),
+      visits,
       staff: { id: actor.id, name: actor.name, headquarter: context.headquarter },
       towns: context.towns,
       clients: context.clients,
@@ -100,6 +114,10 @@ export class DailyReportsService {
     if (dto.coworkerId && !context.coworkers.some((coworker) => coworker.id === dto.coworkerId)) throw new BadRequestException('Select an active sales coworker or Solo.');
 
     const clientIds = [...new Set(dto.tomorrowClientIds)];
+    // Temporary: salons without a client profile can be planned by name until every salon has one.
+    const seenSalons = new Set<string>();
+    const newSalons = (dto.tomorrowNewSalons ?? []).map((name) => name.trim()).filter((name) => name && !seenSalons.has(name.toLowerCase()) && seenSalons.add(name.toLowerCase()));
+    if (!clientIds.length && !newSalons.length) throw new BadRequestException('Add at least one salon to tomorrow’s plan.');
     const selectedClients = context.clients.filter((client) => clientIds.includes(client.id));
     if (selectedClients.length !== clientIds.length) throw new BadRequestException('Tomorrow’s plan can include only clients assigned to you.');
     if (selectedClients.some((client) => client.city !== dto.tomorrowTown)) throw new BadRequestException('Every selected client must belong to tomorrow’s town.');
@@ -110,6 +128,19 @@ export class DailyReportsService {
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(photo.mimetype)) throw new BadRequestException('Call photos must be JPG, PNG, or WebP.');
       if (photo.size > 2 * 1024 * 1024) throw new BadRequestException('Each call photo must be 2 MB or smaller. Retake the photo and try again.');
     }
+    // Newly taken photos must come from the in-app camera and must be new: each is fingerprinted, never reused across calls or visits.
+    const hashes = new Map<number, string>();
+    for (const photo of photos) {
+      const index = Number(photo.fieldname.slice('photo-'.length));
+      if (index >= dto.calls.length) throw new BadRequestException('A call photo could not be matched to its call.');
+      hashes.set(index, assertLiveCameraPhoto(photo.buffer));
+    }
+    const fingerprints = [...hashes.values()];
+    if (new Set(fingerprints).size !== fingerprints.length) throw new BadRequestException('The same photo was used for more than one call. Take a separate photo for each call.');
+    if (fingerprints.length) {
+      const reused = (await this.prisma.dailySalesCall.findFirst({ where: { photoHash: { in: fingerprints } }, select: { id: true } })) ?? (await this.prisma.visitProof.findFirst({ where: { checkInPhotoHash: { in: fingerprints } }, select: { id: true } }));
+      if (reused) throw new BadRequestException('One of these photos has already been used. Take a new photo for each call.');
+    }
     if (needsNoOrderReason(dto.calls, dto.noOrderReason)) throw new BadRequestException('Add a reason when no order was received today.');
     for (const call of dto.calls) {
       if (call.result === 'ORDER' && (!call.orderValue || call.orderValue <= 0)) throw new BadRequestException(`Enter the order value for ${call.customerName}.`);
@@ -117,35 +148,47 @@ export class DailyReportsService {
 
     const reportDate = this.dateFromKey(this.dateKey());
     const routeDate = this.tomorrow(reportDate);
+    const visitIds = dto.calls.map((call) => call.visitActivityId).filter((id): id is string => Boolean(id));
+    if (new Set(visitIds).size !== visitIds.length) throw new BadRequestException('A salon visit can appear only once in the report.');
+    const visits = visitIds.length ? await this.prisma.clientActivity.findMany({
+      where: { id: { in: visitIds }, type: 'VISIT', createdById: actor.id, routeStop: { is: { route: { staffId: actor.id, routeDate: reportDate } } }, visitProof: { is: { gpsVerified: true } } },
+      select: { id: true, client: { select: { salonName: true } }, visitProof: { select: { checkInPhoto: true, checkInPhotoMime: true, checkInPhotoHash: true } } },
+    }) : [];
+    if (visits.length !== visitIds.length) throw new BadRequestException('One of the salon visits in your report could not be verified. Reload the page and try again.');
     const existingIds = dto.calls.map((call) => call.existingCallId).filter((id): id is string => Boolean(id));
-    const existingPhotos = existingIds.length ? await this.prisma.dailySalesCall.findMany({ where: { id: { in: existingIds }, report: { staffId: actor.id, reportDate } }, select: { id: true, visitPhoto: true, photoMime: true } }) : [];
+    const existingPhotos = existingIds.length ? await this.prisma.dailySalesCall.findMany({ where: { id: { in: existingIds }, report: { staffId: actor.id, reportDate } }, select: { id: true, visitPhoto: true, photoMime: true, photoHash: true } }) : [];
     const photoData = dto.calls.map((call, index) => {
+      const visit = visits.find((item) => item.id === call.visitActivityId);
+      if (visit?.visitProof) return { visitPhoto: visit.visitProof.checkInPhoto, photoMime: visit.visitProof.checkInPhotoMime, photoHash: visit.visitProof.checkInPhotoHash };
       const upload = photos.find((photo) => photo.fieldname === `photo-${index}`);
-      if (upload) return { visitPhoto: upload.buffer, photoMime: upload.mimetype };
+      if (upload) return { visitPhoto: upload.buffer, photoMime: 'image/jpeg', photoHash: hashes.get(index) ?? null };
       const existing = existingPhotos.find((photo) => photo.id === call.existingCallId);
-      if (existing) return { visitPhoto: existing.visitPhoto, photoMime: existing.photoMime };
+      if (existing) return { visitPhoto: existing.visitPhoto, photoMime: existing.photoMime, photoHash: existing.photoHash };
       throw new BadRequestException(`Capture a visit photo for call ${index + 1}.`);
     });
+    // Camera passes are used up last, once every other check has passed, so a rejected submit does not cost the staff member their photos.
+    for (const index of hashes.keys()) await this.captures.consume(actor.id, dto.calls[index]?.captureToken, 'REPORT_CALL');
     const saved = await this.prisma.$transaction(async (tx) => {
       const existingRoute = await tx.route.findUnique({ where: { staffId_routeDate: { staffId: actor.id, routeDate } }, include: { stops: true } });
       if (existingRoute?.stops.some((stop) => !['PLANNED', 'REMOVED'].includes(stop.status))) throw new BadRequestException('Tomorrow’s route has already started and can no longer be replaced.');
+      const notes = `Created from daily report ${this.dateKey()}${newSalons.length ? `. New salons without a profile yet: ${newSalons.join(', ')}` : ''}`.slice(0, 500);
       const route = existingRoute
-        ? await tx.route.update({ where: { id: existingRoute.id }, data: { status: 'PLANNED', notes: `Created from daily report ${this.dateKey()}` } })
-        : await tx.route.create({ data: { staffId: actor.id, routeDate, status: 'PLANNED', notes: `Created from daily report ${this.dateKey()}` } });
+        ? await tx.route.update({ where: { id: existingRoute.id }, data: { status: 'PLANNED', notes } })
+        : await tx.route.create({ data: { staffId: actor.id, routeDate, status: 'PLANNED', notes } });
       await tx.routeStop.deleteMany({ where: { routeId: route.id } });
       await tx.routeStop.createMany({ data: clientIds.map((clientId, sequence) => ({ routeId: route.id, clientId, sequence })) });
-      await tx.routeChangeLog.create({ data: { routeId: route.id, changedById: actor.id, changeType: 'STATUS_CHANGE', reason: 'Tomorrow plan submitted with daily sales report', newValue: { clientIds, town: dto.tomorrowTown } } });
+      await tx.routeChangeLog.create({ data: { routeId: route.id, changedById: actor.id, changeType: 'STATUS_CHANGE', reason: 'Tomorrow plan submitted with daily sales report', newValue: { clientIds, newSalons, town: dto.tomorrowTown } } });
 
       const report = await tx.dailySalesReport.upsert({
         where: { staffId_reportDate: { staffId: actor.id, reportDate } },
-        create: { staffId: actor.id, reportDate, headquarter: context.headquarter, workingTown: dto.workingTown, coworkerId: dto.coworkerId || null, tomorrowTown: dto.tomorrowTown, tomorrowRouteId: route.id, noOrderReason: hasOrder ? null : dto.noOrderReason!.trim() },
-        update: { headquarter: context.headquarter, workingTown: dto.workingTown, coworkerId: dto.coworkerId || null, tomorrowTown: dto.tomorrowTown, tomorrowRouteId: route.id, noOrderReason: hasOrder ? null : dto.noOrderReason!.trim(), submittedAt: new Date() },
+        create: { staffId: actor.id, reportDate, headquarter: context.headquarter, workingTown: dto.workingTown, coworkerId: dto.coworkerId || null, tomorrowTown: dto.tomorrowTown, tomorrowRouteId: route.id, tomorrowExtraStops: newSalons.length ? newSalons : Prisma.JsonNull, noOrderReason: hasOrder ? null : dto.noOrderReason!.trim() },
+        update: { headquarter: context.headquarter, workingTown: dto.workingTown, coworkerId: dto.coworkerId || null, tomorrowTown: dto.tomorrowTown, tomorrowRouteId: route.id, tomorrowExtraStops: newSalons.length ? newSalons : Prisma.JsonNull, noOrderReason: hasOrder ? null : dto.noOrderReason!.trim(), submittedAt: new Date() },
       });
       await tx.dailySalesCall.deleteMany({ where: { reportId: report.id } });
-      await tx.dailySalesCall.createMany({ data: dto.calls.map((call, sequence) => ({ reportId: report.id, sequence, customerName: call.customerName.trim(), customerType: call.customerType, result: call.result, orderValue: call.result === 'ORDER' ? call.orderValue : null, remark: call.remark?.trim() || null, ...photoData[sequence] })) });
+      await tx.dailySalesCall.createMany({ data: dto.calls.map((call, sequence) => { const visit = visits.find((item) => item.id === call.visitActivityId); return ({ reportId: report.id, sequence, customerName: visit ? visit.client.salonName : call.customerName.trim(), customerType: visit ? 'EXISTING' as const : call.customerType, visitActivityId: visit?.id ?? null, result: call.result, orderValue: call.result === 'ORDER' ? call.orderValue : null, remark: call.remark?.trim() || null, ...photoData[sequence] }); }) });
       return tx.dailySalesReport.findUniqueOrThrow({ where: { id: report.id }, include: reportInclude });
     });
-    await recordAudit(this.prisma, { actorId: actor.id, action: 'DAILY_REPORT_SUBMIT', entity: 'DAILY_SALES_REPORT', entityId: saved.id, details: { callCount: dto.calls.length, tomorrowClientCount: clientIds.length, workingTown: dto.workingTown, tomorrowTown: dto.tomorrowTown }, ipAddress });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'DAILY_REPORT_SUBMIT', entity: 'DAILY_SALES_REPORT', entityId: saved.id, details: { callCount: dto.calls.length, tomorrowClientCount: clientIds.length, tomorrowNewSalons: newSalons.length, visitCalls: visitIds.length, workingTown: dto.workingTown, tomorrowTown: dto.tomorrowTown }, ipAddress });
     return this.serialize(saved);
   }
 

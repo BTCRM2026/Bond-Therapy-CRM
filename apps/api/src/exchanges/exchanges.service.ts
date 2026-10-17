@@ -1,5 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ExchangeReason, ExchangeStatus, Prisma } from '@prisma/client';
+import { CapturesService } from '../captures/captures.service.js';
+import { assertLiveCameraPhoto } from '../captures/live-photo.js';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -23,7 +25,7 @@ const exchangeInclude = {
 
 @Injectable()
 export class ExchangesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly captures: CapturesService) {}
 
   private hasRole(actor: SessionUser, roles: Set<string>) { return actor.roles.some((role) => roles.has(role.key)); }
   private isAdmin(actor: SessionUser) { return actor.portal === 'ADMIN' && actor.roles.some((role) => role.key === 'SUPER_ADMIN'); }
@@ -97,14 +99,16 @@ export class ExchangesService {
     return exchange;
   }
 
-  async uploadPhoto(actor: SessionUser, id: string, itemId: string, file: { buffer: Buffer; mimetype: string; size: number }, ipAddress?: string) {
+  async uploadPhoto(actor: SessionUser, id: string, itemId: string, file: { buffer: Buffer; mimetype: string; size: number }, captureToken: string | undefined, ipAddress?: string) {
     const exchange = await this.getVisible(actor, id);
     if (!this.isAdmin(actor) && exchange.requestedById !== actor.id) throw new ForbiddenException('Only the requester or Super Admin can add product-condition evidence.');
     if (!['SUBMITTED', 'UNDER_REVIEW'].includes(exchange.status)) throw new ConflictException('Evidence can no longer be changed for this exchange.');
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) throw new ConflictException('Upload a JPG, PNG, or WebP image.');
     if (file.size > 5 * 1024 * 1024) throw new ConflictException('Photo must be 5 MB or smaller.');
     const item = exchange.items.find((candidate) => candidate.id === itemId);
     if (!item) throw new NotFoundException('Exchange item not found.');
+    assertLiveCameraPhoto(file.buffer);
+    await this.captures.consume(actor.id, captureToken, 'EXCHANGE_ITEM');
+    file = { ...file, mimetype: 'image/jpeg' };
     await this.prisma.exchangeItem.update({ where: { id: itemId }, data: { conditionPhoto: file.buffer, conditionPhotoMime: file.mimetype } });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'EXCHANGE_PHOTO_UPLOADED', entity: 'EXCHANGE', entityId: id, details: { itemId, mimeType: file.mimetype, size: file.size }, ipAddress });
     return { itemId, conditionPhotoMime: file.mimetype };

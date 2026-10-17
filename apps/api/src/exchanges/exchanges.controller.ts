@@ -31,9 +31,9 @@ export class ExchangesController {
 
   @Post(':id/items/:itemId/photo')
   @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
-  uploadPhoto(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Param('itemId') itemId: string, @UploadedFile() file: { buffer: Buffer; mimetype: string; size: number } | undefined, @Req() req: Request) {
-    if (!file) throw new BadRequestException('Select a product-condition photo.');
-    return this.exchanges.uploadPhoto(actor, id, itemId, file, req.ip);
+  uploadPhoto(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Param('itemId') itemId: string, @UploadedFile() file: { buffer: Buffer; mimetype: string; size: number } | undefined, @Body('captureToken') captureToken: string | undefined, @Req() req: Request) {
+    if (!file) throw new BadRequestException('Take a product-condition photo with the in-app camera.');
+    return this.exchanges.uploadPhoto(actor, id, itemId, file, captureToken, req.ip);
   }
 
   @Get(':id/items/:itemId/photo')

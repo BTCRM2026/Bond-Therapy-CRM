@@ -7,6 +7,7 @@ const actor = { id: 'staff-1', portal: 'STAFF', roles: [{ key: 'SALES_EXECUTIVE'
 function prismaFor(record: { punchInAt: Date; punchOutAt: Date | null } | null, shiftStart: string | null = null) {
   return {
     attendanceRecord: { findUnique: vi.fn().mockResolvedValue(record) },
+      clientActivity: { count: vi.fn().mockResolvedValue(0) },
     operationsSettings: { findUnique: vi.fn().mockResolvedValue(null) },
     holiday: { findUnique: vi.fn().mockResolvedValue(null) },
     leaveRequest: { findFirst: vi.fn().mockResolvedValue(null) },

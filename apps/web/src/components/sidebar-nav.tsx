@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, AlertTriangle, Award, Building2, CalendarClock, ClipboardCheck, ClipboardList, Clock3, FileCheck2, FileText, IndianRupee, LayoutDashboard, ListChecks, MapPin, Navigation, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
+import { Activity, AlertTriangle, Award, Building2, CalendarClock, CalendarRange, ClipboardCheck, ClipboardList, Clock3, FileCheck2, FileText, IndianRupee, LayoutDashboard, ListChecks, MapPin, Navigation, Package, ReceiptText, Settings, ShoppingCart, TrendingUp, Truck, UserPlus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
@@ -14,7 +14,7 @@ function staffGroups(roleKey?: string) {
   const isSales = roleKey ? SALES_ROLE_KEYS.has(roleKey) : false;
   const isWarehouse = roleKey ? WAREHOUSE_ROLE_KEYS.has(roleKey) : false;
   const isAccounts = roleKey === "ACCOUNTS_BILLING";
-  const overview = [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }, { href: "/dashboard/requests", label: "Requests", icon: ClipboardCheck, exact: false }];
+  const overview = [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }, { href: "/dashboard/requests", label: "Requests", icon: ClipboardCheck, exact: false }, { href: "/dashboard/leave", label: "Leave", icon: CalendarRange, exact: false }];
   const operations = isSales ? [
     { href: "/dashboard/follow-ups", label: "Follow-ups", icon: ListChecks, exact: false },
     { href: "/dashboard/leads", label: "Leads", icon: UserPlus, exact: false },
@@ -56,6 +56,7 @@ export function SidebarNav({ portal = "ADMIN", roleKey, distributionPartnerType,
   const managementItems = [
     ...(canManageStaff ? [{ href: "/dashboard/staff", label: "Staff & Access", icon: UsersRound, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/requests", label: "Requests", icon: ClipboardCheck, exact: false }] : []),
+    ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/leave", label: "Leave", icon: CalendarRange, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/clients", label: "Salon 360", icon: Building2, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/products", label: "Products", icon: Package, exact: false }] : []),
     ...(roleKey === "SUPER_ADMIN" ? [{ href: "/dashboard/orders", label: "Order approvals", icon: FileCheck2, exact: false }, { href: "/dashboard/invoices", label: "Invoices & payments", icon: ReceiptText, exact: false }] : []),

@@ -1,5 +1,6 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ClientActivityStatus, ClientActivityType, ClientCategory, Prisma } from '@prisma/client';
+import { markFieldWorked } from '../attendance/field-attendance.js';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -185,8 +186,12 @@ export class ClientsService {
     const duplicates = await this.possibleDuplicates(actor, dto);
     if (duplicates.length && !dto.continueOnDuplicate) throw new ConflictException({ message: 'Possible existing salon found. Review it before continuing.', candidates: duplicates });
     const assignments = await this.validateAssignments(actor, dto);
+    // Later visits are matched against this point, so staff must save the salon's location while standing at the salon.
+    if (actor.portal === 'STAFF' && (dto.latitude == null || dto.longitude == null)) throw new BadRequestException('Capture the salon location while you are at the salon before saving the profile.');
     const locationStamp = dto.latitude != null && dto.longitude != null ? { locationSetAt: new Date(), locationSetById: actor.id } : undefined;
     const client = await this.prisma.client.create({ data: { ...this.data(dto, assignments, locationStamp), createdById: actor.id }, include: clientInclude });
+    // Creating the profile at the salon is the first visit, so it also counts towards today's attendance.
+    if (actor.portal === 'STAFF' && locationStamp) await markFieldWorked(this.prisma, actor.id, new Date());
     await recordAudit(this.prisma, { actorId: actor.id, action: 'CLIENT_CREATE', entity: 'CLIENT', entityId: client.id, details: { salonName: client.salonName }, ipAddress });
     return client;
   }

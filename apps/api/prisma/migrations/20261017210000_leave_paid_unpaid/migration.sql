@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "LeaveRequest" ADD COLUMN     "breakdown" JSONB,
+ADD COLUMN     "paidDays" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "totalDays" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "unpaidDays" INTEGER NOT NULL DEFAULT 0;
