@@ -8,7 +8,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
-import { AdminVisitsDto, CompleteVisitDto, SalonLocationDto, SaveRouteDto, StartVisitDto, StopStatusDto } from './dto.js';
+import { AdminVisitsDto, CompleteVisitDto, SalonLocationDto, SaveRouteDto, StartVisitDto, StopStatusDto, AddSalonByNameDto } from './dto.js';
 import { RoutesService } from './routes.service.js';
 
 @Controller('routes')
@@ -19,6 +19,10 @@ export class RoutesController {
 
   @Get('salons')
   salons(@CurrentUser() actor: SessionUser) { return this.routes.assignedSalons(actor); }
+
+  // Add a salon by name when it has no client profile yet (it becomes a prospect client for this salesperson).
+  @Post('salons')
+  addSalon(@CurrentUser() actor: SessionUser, @Body() dto: AddSalonByNameDto, @Req() req: Request) { return this.routes.addSalonByName(actor, dto, req.ip); }
 
   @Get('admin')
   admin(@CurrentUser() actor: SessionUser, @Query('date') date: string) { return this.routes.adminOverview(actor, date); }

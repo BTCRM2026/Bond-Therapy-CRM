@@ -62,6 +62,16 @@ export function RoutePlanner() {
   };
   useEffect(() => { (async () => { await load(); })(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A salon typed by name: saved as a prospect client for this salesperson, then used like any other salon in the route.
+  const createSalon = async (name: string, city: string): Promise<Salon> => {
+    const response = await fetch("/api/routes/salons", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, city }) });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(messageFrom(data, "Unable to add this salon."));
+    const salon = data as Salon;
+    setSalons((current) => current.some((item) => item.id === salon.id) ? current : [...current, salon]);
+    return salon;
+  };
+
   const saveStops = async (date: string, stops: Array<{ clientId: string; plannedTime: string | null }>) => {
     const response = await fetch(`/api/routes/${date}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stops: stops.map((stop) => ({ clientId: stop.clientId, plannedTime: stop.plannedTime ? `${date}T${stop.plannedTime}:00` : undefined })) }) });
     const data = await response.json().catch(() => null);
@@ -126,8 +136,8 @@ export function RoutePlanner() {
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</div>}
 
     {route && (tab === "tomorrow"
-      ? <RouteBuilder date={activeDate} route={route} salons={salons} onSave={saveStops} onSubmit={() => submitRoute(activeDate)} />
-      : <TodayRoute date={activeDate} route={route} salons={salons} onSave={saveStops} onStart={setStarting} onComplete={checkOut} onResolve={(stop, mode) => setResolving({ stop, mode })} onRemove={(stopId) => removeStop(activeDate, stopId)} />)}
+      ? <RouteBuilder date={activeDate} route={route} salons={salons} onSave={saveStops} onCreateSalon={createSalon} onSubmit={() => submitRoute(activeDate)} />
+      : <TodayRoute date={activeDate} route={route} salons={salons} onSave={saveStops} onCreateSalon={createSalon} onStart={setStarting} onComplete={checkOut} onResolve={(stop, mode) => setResolving({ stop, mode })} onRemove={(stopId) => removeStop(activeDate, stopId)} />)}
 
     {starting && <StartVisitModal stop={starting} date={today} radius={routes[today]?.visitRadiusMeters ?? 100} onClose={() => setStarting(null)} onDone={async () => { setStarting(null); await load(); setNotice("Checked in. Your attendance for today has started."); }} />}
     {resolving && <ResolveStopModal stop={resolving.stop} mode={resolving.mode} onClose={() => setResolving(null)} onConfirm={(reason, rescheduleDate) => resolveStop(today, resolving.stop.id, resolving.mode, reason, rescheduleDate)} />}
@@ -136,7 +146,7 @@ export function RoutePlanner() {
 
 function activeStops(route: RouteData) { return route.stops.filter((stop) => stop.status !== "REMOVED").sort((a, b) => a.sequence - b.sequence); }
 
-function RouteBuilder({ date, route, salons, onSave, onSubmit }: { date: string; route: RouteData; salons: Salon[]; onSave: (date: string, stops: Array<{ clientId: string; plannedTime: string | null }>) => Promise<void>; onSubmit: () => void }) {
+function RouteBuilder({ date, route, salons, onSave, onCreateSalon, onSubmit }: { date: string; route: RouteData; salons: Salon[]; onSave: (date: string, stops: Array<{ clientId: string; plannedTime: string | null }>) => Promise<void>; onCreateSalon: (name: string, city: string) => Promise<Salon>; onSubmit: () => void }) {
   const initial = activeStops(route).map((stop) => ({ clientId: stop.clientId, plannedTime: stop.plannedTime ? new Date(stop.plannedTime).toTimeString().slice(0, 5) : "" }));
   const [picks, setPicks] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -157,7 +167,7 @@ function RouteBuilder({ date, route, salons, onSave, onSubmit }: { date: string;
       <div><h2 className="text-sm font-semibold text-foreground">{dayLabel(date)}</h2><p className="mt-0.5 text-xs text-muted">{picks.length} salon{picks.length === 1 ? "" : "s"} planned</p></div>
       <RouteStatusBadge status={route.status} />
     </div>
-    {picks.length === 0 ? <div className="px-5 py-10 text-center"><Calendar className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">No salons added yet</p><p className="mt-1 text-xs text-muted">Add salons from your assigned list to plan this route.</p></div>
+    {picks.length === 0 ? <div className="px-5 py-10 text-center"><Calendar className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">No salons added yet</p><p className="mt-1 text-xs text-muted">Type a salon name below, or pick one from your client profiles.</p></div>
       : <div className="divide-y">{picks.map((pick, index) => { const salon = salonMap.get(pick.clientId); return <div key={pick.clientId} className="flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <span className="grid size-7 shrink-0 place-items-center rounded-full bg-background text-xs font-bold text-muted">{index + 1}</span>
@@ -173,6 +183,7 @@ function RouteBuilder({ date, route, salons, onSave, onSubmit }: { date: string;
         </div>
       </div>; })}</div>}
     <div className="space-y-3 border-t p-4 sm:p-5">
+      <AddSalonByName salons={salons} onCreate={onCreateSalon} onAdded={add} />
       {picking ? <div className="rounded-lg border bg-background p-3">
         {available.length === 0 ? <p className="px-1 py-2 text-xs text-muted">All your assigned salons are already on this route.</p> : <div className="max-h-56 space-y-1 overflow-y-auto">{available.map((salon) => <button key={salon.id} type="button" onClick={() => add(salon.id)} className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-white"><span className="min-w-0"><span className="block truncate font-medium text-foreground">{salon.salonName}</span><span className="block truncate text-muted">{[salon.area, salon.city].filter(Boolean).join(" · ")}</span></span>{salon.potential === "HIGH" && <Star size={12} className="shrink-0 fill-warning text-warning" />}</button>)}</div>}
         <Button type="button" variant="secondary" className="mt-2 h-8 w-full text-xs" onClick={() => setPicking(false)}>Close</Button>
@@ -185,7 +196,7 @@ function RouteBuilder({ date, route, salons, onSave, onSubmit }: { date: string;
   </section>;
 }
 
-function TodayRoute({ date, route, salons, onSave, onStart, onComplete, onResolve, onRemove }: { date: string; route: RouteData; salons: Salon[]; onSave: (date: string, stops: Array<{ clientId: string; plannedTime: string | null }>) => Promise<void>; onStart: (stop: RouteStop) => void; onComplete: (stop: RouteStop) => Promise<void>; onResolve: (stop: RouteStop, mode: "UNABLE_TO_MEET" | "RESCHEDULED") => void; onRemove: (stopId: string) => void }) {
+function TodayRoute({ date, route, salons, onSave, onCreateSalon, onStart, onComplete, onResolve, onRemove }: { date: string; route: RouteData; salons: Salon[]; onSave: (date: string, stops: Array<{ clientId: string; plannedTime: string | null }>) => Promise<void>; onCreateSalon: (name: string, city: string) => Promise<Salon>; onStart: (stop: RouteStop) => void; onComplete: (stop: RouteStop) => Promise<void>; onResolve: (stop: RouteStop, mode: "UNABLE_TO_MEET" | "RESCHEDULED") => void; onRemove: (stopId: string) => void }) {
   const [picking, setPicking] = useState(false);
   const stops = activeStops(route);
   const available = salons.filter((salon) => !stops.some((stop) => stop.clientId === salon.id));
@@ -198,13 +209,47 @@ function TodayRoute({ date, route, salons, onSave, onStart, onComplete, onResolv
     </div>
     {stops.length === 0 ? <div className="px-5 py-10 text-center"><Calendar className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">No route planned for today</p><p className="mt-1 text-xs text-muted">Add salons below to start today&apos;s route.</p></div>
       : <div className="divide-y">{stops.map((stop) => <TodayStopRow key={stop.id} stop={stop} onStart={() => onStart(stop)} onComplete={() => onComplete(stop)} onUnableToMeet={() => onResolve(stop, "UNABLE_TO_MEET")} onReschedule={() => onResolve(stop, "RESCHEDULED")} onRemove={() => onRemove(stop.id)} />)}</div>}
-    <div className="border-t p-4 sm:p-5">
+    <div className="space-y-3 border-t p-4 sm:p-5">
+      <AddSalonByName salons={salons} onCreate={onCreateSalon} onAdded={addToday} />
       {picking ? <div className="rounded-lg border bg-background p-3">
         {available.length === 0 ? <p className="px-1 py-2 text-xs text-muted">All your assigned salons are already on today&apos;s route.</p> : <div className="max-h-56 space-y-1 overflow-y-auto">{available.map((salon) => <button key={salon.id} type="button" onClick={() => addToday(salon.id)} className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-white"><span className="min-w-0"><span className="block truncate font-medium text-foreground">{salon.salonName}</span><span className="block truncate text-muted">{[salon.area, salon.city].filter(Boolean).join(" · ")}</span></span>{salon.potential === "HIGH" && <Star size={12} className="shrink-0 fill-warning text-warning" />}</button>)}</div>}
         <Button type="button" variant="secondary" className="mt-2 h-8 w-full text-xs" onClick={() => setPicking(false)}>Close</Button>
       </div> : <Button type="button" variant="secondary" onClick={() => setPicking(true)}><Plus size={15} />Add salon to today</Button>}
     </div>
   </section>;
+}
+
+const STANDARD_TOWNS = ["Navsari", "Surat", "Vadodara", "Ahmedabad", "Bhavnagar", "Junagadh", "Rajkot", "Gandhinagar", "Jaipur", "Indore"];
+
+// For salons that have no client profile yet: type the name and town and the salon is added to the route. Its client profile is completed at the salon.
+function AddSalonByName({ salons, onCreate, onAdded }: { salons: Salon[]; onCreate: (name: string, city: string) => Promise<Salon>; onAdded: (clientId: string) => void | Promise<void> }) {
+  const common = useMemo(() => { const counts = new Map<string, number>(); for (const salon of salons) counts.set(salon.city, (counts.get(salon.city) ?? 0) + 1); return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ""; }, [salons]);
+  const cities = useMemo(() => [...new Set([...salons.map((salon) => salon.city), ...STANDARD_TOWNS])].sort((a, b) => a.localeCompare(b)), [salons]);
+  const [name, setName] = useState("");
+  const [city, setCity] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  const town = city || common;
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (name.trim().length < 2) return setProblem("Enter the salon name.");
+    if (town.trim().length < 2) return setProblem("Enter the town.");
+    setBusy(true); setProblem("");
+    try { const salon = await onCreate(name.trim(), town.trim()); setName(""); await onAdded(salon.id); }
+    catch (cause) { setProblem(cause instanceof Error ? cause.message : "Unable to add this salon."); }
+    finally { setBusy(false); }
+  };
+  return <form onSubmit={submit} className="rounded-lg border border-brand/25 bg-brand-soft/40 p-3" aria-label="Add a salon by name">
+    <p className="text-xs font-semibold text-foreground">Add a salon by name</p>
+    <p className="mt-0.5 text-[11px] leading-4 text-muted">No client profile needed yet. When you reach the salon, save its location and complete its client profile there.</p>
+    <div className="mt-2.5 grid gap-2 sm:grid-cols-[1fr_170px_auto]">
+      <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Salon name" aria-label="Salon name" />
+      <Input value={city} onChange={(event) => setCity(event.target.value)} maxLength={100} placeholder={common || "Town"} list="route-towns" aria-label="Town" />
+      <Button type="submit" disabled={busy || name.trim().length < 2}>{busy ? <LoaderCircle className="animate-spin" size={15} /> : <Plus size={15} />}Add</Button>
+    </div>
+    <datalist id="route-towns">{cities.map((item) => <option key={item} value={item} />)}</datalist>
+    {problem && <p role="alert" className="mt-2 text-xs text-danger">{problem}</p>}
+  </form>;
 }
 
 function TodayStopRow({ stop, onStart, onComplete, onUnableToMeet, onReschedule, onRemove }: { stop: RouteStop; onStart: () => void; onComplete: () => Promise<void>; onUnableToMeet: () => void; onReschedule: () => void; onRemove: () => void }) {

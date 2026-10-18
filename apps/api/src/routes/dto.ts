@@ -1,6 +1,14 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { VisitOutcome } from '@prisma/client';
+
+const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value);
+
+// A salon the salesperson types by name because it has no client profile yet; it is saved as a prospect client assigned to them.
+export class AddSalonByNameDto {
+  @Transform(trim) @IsString() @MinLength(2, { message: 'Enter the salon name.' }) @MaxLength(120) name!: string;
+  @Transform(trim) @IsString() @MinLength(2, { message: 'Enter the town.' }) @MaxLength(100) city!: string;
+}
 
 export class RouteStopInputDto {
   @IsString() @MinLength(1) clientId!: string;

@@ -125,3 +125,29 @@ describe('RoutesService admin visits paging', () => {
     expect(result.summary).toMatchObject({ completed: 10, pending: 10, gpsVerified: 10 });
   });
 });
+
+describe('RoutesService salons added by name', () => {
+  const dto = { name: '  Royal   Hair Studio ', city: ' surat ' } as never;
+  const saved = { id: 'c-new', salonName: 'Royal Hair Studio', city: 'surat', area: null, potential: null, beat: null };
+
+  it('saves a salon typed by name as a prospect client assigned to the salesperson', async () => {
+    const { service, prisma } = build();
+    Object.assign(prisma, { client: { ...prisma.client, findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue(saved) } });
+    const result = await service.addSalonByName(actor, dto);
+    expect(prisma.client.create.mock.calls[0]![0].data).toMatchObject({ salonName: 'Royal Hair Studio', city: 'surat', status: 'PROSPECT', primaryContact: '', assignedSalespersonId: 'staff-1', createdById: 'staff-1' });
+    expect(result).toMatchObject({ id: 'c-new', existing: false });
+  });
+
+  it('reuses the salon the salesperson already has, ignoring case and spacing', async () => {
+    const { service, prisma } = build();
+    Object.assign(prisma, { client: { ...prisma.client, findMany: vi.fn().mockResolvedValue([{ ...saved, id: 'c-old', salonName: 'royal hair studio', city: 'Surat' }]), create: vi.fn() } });
+    const result = await service.addSalonByName(actor, dto);
+    expect(prisma.client.create).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ id: 'c-old', existing: true });
+  });
+
+  it('is for the salesperson only', async () => {
+    const { service } = build();
+    await expect(service.addSalonByName({ id: 'admin-1', portal: 'ADMIN', roles: [{ key: 'SUPER_ADMIN' }] } as never, dto)).rejects.toThrow();
+  });
+});

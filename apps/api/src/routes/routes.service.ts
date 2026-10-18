@@ -7,7 +7,7 @@ import { CapturesService } from '../captures/captures.service.js';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { AdminVisitsDto, CompleteVisitDto, SalonLocationDto, SaveRouteDto, StartVisitDto, StopStatusDto } from './dto.js';
+import { AdminVisitsDto, CompleteVisitDto, SalonLocationDto, SaveRouteDto, StartVisitDto, StopStatusDto, AddSalonByNameDto } from './dto.js';
 
 // Arrival must be within this distance of the salon's saved location unless an administrator has set another radius.
 export const DEFAULT_VISIT_RADIUS_METERS = 100;
@@ -56,6 +56,22 @@ export class RoutesService {
 
   private checkAccuracy(accuracy?: number) {
     if (accuracy != null && accuracy > MAX_GPS_ACCURACY_METERS) throw new BadRequestException(`Your GPS signal is too weak (about ${Math.round(accuracy)} m off). Step outside or wait a few seconds, then try again.`);
+  }
+
+  // The salesperson plans a visit to a salon that has no client profile yet. It is saved as a prospect client assigned to them,
+  // and they complete the profile (and save its location) when they reach the salon.
+  async addSalonByName(actor: SessionUser, dto: AddSalonByNameDto, ipAddress?: string) {
+    this.ensureAccess(actor);
+    if (actor.portal !== 'STAFF') throw new ForbiddenException('Salons are added by the salesperson who will visit them.');
+    const name = dto.name.trim().replace(/\s+/g, ' ');
+    const city = dto.city.trim().replace(/\s+/g, ' ');
+    const select = { id: true, salonName: true, city: true, area: true, potential: true, beat: { select: { id: true, name: true } } } as const;
+    const mine = await this.prisma.client.findMany({ where: { status: { not: 'INACTIVE' }, OR: [{ assignedSalespersonId: actor.id }, { createdById: actor.id }] }, select });
+    const same = mine.find((salon) => salon.salonName.trim().toLowerCase() === name.toLowerCase() && salon.city.trim().toLowerCase() === city.toLowerCase());
+    if (same) return { ...same, existing: true };
+    const created = await this.prisma.client.create({ data: { salonName: name, category: 'SALON', primaryContact: '', city, status: 'PROSPECT', assignedSalespersonId: actor.id, createdById: actor.id }, select });
+    await this.recordAudit(actor, 'ROUTE_SALON_ADDED_BY_NAME', created.id, { salonName: name, city }, ipAddress);
+    return { ...created, existing: false };
   }
 
   async assignedSalons(actor: SessionUser) {
