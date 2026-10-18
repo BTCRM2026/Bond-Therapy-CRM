@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { AttendanceService } from '../attendance/attendance.service.js';
+import { countedOrders } from '../common/counted-orders.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { BoardQueryDto, TeamActivitiesQueryDto, TeamLeadsQueryDto } from './dto.js';
@@ -158,6 +159,83 @@ export class TeamActivityService {
         calls,
       } : null,
     };
+  }
+
+  // ---- Area Sales Manager: a read-only view of their own team (the executives who report to them). Approvals stay with the admin.
+  private ensureManager(actor: SessionUser) {
+    if (!(actor.portal === 'STAFF' && actor.roles.some((item) => item.key === 'SALES_MANAGER'))) throw new ForbiddenException('The team view is for Area Sales Managers.');
+  }
+
+  private async teamMember(actor: SessionUser, staffId: string) {
+    this.ensureManager(actor);
+    const member = await this.prisma.user.findFirst({ where: { id: staffId, managerId: actor.id, roles: { some: { role: { key: { in: SALES_ROLES } } } } }, select: { id: true } });
+    if (!member) throw new NotFoundException('This person is not in your team.');
+  }
+
+  async myTeam(actor: SessionUser) {
+    this.ensureManager(actor);
+    const key = istToday();
+    const date = new Date(`${key}T00:00:00.000Z`);
+    const year = Number(key.slice(0, 4));
+    const month = Number(key.slice(5, 7));
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+    const members = await this.prisma.user.findMany({
+      where: { managerId: actor.id, status: 'ACTIVE', roles: { some: { role: { key: { in: SALES_ROLES }, isActive: true } } } },
+      select: { id: true, name: true, loginId: true, staffProfile: { select: { shiftStart: true, shiftEnd: true, isTechnician: true } }, roles: { select: { role: { select: { name: true, priority: true } } } } },
+      orderBy: { name: 'asc' },
+    });
+    const ids = members.map((member) => member.id);
+    const [days, sales, plans] = await Promise.all([
+      this.attendance.classifyStaffOnDate(date, members),
+      this.prisma.order.groupBy({ by: ['salespersonId'], where: { salespersonId: { in: ids }, ...countedOrders(start, end) }, _sum: { totalAmount: true }, _count: true }),
+      this.prisma.annualTargetPlan.findMany({ where: { staffId: { in: ids }, targetYear: year, isActive: true }, select: { id: true, staffId: true } }),
+    ]);
+    const targets = plans.length ? await this.prisma.target.findMany({ where: { annualPlanId: { in: plans.map((plan) => plan.id) }, period: 'MONTHLY', periodYear: year, periodIndex: month }, select: { annualPlanId: true, targetValue: true } }) : [];
+    const items = members.map((member) => {
+      const day = days.get(member.id)!;
+      const total = sales.find((row) => row.salespersonId === member.id);
+      const plan = plans.find((row) => row.staffId === member.id);
+      const target = plan ? targets.find((row) => row.annualPlanId === plan.id) : undefined;
+      const amount = Number(total?._sum.totalAmount ?? 0);
+      const targetValue = target ? Number(target.targetValue) : null;
+      return {
+        staffId: member.id, name: member.name, loginId: member.loginId, roleName: role(member),
+        status: day.status, verifiedCalls: day.verifiedCalls ?? 0, reportSubmitted: day.reportSubmitted ?? false, dayNote: day.dayNote ?? null,
+        sales: amount, orders: total?._count ?? 0, target: targetValue, percent: targetValue ? Math.round((amount / targetValue) * 100) : null,
+      };
+    });
+    const withTarget = items.filter((item) => item.target != null);
+    return {
+      date: key,
+      period: { month, year },
+      totals: {
+        members: items.length,
+        working: items.filter((item) => WORKING.has(item.status)).length,
+        reportsSubmitted: items.filter((item) => item.reportSubmitted).length,
+        verifiedCalls: items.reduce((sum, item) => sum + item.verifiedCalls, 0),
+        sales: items.reduce((sum, item) => sum + item.sales, 0),
+        target: withTarget.length ? withTarget.reduce((sum, item) => sum + (item.target ?? 0), 0) : null,
+      },
+      items,
+    };
+  }
+
+  async myTeamMonth(actor: SessionUser, staffId: string, month?: number, year?: number) {
+    await this.teamMember(actor, staffId);
+    return this.attendance.monthlyFor(staffId, month, year);
+  }
+
+  async myTeamDay(actor: SessionUser, staffId: string, dateValue?: string) {
+    await this.teamMember(actor, staffId);
+    return this.staffDay(staffId, dateValue);
+  }
+
+  async myTeamCallPhoto(actor: SessionUser, callId: string) {
+    this.ensureManager(actor);
+    const call = await this.prisma.dailySalesCall.findFirst({ where: { id: callId, report: { staff: { managerId: actor.id } } }, select: { visitPhoto: true, photoMime: true } });
+    if (!call) throw new NotFoundException('Call photo not found.');
+    return { buffer: Buffer.from(call.visitPhoto), mime: call.photoMime };
   }
 
   async callPhoto(actor: SessionUser, callId: string) {

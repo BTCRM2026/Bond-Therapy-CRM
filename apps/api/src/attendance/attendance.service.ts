@@ -33,13 +33,9 @@ export class AttendanceService {
     if (!this.isAdmin(actor)) throw new ForbiddenException('This action is restricted to Super Admin.');
   }
 
-  private isManager(actor: SessionUser) {
-    return actor.portal === 'STAFF' && actor.roles.some((role) => role.key === 'SALES_MANAGER');
-  }
-
   private ensureReviewerAccess(actor: SessionUser) {
-    if (this.isAdmin(actor) || this.isManager(actor)) return;
-    throw new ForbiddenException('Reviewing requests is restricted to Sales Managers and Super Admin.');
+    if (this.isAdmin(actor)) return;
+    throw new ForbiddenException('Reviewing requests is restricted to administrators.');
   }
 
   private todayKey() {
@@ -152,6 +148,7 @@ export class AttendanceService {
       halfDayThresholdHours: Number(settings.halfDayThresholdHours),
       ...classified,
       rulesApplied: Boolean(rules),
+      rulesStartOn: strictFrom ? strictFrom.toISOString().slice(0, 10) : null,
       verifiedCalls: facts.verifiedCalls,
       fullDayCalls: FULL_DAY_CALLS,
       halfDayCalls: HALF_DAY_CALLS,
@@ -211,7 +208,7 @@ export class AttendanceService {
     return this.monthlyFor(actor.id, monthParam, yearParam);
   }
 
-  private async monthlyFor(userId: string, monthParam?: number, yearParam?: number) {
+  async monthlyFor(userId: string, monthParam?: number, yearParam?: number) {
     const now = new Date();
     const month = monthParam ?? now.getUTCMonth() + 1;
     const year = yearParam ?? now.getUTCFullYear();
@@ -276,7 +273,6 @@ export class AttendanceService {
     this.ensureReviewerAccess(actor);
     const where: Prisma.AttendanceCorrectionRequestWhereInput = {};
     if (status) where.status = status as CorrectionStatus;
-    if (!this.isAdmin(actor)) where.user = { managerId: actor.id };
     return this.prisma.attendanceCorrectionRequest.findMany({ where, include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' }, take: 100 });
   }
 
@@ -285,10 +281,6 @@ export class AttendanceService {
     const request = await this.prisma.attendanceCorrectionRequest.findUnique({ where: { id } });
     if (!request) throw new NotFoundException('Correction request not found.');
     if (request.status !== 'PENDING') throw new BadRequestException('This request has already been reviewed.');
-    if (!this.isAdmin(actor)) {
-      const member = await this.prisma.user.findFirst({ where: { id: request.userId, managerId: actor.id } });
-      if (!member) throw new ForbiddenException('You can only review requests for your own team.');
-    }
     const updated = await this.prisma.attendanceCorrectionRequest.update({ where: { id }, data: { status: dto.status, reviewedById: actor.id, reviewedAt: new Date(), reviewNote: dto.reviewNote?.trim() || null } });
     if (dto.status === 'APPROVED') {
       await this.prisma.attendanceRecord.upsert({
@@ -310,7 +302,6 @@ export class AttendanceService {
     this.ensureReviewerAccess(actor);
     const where: Prisma.LeaveRequestWhereInput = {};
     if (status) where.status = status as LeaveStatus;
-    if (!this.isAdmin(actor)) where.user = { managerId: actor.id };
     return this.prisma.leaveRequest.findMany({ where, include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' }, take: 100 });
   }
 

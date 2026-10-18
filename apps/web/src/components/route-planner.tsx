@@ -2,6 +2,7 @@
 
 import { DayGateBanner } from "@/components/day-gate-banner";
 import { AlertTriangle, ArrowDown, ArrowUp, Calendar, CheckCircle2, Clock3, LoaderCircle, MapPin, Plus, RotateCcw, Star, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FormError } from "@/components/ui/field";
@@ -13,7 +14,7 @@ import { SuccessToast } from "@/components/ui/toast";
 
 type Salon = { id: string; salonName: string; city: string; area: string | null; potential: string | null; beat: { id: string; name: string } | null };
 type Activity = { id: string; checkInAt: string | null; checkOutAt: string | null; visitOutcome: string | null; status: string; note: string | null };
-type RouteStop = { id: string; clientId: string; sequence: number; plannedTime: string | null; status: "PLANNED" | "VISITED" | "UNABLE_TO_MEET" | "RESCHEDULED" | "REMOVED"; note: string | null; client: { id: string; salonName: string; city: string; area: string | null; primaryContact: string; potential: string | null; latitude: string | null; longitude: string | null }; activity: Activity | null };
+type RouteStop = { id: string; clientId: string; sequence: number; plannedTime: string | null; status: "PLANNED" | "VISITED" | "UNABLE_TO_MEET" | "RESCHEDULED" | "REMOVED"; note: string | null; client: { id: string; salonName: string; city: string; area: string | null; primaryContact: string; potential: string | null; latitude: string | null; longitude: string | null; status?: string }; activity: Activity | null };
 type RouteData = { id: string | null; staffId: string; routeDate: string; status: "DRAFT" | "PLANNED" | "IN_PROGRESS" | "PARTIALLY_COMPLETED" | "COMPLETED" | "CANCELLED"; notes: string | null; stops: RouteStop[]; visitRadiusMeters?: number };
 
 const OUTCOMES = [
@@ -212,7 +213,7 @@ function TodayStopRow({ stop, onStart, onComplete, onUnableToMeet, onReschedule,
   const started = Boolean(stop.activity?.checkInAt) && !stop.activity?.checkOutAt;
   return <div className="p-4 sm:px-5">
     <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-foreground">{stop.client.salonName}</p><StopStatusBadge stop={stop} /></div><p className="mt-0.5 text-xs text-muted">{[stop.client.area, stop.client.city].filter(Boolean).join(" · ")}{stop.plannedTime && ` · ${timeOf(stop.plannedTime)}`}</p>{stop.note && <p className="mt-1 text-xs text-muted">{stop.note}</p>}</div>
+      <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-foreground">{stop.client.salonName}</p><StopStatusBadge stop={stop} />{stop.client.status === "PROSPECT" && <Link href="/dashboard/clients" className="inline-flex rounded-full bg-warning-soft px-2 py-0.5 text-[10px] font-semibold text-warning hover:underline">Complete client profile</Link>}</div><p className="mt-0.5 text-xs text-muted">{[stop.client.area, stop.client.city].filter(Boolean).join(" · ")}{stop.plannedTime && ` · ${timeOf(stop.plannedTime)}`}</p>{stop.note && <p className="mt-1 text-xs text-muted">{stop.note}</p>}</div>
       {stop.status === "PLANNED" && <button type="button" onClick={() => setOpen((v) => !v)} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-background" aria-label="More actions"><Clock3 size={15} /></button>}
     </div>
     {stop.status === "PLANNED" && <div className="mt-3 flex flex-wrap gap-2">

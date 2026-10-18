@@ -17,10 +17,11 @@ export class NotificationsService {
     const isSales = user.portal === 'STAFF' && user.roles.some((role) => salesRoles.has(role.key));
     if (isAdmin || user.portal === 'STAFF') await this.refreshStaffRequests(user, isAdmin);
     if (isAdmin) {
-      await Promise.all([this.refreshExpiringAgreements(user), this.refreshLockedAccounts(user), this.refreshIncentivePendingApproval(user), this.refreshAttendanceRequests(user)]);
+      await Promise.all([this.refreshExpiringAgreements(user), this.refreshLockedAccounts(user), this.refreshDeviceLocks(user), this.refreshIncentivePendingApproval(user), this.refreshAttendanceRequests(user)]);
     } else if (isSales) {
       const tasks = [this.refreshOverdueVisits(user)];
-      if (isManager) tasks.push(this.refreshIncentivePendingApproval(user), this.refreshAttendanceRequests(user));
+      // Leave and attendance corrections are approved by the administrator only, so an area manager gets no alert for them.
+      if (isManager) tasks.push(this.refreshIncentivePendingApproval(user));
       await Promise.all(tasks);
     }
   }
@@ -136,6 +137,17 @@ export class NotificationsService {
           message: `${agreement.title} (${agreement.partyName}) ${isOverdue ? 'expired' : 'expires'} on ${agreement.expiryDate?.toDateString()}.`,
         },
       });
+    }
+  }
+
+  // Admin: staff accounts locked because they were used from a third device, until reactivated.
+  private async refreshDeviceLocks(user: SessionUser) {
+    const locked = await this.prisma.user.findMany({ where: { status: 'LOCKED', deviceLockedAt: { not: null } }, select: { id: true, name: true, loginId: true, deviceLockDetail: true } });
+    const keys = locked.map((item) => `device-lock:${item.id}:${user.id}`);
+    await this.prisma.notification.deleteMany({ where: { type: 'DEVICE_LOCK', recipientId: user.id, sourceKey: { notIn: keys } } });
+    for (const item of locked) {
+      const message = `${item.name} (${item.loginId}) was locked: a third device tried to sign in${item.deviceLockDetail ? ` (${item.deviceLockDetail})` : ''}. Reactivate the account if it was them.`;
+      await this.notifyOnChange({ type: 'DEVICE_LOCK', severity: 'CRITICAL', title: 'Account locked: third device', message, sourceKey: `device-lock:${item.id}:${user.id}`, portal: user.portal, recipientId: user.id });
     }
   }
 

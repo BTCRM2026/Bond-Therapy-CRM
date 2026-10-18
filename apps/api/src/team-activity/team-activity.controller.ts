@@ -8,6 +8,7 @@ import { Roles } from '../common/roles.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
+import { AttendanceMonthQueryDto } from '../attendance/dto.js';
 import { BoardQueryDto, DayQueryDto, TeamActivitiesQueryDto, TeamLeadsQueryDto } from './dto.js';
 import { TeamActivityService } from './team-activity.service.js';
 
@@ -20,6 +21,32 @@ export class MyDayController {
 
   @Get(':date')
   day(@CurrentUser() actor: SessionUser, @Param() params: DayQueryDto) { return this.team.myDay(actor, params.date); }
+}
+
+// An Area Sales Manager's read-only view of the executives who report to them.
+@Controller('my-team')
+@UseGuards(SessionGuard, PortalGuard, RolesGuard)
+@Portals(PortalType.STAFF)
+export class MyTeamController {
+  constructor(private readonly team: TeamActivityService) {}
+
+  @Get()
+  summary(@CurrentUser() actor: SessionUser) { return this.team.myTeam(actor); }
+
+  @Get('calls/:callId/photo')
+  async photo(@CurrentUser() actor: SessionUser, @Param('callId') callId: string, @Res() response: Response) {
+    const photo = await this.team.myTeamCallPhoto(actor, callId);
+    response.setHeader('content-type', photo.mime);
+    response.setHeader('content-disposition', 'inline');
+    response.setHeader('cache-control', 'private, max-age=300');
+    response.send(photo.buffer);
+  }
+
+  @Get(':staffId/month')
+  month(@CurrentUser() actor: SessionUser, @Param('staffId') staffId: string, @Query() query: AttendanceMonthQueryDto) { return this.team.myTeamMonth(actor, staffId, query.month, query.year); }
+
+  @Get(':staffId/day')
+  day(@CurrentUser() actor: SessionUser, @Param('staffId') staffId: string, @Query() query: DayQueryDto) { return this.team.myTeamDay(actor, staffId, query.date); }
 }
 
 // Read-only monitoring of everything the sales staff do, for the Super Admin.

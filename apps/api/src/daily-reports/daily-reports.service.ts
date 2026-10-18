@@ -96,12 +96,12 @@ export class DailyReportsService {
       this.prisma.target.findFirst({ where: { scope: 'STAFF', scopeId: actor.id, metric: 'CALLS', period: 'MONTHLY', periodYear: date.getUTCFullYear(), periodIndex: date.getUTCMonth() + 1 }, select: { targetValue: true } }),
     ]);
     const visits = await this.todayVisits(actor, date);
-    const gate = await this.dayRules.gate(actor.id);
+    const [gate, strictFrom] = await Promise.all([this.dayRules.gate(actor.id), this.dayRules.strictFrom()]);
     return {
       date: this.dateKey(),
       visits,
       // Rules shown on the report screen: the report locks once submitted, and 11 PM is the deadline for a full day.
-      rules: { fullDayCalls: FULL_DAY_CALLS, halfDayCalls: HALF_DAY_CALLS, deadlineAt: reportCutoff(this.dateKey()).toISOString(), locked: Boolean(report) },
+      rules: { fullDayCalls: FULL_DAY_CALLS, halfDayCalls: HALF_DAY_CALLS, deadlineAt: reportCutoff(this.dateKey()).toISOString(), locked: Boolean(report), startsOn: strictFrom ? strictFrom.toISOString().slice(0, 10) : null },
       gate,
       staff: { id: actor.id, name: actor.name, headquarter: context.headquarter },
       towns: context.towns,
@@ -118,6 +118,9 @@ export class DailyReportsService {
     const reportDate = this.dateFromKey(this.dateKey());
     // The report is the end of the day: once it is submitted the day is locked.
     if (await this.prisma.dailySalesReport.findUnique({ where: { staffId_reportDate: { staffId: actor.id, reportDate } }, select: { id: true } })) throw new ConflictException('Today’s report is already submitted and locked. Ask your administrator if something needs to change.');
+    // Until the strict day rules start, a report may have no calls (for example on launch night), so tomorrow's route can still be planned.
+    const strictFrom = await this.dayRules.strictFrom();
+    if (!dto.calls.length && strictFrom && reportDate.getTime() >= strictFrom.getTime()) throw new BadRequestException('You have no verified visits today. Check in at a salon from My Route first, or add a call.');
     const context = await this.context(actor);
     if (!context.towns.includes(dto.workingTown) || !context.towns.includes(dto.tomorrowTown)) throw new BadRequestException('Select a town assigned to your territory.');
     if (dto.coworkerId && !context.coworkers.some((coworker) => coworker.id === dto.coworkerId)) throw new BadRequestException('Select an active sales coworker or Solo.');
@@ -150,7 +153,7 @@ export class DailyReportsService {
       const reused = (await this.prisma.dailySalesCall.findFirst({ where: { photoHash: { in: fingerprints } }, select: { id: true } })) ?? (await this.prisma.visitProof.findFirst({ where: { checkInPhotoHash: { in: fingerprints } }, select: { id: true } }));
       if (reused) throw new BadRequestException('One of these photos has already been used. Take a new photo for each call.');
     }
-    if (needsNoOrderReason(dto.calls, dto.noOrderReason)) throw new BadRequestException('Add a reason when no order was received today.');
+    if (dto.calls.length && needsNoOrderReason(dto.calls, dto.noOrderReason)) throw new BadRequestException('Add a reason when no order was received today.');
     for (const call of dto.calls) {
       if (call.result === 'ORDER' && (!call.orderValue || call.orderValue <= 0)) throw new BadRequestException(`Enter the order value for ${call.customerName}.`);
     }
@@ -189,14 +192,24 @@ export class DailyReportsService {
       const route = existingRoute
         ? await tx.route.update({ where: { id: existingRoute.id }, data: { status: 'PLANNED', notes } })
         : await tx.route.create({ data: { staffId: actor.id, routeDate, status: 'PLANNED', notes } });
+      // A salon typed by name has no client profile yet. It becomes a stop on tomorrow's route with a prospect profile that the
+      // salesperson completes at the salon (saving its location there is what lets the visit be verified).
+      const typedIds: string[] = [];
+      for (const name of newSalons) {
+        const match = context.clients.find((client) => client.city === dto.tomorrowTown && client.salonName.trim().toLowerCase() === name.toLowerCase());
+        if (match) { typedIds.push(match.id); continue; }
+        const created = await tx.client.create({ data: { salonName: name, category: 'SALON', primaryContact: '', city: dto.tomorrowTown, status: 'PROSPECT', assignedSalespersonId: actor.id, createdById: actor.id } });
+        typedIds.push(created.id);
+      }
+      const stopClientIds = [...new Set([...clientIds, ...typedIds])];
       await tx.routeStop.deleteMany({ where: { routeId: route.id } });
-      await tx.routeStop.createMany({ data: clientIds.map((clientId, sequence) => ({ routeId: route.id, clientId, sequence })) });
+      await tx.routeStop.createMany({ data: stopClientIds.map((clientId, sequence) => ({ routeId: route.id, clientId, sequence })) });
       await tx.routeChangeLog.create({ data: { routeId: route.id, changedById: actor.id, changeType: 'STATUS_CHANGE', reason: 'Tomorrow plan submitted with daily sales report', newValue: { clientIds, newSalons, town: dto.tomorrowTown } } });
 
       const report = await tx.dailySalesReport.upsert({
         where: { staffId_reportDate: { staffId: actor.id, reportDate } },
-        create: { staffId: actor.id, reportDate, headquarter: context.headquarter, workingTown: dto.workingTown, coworkerId: dto.coworkerId || null, tomorrowTown: dto.tomorrowTown, tomorrowRouteId: route.id, tomorrowExtraStops: newSalons.length ? newSalons : Prisma.JsonNull, noOrderReason: hasOrder ? null : dto.noOrderReason!.trim() },
-        update: { headquarter: context.headquarter, workingTown: dto.workingTown, coworkerId: dto.coworkerId || null, tomorrowTown: dto.tomorrowTown, tomorrowRouteId: route.id, tomorrowExtraStops: newSalons.length ? newSalons : Prisma.JsonNull, noOrderReason: hasOrder ? null : dto.noOrderReason!.trim(), submittedAt: new Date() },
+        create: { staffId: actor.id, reportDate, headquarter: context.headquarter, workingTown: dto.workingTown, coworkerId: dto.coworkerId || null, tomorrowTown: dto.tomorrowTown, tomorrowRouteId: route.id, tomorrowExtraStops: newSalons.length ? newSalons : Prisma.JsonNull, noOrderReason: hasOrder ? null : (dto.noOrderReason?.trim() || 'No calls recorded today') },
+        update: { headquarter: context.headquarter, workingTown: dto.workingTown, coworkerId: dto.coworkerId || null, tomorrowTown: dto.tomorrowTown, tomorrowRouteId: route.id, tomorrowExtraStops: newSalons.length ? newSalons : Prisma.JsonNull, noOrderReason: hasOrder ? null : (dto.noOrderReason?.trim() || 'No calls recorded today'), submittedAt: new Date() },
       });
       await tx.dailySalesCall.deleteMany({ where: { reportId: report.id } });
       await tx.dailySalesCall.createMany({ data: dto.calls.map((call, sequence) => { const visit = visits.find((item) => item.id === call.visitActivityId); return ({ reportId: report.id, sequence, customerName: visit ? visit.client.salonName : call.customerName.trim(), customerType: visit ? 'EXISTING' as const : call.customerType, visitActivityId: visit?.id ?? null, result: call.result, orderValue: call.result === 'ORDER' ? call.orderValue : null, remark: call.remark?.trim() || null, ...photoData[sequence] }); }) });

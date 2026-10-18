@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { BloodGroup, DataScope, Department, EmploymentType, PortalType, StaffProfile } from '@prisma/client';
+import { MAX_STAFF_DEVICES } from '../auth/device-rules.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { hashPassword } from '../auth/password.js';
 import { recordAudit } from '../common/audit.util.js';
@@ -23,6 +24,8 @@ type PresentedUser = {
   email: string | null;
   name: string;
   status: string;
+  deviceLockedAt?: Date | null;
+  deviceLockDetail?: string | null;
   department: Department | null;
   dataScope: DataScope;
   managerId: string | null;
@@ -53,6 +56,8 @@ export class UsersService {
       email: user.email,
       name: user.name,
       status: user.status,
+      deviceLockedAt: user.deviceLockedAt ?? null,
+      deviceLockDetail: user.deviceLockDetail ?? null,
       department: user.department,
       dataScope: user.dataScope,
       managerId: user.managerId,
@@ -94,7 +99,7 @@ export class UsersService {
       where: { id: managerId, status: 'ACTIVE', roles: { some: { role: { key: 'SALES_MANAGER', isActive: true } } } },
       select: { id: true },
     });
-    if (!manager) throw new BadRequestException('Select an active Sales Manager.');
+    if (!manager) throw new BadRequestException('Select an active Area Sales Manager.');
     return { role, config, managerId: manager.id };
   }
 
@@ -167,6 +172,28 @@ export class UsersService {
     return this.present(user);
   }
 
+  // The devices a staff account has been used from (at most two), for the administrator.
+  async devices(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true, status: true, deviceLockedAt: true, deviceLockDetail: true } });
+    if (!user) throw new NotFoundException('Staff member not found.');
+    const devices = await this.prisma.staffDevice.findMany({ where: { userId: id }, orderBy: { firstSeenAt: 'asc' }, select: { id: true, label: true, firstIp: true, lastIp: true, firstSeenAt: true, lastSeenAt: true } });
+    return { limit: MAX_STAFF_DEVICES, locked: user.status === 'LOCKED' && Boolean(user.deviceLockedAt), lockedAt: user.deviceLockedAt, lockDetail: user.deviceLockDetail, devices };
+  }
+
+  // Forgets every registered device and signs the person out, so their next two logins register again (for a new or replaced phone).
+  async resetDevices(id: string, actor: SessionUser, ipAddress?: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true, name: true } });
+    if (!user) throw new NotFoundException('Staff member not found.');
+    // A device lock is lifted by the reset too, since starting over is exactly what a replaced phone needs.
+    const [removed, , reactivated] = await this.prisma.$transaction([
+      this.prisma.staffDevice.deleteMany({ where: { userId: id } }),
+      this.prisma.session.deleteMany({ where: { userId: id } }),
+      this.prisma.user.updateMany({ where: { id, status: 'LOCKED', deviceLockedAt: { not: null } }, data: { status: 'ACTIVE', deviceLockedAt: null, deviceLockDetail: null } }),
+    ]);
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'DEVICES_RESET', entity: 'USER', entityId: id, details: { removed: removed.count, reactivated: reactivated.count > 0 }, ipAddress });
+    return { removed: removed.count, reactivated: reactivated.count > 0 };
+  }
+
   async update(id: string, dto: UpdateUserDto, actor: SessionUser, ipAddress?: string) {
     const existing = await this.prisma.user.findUnique({ where: { id }, include: { roles: { include: { role: true } }, staffProfile: true } });
     if (!existing || existing.roles.some(({ role }) => role.key === 'SUPER_ADMIN')) throw new NotFoundException('Staff member not found.');
@@ -219,7 +246,7 @@ export class UsersService {
       }
       const updated = await tx.user.update({
         where: { id },
-        data: { name: dto.name?.trim(), email, status: dto.status, department: config.department, dataScope: config.dataScope, managerId, assignedDistributorId },
+        data: { name: dto.name?.trim(), email, status: dto.status, ...(dto.status === 'ACTIVE' ? { deviceLockedAt: null, deviceLockDetail: null } : {}), department: config.department, dataScope: config.dataScope, managerId, assignedDistributorId },
         include: { manager: { select: { id: true, name: true } }, assignedDistributor: { select: { id: true, businessName: true } }, roles: { include: { role: true } }, staffProfile: true },
       });
       if (dto.status && dto.status !== 'ACTIVE') await tx.session.deleteMany({ where: { userId: id } });

@@ -84,3 +84,39 @@ describe('TeamActivityService own day', () => {
     await expect(service.myDay(admin, '2026-10-17')).rejects.toThrow('sales staff only');
   });
 });
+
+describe('TeamActivityService area manager team view', () => {
+  const manager = { id: 'asm-1', portal: 'STAFF', roles: [{ key: 'SALES_MANAGER' }] } as never;
+
+  it('is for area sales managers only', async () => {
+    const { service } = build();
+    await expect(service.myTeam(staffUser)).rejects.toThrow('Area Sales Managers');
+    await expect(service.myTeam(admin)).rejects.toThrow('Area Sales Managers');
+    await expect(service.myTeamDay(staffUser, 's1', '2026-10-17')).rejects.toThrow('Area Sales Managers');
+    await expect(service.myTeamCallPhoto(staffUser, 'c1')).rejects.toThrow('Area Sales Managers');
+  });
+
+  it('shows only the people who report to the manager, with confirmed sales against their target', async () => {
+    const { service, prisma } = build();
+    Object.assign(prisma, {
+      user: { findMany: vi.fn().mockResolvedValue([people[0], people[1]]) },
+      order: { groupBy: vi.fn().mockResolvedValue([{ salespersonId: 's1', _sum: { totalAmount: 60000 }, _count: 3 }]) },
+      annualTargetPlan: { findMany: vi.fn().mockResolvedValue([{ id: 'plan-1', staffId: 's1' }]) },
+      target: { findMany: vi.fn().mockResolvedValue([{ annualPlanId: 'plan-1', targetValue: 100000 }]) },
+    });
+    const team = await service.myTeam(manager);
+    expect(prisma.user.findMany.mock.calls[0]![0].where).toMatchObject({ managerId: 'asm-1', status: 'ACTIVE' });
+    expect(prisma.order.groupBy.mock.calls[0]![0].where).toHaveProperty('paymentVerifiedAt');
+    expect(team.items.find((item) => item.staffId === 's1')).toMatchObject({ sales: 60000, orders: 3, target: 100000, percent: 60, status: 'PRESENT' });
+    expect(team.items.find((item) => item.staffId === 's2')).toMatchObject({ sales: 0, target: null, percent: null });
+    expect(team.totals).toMatchObject({ members: 2, sales: 60000, target: 100000, working: 2 });
+  });
+
+  it('refuses to open someone else’s day or calendar', async () => {
+    const { service, prisma } = build();
+    Object.assign(prisma, { user: { ...prisma.user, findFirst: vi.fn().mockResolvedValue(null) } });
+    await expect(service.myTeamDay(manager, 's9', '2026-10-17')).rejects.toThrow('not in your team');
+    await expect(service.myTeamMonth(manager, 's9', 10, 2026)).rejects.toThrow('not in your team');
+    expect(prisma.user.findFirst.mock.calls[0]![0].where).toMatchObject({ id: 's9', managerId: 'asm-1' });
+  });
+});

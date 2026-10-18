@@ -65,7 +65,7 @@ await prisma.rolePermission.upsert({
 });
 
 const staffRoles = [
-  ['SALES_MANAGER', 'Sales Manager', 'staff.sales.access', 10],
+  ['SALES_MANAGER', 'Area Sales Manager', 'staff.sales.access', 10],
   ['SALES_EXECUTIVE', 'Sales Executive', 'staff.sales.access', 11],
   ['ACCOUNTS_BILLING', 'Accounts & Billing', 'staff.accounts.access', 20],
   ['WAREHOUSE', 'Warehouse', 'staff.warehouse.access', 30],

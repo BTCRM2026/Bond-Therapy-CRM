@@ -7,6 +7,7 @@ const ENABLED = new Set([
   "/dashboard/clients",
   "/dashboard/daily-report",
   "/dashboard/order-form",
+  "/dashboard/my-team",
   "/dashboard/requests",
   "/dashboard/leave",
   "/dashboard/attendance",

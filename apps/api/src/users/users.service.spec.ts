@@ -83,3 +83,20 @@ describe('UsersService administrator password updates', () => {
     expect(prisma.auditLog.create).toHaveBeenCalledOnce();
   });
 });
+
+describe('UsersService device reset', () => {
+  it('forgets the devices, signs the person out and lifts a device lock', async () => {
+    const prisma = {
+      user: { findUnique: vi.fn().mockResolvedValue({ id: 'u1', name: 'Ali' }), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      staffDevice: { deleteMany: vi.fn().mockResolvedValue({ count: 2 }) },
+      session: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      auditLog: { create: vi.fn() },
+      $transaction: vi.fn(async (operations: Array<Promise<unknown>>) => Promise.all(operations)),
+    };
+    const service = new UsersService(prisma as never);
+    const result = await service.resetDevices('u1', { id: 'admin-1' } as never);
+    expect(result).toEqual({ removed: 2, reactivated: true });
+    expect(prisma.user.updateMany.mock.calls[0]![0]).toMatchObject({ where: { id: 'u1', status: 'LOCKED', deviceLockedAt: { not: null } }, data: { status: 'ACTIVE', deviceLockedAt: null } });
+    expect(prisma.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } });
+  });
+});

@@ -15,13 +15,25 @@ function loginUrl(request: Request, portal: PortalType) {
   return `${protocol}://${targetHostname}${port}/login`;
 }
 
+// The API only sees this web server, so the visitor's address, browser and device token are passed along explicitly.
+function visitorHeaders(request: Request) {
+  const headers: Record<string, string> = {};
+  const address = (request.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || request.headers.get("x-real-ip")?.trim();
+  if (address) headers["x-client-ip"] = address;
+  const agent = request.headers.get("user-agent");
+  if (agent) headers["user-agent"] = agent;
+  const device = (request.headers.get("cookie") ?? "").split(";").map((part) => part.trim()).find((part) => part.startsWith("bt_device="))?.slice("bt_device=".length);
+  if (device) headers["x-bt-device"] = decodeURIComponent(device);
+  return headers;
+}
+
 export async function POST(request: Request) {
   try {
     const portal = portalFromRequest(request);
     if (!portal) return NextResponse.json({ message: "Unknown portal." }, { status: 400 });
     const upstream = await fetch(`${process.env.API_INTERNAL_URL ?? "http://localhost:3001"}/auth/login`, {
       method: "POST",
-      headers: { "content-type": "application/json", [PORTAL_HEADER]: portal },
+      headers: { "content-type": "application/json", [PORTAL_HEADER]: portal, ...visitorHeaders(request) },
       body: await request.text(),
       cache: "no-store",
     });
@@ -36,8 +48,8 @@ export async function POST(request: Request) {
       status: upstream.status,
       headers: { "content-type": upstream.headers.get("content-type") ?? "application/json" },
     });
-    const cookie = upstream.headers.get("set-cookie");
-    if (cookie) response.headers.set("set-cookie", cookie);
+    // Both the session cookie and (for staff) the device cookie must reach the browser, so each is added on its own.
+    for (const cookie of upstream.headers.getSetCookie()) response.headers.append("set-cookie", cookie);
     return response;
   } catch {
     return NextResponse.json({ message: "The login service is temporarily unavailable." }, { status: 503 });

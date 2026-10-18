@@ -10,7 +10,7 @@ const base = { workingTown: 'Vadodara', tomorrowTown: 'Surat', tomorrowClientIds
 function build(visits: unknown[] = [visit]) {
   const prisma = {
     staffProfile: { findUnique: vi.fn().mockResolvedValue({ workLocation: 'Vadodara' }) },
-    client: { findMany: vi.fn().mockResolvedValue([]) },
+    client: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockImplementation(async ({ data }: { data: { salonName: string } }) => ({ id: `client-${data.salonName}` })) },
     territoryAssignment: { findMany: vi.fn().mockResolvedValue([]) },
     user: { findMany: vi.fn().mockResolvedValue([]) },
     clientActivity: { findMany: vi.fn().mockResolvedValue(visits) },
@@ -25,7 +25,7 @@ function build(visits: unknown[] = [visit]) {
   };
   prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma));
   const captures = { consume: vi.fn().mockResolvedValue(undefined) };
-  return { service: new DailyReportsService(prisma as unknown as PrismaService, captures as never, { gate: vi.fn().mockResolvedValue({ blocked: false }) } as never), prisma, captures };
+  return { service: new DailyReportsService(prisma as unknown as PrismaService, captures as never, { gate: vi.fn().mockResolvedValue({ blocked: false }), strictFrom: vi.fn().mockResolvedValue(null) } as never), prisma, captures };
 }
 
 describe('DailyReportsService visit-based reports', () => {
@@ -54,6 +54,10 @@ describe('DailyReportsService visit-based reports', () => {
     const upsert = prisma.dailySalesReport.upsert.mock.calls[0]![0];
     expect(upsert.create.tomorrowExtraStops).toEqual(['Royal Hair Studio', 'Glam Zone']);
     expect(prisma.route.create.mock.calls[0]![0].data.notes).toContain('Royal Hair Studio, Glam Zone');
+    // each typed salon becomes a prospect client and a stop on tomorrow's route
+    expect(prisma.client.create).toHaveBeenCalledTimes(2);
+    expect(prisma.client.create.mock.calls[0]![0].data).toMatchObject({ salonName: 'Royal Hair Studio', city: 'Surat', status: 'PROSPECT', assignedSalespersonId: 'staff-1', createdById: 'staff-1' });
+    expect(prisma.routeStop.createMany.mock.calls[0]![0].data).toHaveLength(2);
     await expect(build().service.save(actor, { ...base } as never, [])).rejects.toThrow('at least one salon');
   });
 });
@@ -71,6 +75,33 @@ describe('DailyReportsService day rules', () => {
     await expect(open.service.save(actor, { ...base, tomorrowNewSalons: ['A Salon'] } as never, [])).rejects.toThrow('Check out of Glow Studio');
     const other = { ...visit, id: 'visit-2', client: { salonName: 'Royal Studio', city: 'Vadodara' } };
     await expect(build([visit, other]).service.save(actor, { ...base, tomorrowNewSalons: ['A Salon'] } as never, [])).rejects.toThrow('Add Royal Studio');
+  });
+});
+
+describe('DailyReportsService empty days', () => {
+  const noCalls = { workingTown: 'Vadodara', tomorrowTown: 'Surat', tomorrowClientIds: [] as string[], calls: [], tomorrowNewSalons: ['Royal Hair Studio'] };
+
+  it('lets a day with no calls be submitted before the strict rules start, so tomorrow can be planned', async () => {
+    const { service, prisma } = build([]);
+    await service.save(actor, noCalls as never, []);
+    expect(prisma.dailySalesReport.upsert.mock.calls[0]![0].create.noOrderReason).toBe('No calls recorded today');
+    expect(prisma.routeStop.createMany.mock.calls[0]![0].data).toHaveLength(1);
+  });
+
+  it('asks for a verified visit once the strict rules have started', async () => {
+    const strict = build([]);
+    (strict.service as unknown as { dayRules: { strictFrom: unknown } }).dayRules.strictFrom = vi.fn().mockResolvedValue(new Date('2020-01-01T00:00:00.000Z'));
+    await expect(strict.service.save(actor, noCalls as never, [])).rejects.toThrow('no verified visits');
+  });
+});
+
+describe('DailyReportsService typed salons', () => {
+  it('reuses a client the salesperson already has instead of creating a second one', async () => {
+    const { service, prisma } = build();
+    prisma.client.findMany.mockResolvedValue([{ id: 'c-glow', salonName: 'Glow Studio', city: 'Surat', area: null }]);
+    await service.save(actor, { ...base, tomorrowClientIds: [], tomorrowNewSalons: ['  glow studio '] } as never, []);
+    expect(prisma.client.create).not.toHaveBeenCalled();
+    expect(prisma.routeStop.createMany.mock.calls[0]![0].data).toEqual([{ routeId: 'route-1', clientId: 'c-glow', sequence: 0 }]);
   });
 });
 

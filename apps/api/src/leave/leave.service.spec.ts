@@ -67,14 +67,14 @@ describe('LeaveService requests and approval', () => {
     expect(result).toMatchObject({ status: 'APPROVED', paidDays: 1, unpaidDays: 2 });
   });
 
-  it('stores no split on rejection, blocks double review and other managers’ teams', async () => {
+  it('stores no split on rejection, blocks double review, and area managers cannot approve leave at all', async () => {
     const pending = { id: 'l1', userId: 'u1', status: 'PENDING', startDate: day('2026-10-05'), endDate: day('2026-10-07'), user: { id: 'u1', name: 'Ali', managerId: 'm1' } };
     const rejected = build({ pendingRow: pending });
     await rejected.service.review(admin, 'l1', { status: 'REJECTED', reviewNote: 'Busy week' });
     expect(rejected.prisma.leaveRequest.update.mock.calls[0]![0].data).not.toHaveProperty('paidDays');
     await expect(build({ pendingRow: { ...pending, status: 'APPROVED' } }).service.review(admin, 'l1', { status: 'APPROVED' })).rejects.toThrow('already been reviewed');
     const otherManager = { id: 'm2', name: 'M', portal: 'STAFF', roles: [{ key: 'SALES_MANAGER' }] } as never;
-    await expect(build({ pendingRow: pending }).service.review(otherManager, 'l1', { status: 'APPROVED' })).rejects.toThrow('own team');
+    await expect(build({ pendingRow: pending }).service.review(otherManager, 'l1', { status: 'APPROVED' })).rejects.toThrow('restricted to administrators');
     await expect(build({ pendingRow: pending }).service.review(staff, 'l1', { status: 'APPROVED' })).rejects.toThrow('restricted');
   });
 });

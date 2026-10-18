@@ -32,16 +32,12 @@ export class LeaveService {
     return actor.portal === 'ADMIN' && actor.roles.some((role) => role.key === 'SUPER_ADMIN');
   }
 
-  private isManager(actor: SessionUser) {
-    return actor.portal === 'STAFF' && actor.roles.some((role) => role.key === 'SALES_MANAGER');
-  }
-
   private ensureStaff(actor: SessionUser) {
     if (actor.portal !== 'STAFF') throw new ForbiddenException('Leave is applied for from the staff portal.');
   }
 
   private ensureReviewer(actor: SessionUser) {
-    if (!this.isAdmin(actor) && !this.isManager(actor)) throw new ForbiddenException('Reviewing leave is restricted to administrators and sales managers.');
+    if (!this.isAdmin(actor)) throw new ForbiddenException('Reviewing leave is restricted to administrators.');
   }
 
   private today() {
@@ -188,8 +184,7 @@ export class LeaveService {
   // Paged on the server. Counts cover the whole queue so the status chips stay accurate.
   async listForReview(actor: SessionUser, query: LeavePageDto & { status?: LeaveStatus }) {
     this.ensureReviewer(actor);
-    const scope: Prisma.LeaveRequestWhereInput = this.isAdmin(actor) ? {} : { user: { managerId: actor.id } };
-    const where: Prisma.LeaveRequestWhereInput = { ...scope, ...(query.status ? { status: query.status } : {}) };
+    const where: Prisma.LeaveRequestWhereInput = query.status ? { status: query.status } : {};
     const [rows, total, grouped] = await Promise.all([
       this.prisma.leaveRequest.findMany({
         where,
@@ -200,7 +195,7 @@ export class LeaveService {
         take: query.pageSize,
       }),
       this.prisma.leaveRequest.count({ where }),
-      this.prisma.leaveRequest.groupBy({ by: ['status'], where: scope, _count: { _all: true } }),
+      this.prisma.leaveRequest.groupBy({ by: ['status'], where: {}, _count: { _all: true } }),
     ]);
     const items = await Promise.all(rows.map((row) => this.present(row)));
     const count = (status: LeaveStatus) => grouped.find((row) => row.status === status)?._count._all ?? 0;
@@ -214,7 +209,6 @@ export class LeaveService {
       const request = await tx.leaveRequest.findUnique({ where: { id }, include: { user: { select: { id: true, name: true, managerId: true } } } });
       if (!request) throw new NotFoundException('Leave request not found.');
       if (request.status !== 'PENDING') throw new BadRequestException('This request has already been reviewed.');
-      if (!this.isAdmin(actor) && request.user.managerId !== actor.id) throw new ForbiddenException('You can only review requests for your own team.');
       // The paid/unpaid split is decided now, against what has already been approved this month.
       const split = dto.status === 'APPROVED' ? await this.split(tx, request.userId, request.startDate, request.endDate, request.id) : null;
       return tx.leaveRequest.update({

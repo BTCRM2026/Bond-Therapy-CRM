@@ -37,6 +37,7 @@ function staffGroups(roleKey?: string) {
   const planning = isSales ? [
     { href: "/dashboard/territory", label: "Territory", icon: MapPin, exact: false },
     { href: "/dashboard/route", label: "My Route", icon: Navigation, exact: false },
+    ...(roleKey === "SALES_MANAGER" ? [{ href: "/dashboard/my-team", label: "My Team", icon: UsersRound, exact: false }] : []),
     { href: "/dashboard/performance", label: "Performance", icon: TrendingUp, exact: false },
     { href: "/dashboard/incentives", label: "Incentives", icon: IndianRupee, exact: false },
     { href: "/dashboard/my-performance", label: "My Performance", icon: Award, exact: false },

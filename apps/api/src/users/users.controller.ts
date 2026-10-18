@@ -33,6 +33,16 @@ export class UsersController {
     return this.users.update(id, dto, actor, req.ip);
   }
 
+  @Get(':id/devices')
+  devices(@Param('id') id: string) {
+    return this.users.devices(id);
+  }
+
+  @Post(':id/devices/reset')
+  resetDevices(@Param('id') id: string, @CurrentUser() actor: SessionUser, @Req() req: Request) {
+    return this.users.resetDevices(id, actor, req.ip);
+  }
+
   @Post(':id/password')
   updatePassword(@Param('id') id: string, @Body() dto: UpdateStaffPasswordDto, @CurrentUser() actor: SessionUser, @Req() req: Request) {
     return this.users.updatePassword(id, dto, actor, req.ip);

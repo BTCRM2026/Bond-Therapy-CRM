@@ -24,7 +24,7 @@ type ReportData = {
   report: SavedReport | null;
   recent: SavedReport[];
   performance: { monthNewCalls: number; monthlyTarget: number | null };
-  rules: { fullDayCalls: number; halfDayCalls: number; deadlineAt: string; locked: boolean };
+  rules: { fullDayCalls: number; halfDayCalls: number; deadlineAt: string; locked: boolean; startsOn: string | null };
   gate: { blocked: boolean; approved: boolean; requiredDate: string | null; message: string | null };
 };
 type CallRow = { key: string; existingCallId?: string; customerName: string; customerType: CallType; result: CallResult; orderValue: string; remark: string; photo: File | null; captureToken?: string; photoUrl?: string };
@@ -100,6 +100,8 @@ export function DailyReportModule() {
   const tomorrowClients = (data?.clients ?? []).filter((client) => client.city === tomorrowTown && (!clientSearch.trim() || `${client.salonName} ${client.area ?? ""}`.toLowerCase().includes(clientSearch.toLowerCase())));
   const hasOrder = summary.productiveCalls > 0;
   const locked = Boolean(data?.report);
+  // Before the strict rules start, a day with no calls can still be submitted so tomorrow's route can be planned.
+  const rulesActive = Boolean(data?.rules.startsOn && data.date >= data.rules.startsOn);
   const openVisits = visits.filter((visit) => !visit.checkOutAt);
 
   const updateCall = (index: number, patch: Partial<CallRow>) => setCalls((current) => current.map((call, callIndex) => callIndex === index ? { ...call, ...patch } : call));
@@ -118,12 +120,12 @@ export function DailyReportModule() {
     if (locked) return setError("Today’s report is already submitted and locked.");
     if (openVisits.length) return setError(`Check out of ${openVisits.map((visit) => visit.salonName).join(", ")} from My Route before submitting.`);
     if (!workingTown) return setError("Select today’s working town.");
-    if (!visits.length && !calls.length) return setError("You have no salon visits yet. Check in at a salon from My Route, or add a call below.");
+    if (!visits.length && !calls.length && rulesActive) return setError("You have no salon visits yet. Check in at a salon from My Route, or add a call below.");
     const badVisit = visitList.findIndex(({ input }) => input.result === "ORDER" && Number(input.orderValue) <= 0);
     if (badVisit >= 0) return setError(`Enter the order value for ${visitList[badVisit]!.visit.salonName}.`);
     const incomplete = calls.findIndex((call) => call.customerName.trim().length < 2 || (!call.photo && !call.photoUrl) || (call.result === "ORDER" && Number(call.orderValue) <= 0));
     if (incomplete >= 0) return setError(`Complete the name, result, order value and photo for extra call ${incomplete + 1}.`);
-    if (!hasOrder && !noOrderReason.trim()) return setError("Tell us why no order was received today.");
+    if (summary.totalCalls > 0 && !hasOrder && !noOrderReason.trim()) return setError("Tell us why no order was received today.");
     if (!tomorrowTown || (!tomorrowClientIds.length && !tomorrowNewSalons.length)) return setError("Select tomorrow’s town and at least one salon to visit.");
     setSaving(true);
     try {
@@ -183,7 +185,7 @@ export function DailyReportModule() {
         <SummaryCell label="Today’s value" value={money(summary.totalValue)} detail="Order value" />
         <SummaryCell label="New calls target" value={data.performance.monthlyTarget == null ? monthNewCalls : `${monthNewCalls} / ${data.performance.monthlyTarget}`} detail="This month" />
       </div>
-      {!hasOrder && <div className="border-t bg-warning-soft/45 p-4 sm:p-5"><label className="block space-y-1.5"><span className="text-xs font-semibold text-foreground">Reason for no orders <b className="text-danger">*</b></span><Input value={noOrderReason} onChange={(event) => setNoOrderReason(event.target.value)} maxLength={500} placeholder="Briefly explain the main reason" required /></label></div>}
+      {!hasOrder && summary.totalCalls > 0 && <div className="border-t bg-warning-soft/45 p-4 sm:p-5"><label className="block space-y-1.5"><span className="text-xs font-semibold text-foreground">Reason for no orders <b className="text-danger">*</b></span><Input value={noOrderReason} onChange={(event) => setNoOrderReason(event.target.value)} maxLength={500} placeholder="Briefly explain the main reason" required /></label></div>}
     </section>
 
     <section className="crm-surface overflow-hidden">
@@ -193,14 +195,15 @@ export function DailyReportModule() {
           <label className="space-y-1.5"><span className="text-xs font-medium">Town <b className="text-danger">*</b></span><select className={control} value={tomorrowTown} onChange={(event) => { setTomorrowTown(event.target.value); setTomorrowClientIds([]); setClientSearch(""); }} required><option value="">Select town</option>{data.towns.map((town) => <option key={town}>{town}</option>)}</select></label>
           <div className="mt-4 rounded-lg bg-background p-3 text-xs text-muted"><MapPin size={15} className="mb-2 text-brand" /><strong className="text-foreground">{tomorrowClientIds.length + tomorrowNewSalons.length} salon{tomorrowClientIds.length + tomorrowNewSalons.length === 1 ? "" : "s"}</strong> planned for tomorrow.</div>
         </div>
-        <div className="p-4 sm:p-5">
-          <div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" /><Input value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} className="pl-9" placeholder="Search salons in selected town" disabled={!tomorrowTown} /></div>
-          <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+        <div className="flex flex-col p-4 sm:p-5">
+          <p className="order-1 mb-2 text-xs font-semibold text-foreground">Salons with a client profile</p>
+          <div className="relative order-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" /><Input value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} className="pl-9" placeholder="Search salons in selected town" disabled={!tomorrowTown} /></div>
+          <div className="order-1 mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
             {!tomorrowTown ? <EmptyPlan text="Select a town to see assigned salons." /> : tomorrowClients.length ? tomorrowClients.map((client) => <label key={client.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${tomorrowClientIds.includes(client.id) ? "border-brand/30 bg-brand-soft/45" : "hover:bg-background"}`}><input type="checkbox" checked={tomorrowClientIds.includes(client.id)} onChange={() => toggleClient(client.id)} className="size-4 shrink-0 accent-[var(--brand)]" /><span className="min-w-0"><span className="block truncate text-sm font-medium text-foreground">{client.salonName}</span><span className="block truncate text-xs text-muted">{client.area || client.city}</span></span></label>) : <EmptyPlan text="No assigned salons match this town or search." />}
           </div>
-          <div className="mt-4 rounded-lg border border-dashed bg-background p-3">
-            <p className="flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground">Salon without a client profile yet<span className="rounded-full bg-warning-soft px-2 py-0.5 text-[10px] font-semibold text-warning">Temporary</span></p>
-            <p className="mt-1 text-[11px] leading-4 text-muted">Type the salon name to plan it. When you reach it, create its client profile so its GPS location is saved for future visits.</p>
+          <div className="order-first mb-5 rounded-lg border border-brand/25 bg-brand-soft/40 p-3">
+            <p className="flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground">Add a salon by name<span className="rounded-full bg-warning-soft px-2 py-0.5 text-[10px] font-semibold text-warning">For now</span></p>
+            <p className="mt-1 text-[11px] leading-4 text-muted">No client profile needed yet. Type each salon you will visit tomorrow. It appears on My Route; when you reach it, save its location and complete its client profile there.</p>
             <div className="mt-2 flex gap-2"><Input value={newSalonInput} onChange={(event) => setNewSalonInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addNewSalon(); } }} maxLength={120} placeholder="Salon name" /><Button type="button" variant="secondary" onClick={addNewSalon} disabled={newSalonInput.trim().length < 2}>Add</Button></div>
             {tomorrowNewSalons.length > 0 && <ul className="mt-2.5 flex flex-wrap gap-1.5">{tomorrowNewSalons.map((name) => <li key={name} className="inline-flex items-center gap-1 rounded-full border bg-white py-1 pl-2.5 pr-1 text-xs text-foreground">{name}<button type="button" onClick={() => setTomorrowNewSalons((current) => current.filter((item) => item !== name))} className="grid size-5 place-items-center rounded-full text-muted hover:bg-red-50 hover:text-danger" aria-label={`Remove ${name}`}><Trash2 size={11} /></button></li>)}</ul>}
           </div>
@@ -226,7 +229,9 @@ function DayRulesCard({ data, verified, openVisits, now }: { data: ReportData; v
   const percent = Math.min(100, Math.round((verified / fullDayCalls) * 100));
   return <section className="crm-surface overflow-hidden" aria-label="Today's rules">
     {data.gate.blocked && <div role="alert" className="flex items-start gap-2.5 border-b border-danger/20 bg-red-50 px-4 py-3 text-xs text-danger sm:px-5"><TriangleAlert size={15} className="mt-0.5 shrink-0" /><p>{data.gate.message}</p></div>}
-    {locked
+    {!locked && data.rules.startsOn && data.date < data.rules.startsOn
+      ? <div className="flex items-start gap-3 px-4 py-4 sm:px-5"><Clock3 size={16} className="mt-0.5 shrink-0 text-brand" /><div><p className="text-sm font-semibold text-foreground">Strict day rules start on {new Date(`${data.rules.startsOn}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long" })}</p><p className="mt-0.5 text-xs leading-5 text-muted">Until then your attendance counts as before, while client profiles are being built. From that day, {fullDayCalls} GPS-verified calls make a full day and {halfDayCalls} a half day, and this report with tomorrow’s plan is due by 11 PM.</p></div></div>
+      : locked
       ? <div className="flex items-start gap-3 bg-success-soft/50 px-4 py-4 sm:px-5"><Lock size={16} className="mt-0.5 shrink-0 text-success" /><div><p className="text-sm font-semibold text-foreground">Day submitted and locked</p><p className="mt-0.5 text-xs text-muted">{data.report?.submittedAt ? `Submitted at ${clock(data.report.submittedAt)}. ` : ""}Tomorrow’s route is ready in My Route.</p></div></div>
       : <div className="grid gap-4 p-4 sm:grid-cols-[1.2fr_1fr] sm:p-5">
         <div>

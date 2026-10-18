@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { DataScope, Department, PortalType, StaffProfile } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
+import { describeDevice, hashDeviceToken, isDeviceToken, MAX_STAFF_DEVICES } from './device-rules.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LoginDto } from './login.dto.js';
 import { hashPassword, verifyPassword } from './password.js';
@@ -13,7 +14,7 @@ const REMEMBER_DAYS = 30;
 const MAX_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
 
-type RequestMeta = { ipAddress?: string; userAgent?: string };
+type RequestMeta = { ipAddress?: string; userAgent?: string; deviceToken?: string };
 
 type AuthUser = {
   id: string;
@@ -83,6 +84,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid login ID or password.');
     }
     if (user.status !== 'ACTIVE' || (user.lockedUntil && user.lockedUntil > new Date())) {
+      if (user.status === 'LOCKED' && user.deviceLockedAt && await verifyPassword(dto.password, user.passwordHash)) throw new UnauthorizedException('This account was locked because it was used from a third device. Please ask your administrator to reactivate it.');
       throw new UnauthorizedException('This account is temporarily unavailable.');
     }
 
@@ -108,6 +110,9 @@ export class AuthService {
       throw new UnauthorizedException({ message: 'Redirecting you to your assigned portal.', assignedPortal });
     }
 
+    // Staff accounts work from two devices only; the third attempt locks the account.
+    const deviceToken = portal === 'STAFF' ? await this.checkStaffDevice(user, meta) : undefined;
+
     const token = randomBytes(32).toString('base64url');
     const maxAgeMs = dto.remember ? REMEMBER_DAYS * 86_400_000 : SESSION_HOURS * 3_600_000;
     await this.prisma.$transaction([
@@ -124,7 +129,35 @@ export class AuthService {
       }),
       this.prisma.auditLog.create({ data: { actorId: user.id, action: 'LOGIN', entity: 'SESSION', ipAddress: meta.ipAddress, details: { portal } } }),
     ]);
-    return { token, maxAgeMs, user: publicUser };
+    return { token, maxAgeMs, user: publicUser, deviceToken };
+  }
+
+  // Known device: allowed. New device while fewer than two are registered: it is registered. A third device: the account is locked.
+  // Returns a new device token only when one must be stored in the browser.
+  private async checkStaffDevice(user: { id: string; name: string; loginId: string }, meta: RequestMeta) {
+    const presented = isDeviceToken(meta.deviceToken) ? meta.deviceToken : undefined;
+    const devices = await this.prisma.staffDevice.findMany({ where: { userId: user.id } });
+    const known = presented ? devices.find((device) => device.tokenHash === hashDeviceToken(presented)) : undefined;
+    const label = describeDevice(meta.userAgent);
+    if (known) {
+      await this.prisma.staffDevice.update({ where: { id: known.id }, data: { lastSeenAt: new Date(), lastIp: meta.ipAddress ?? known.lastIp, label } });
+      return undefined;
+    }
+    if (devices.length < MAX_STAFF_DEVICES) {
+      const token = presented ?? randomBytes(32).toString('base64url');
+      await this.prisma.$transaction([
+        this.prisma.staffDevice.create({ data: { userId: user.id, tokenHash: hashDeviceToken(token), label, firstIp: meta.ipAddress, lastIp: meta.ipAddress } }),
+        this.prisma.auditLog.create({ data: { actorId: user.id, action: 'DEVICE_REGISTERED', entity: 'USER', entityId: user.id, ipAddress: meta.ipAddress, details: { label, devices: devices.length + 1 } } }),
+      ]);
+      return presented ? undefined : token;
+    }
+    const detail = `${label} from ${meta.ipAddress ?? 'an unknown address'}`;
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: user.id }, data: { status: 'LOCKED', deviceLockedAt: new Date(), deviceLockDetail: detail } }),
+      this.prisma.session.deleteMany({ where: { userId: user.id } }),
+      this.prisma.auditLog.create({ data: { actorId: user.id, action: 'DEVICE_LIMIT_LOCK', entity: 'USER', entityId: user.id, ipAddress: meta.ipAddress, details: { attempted: detail, allowedDevices: devices.map((device) => device.label) } } }),
+    ]);
+    throw new ForbiddenException('This account was locked because it was used from a third device. Please ask your administrator to reactivate it.');
   }
 
   async session(portal: PortalType, token?: string) {

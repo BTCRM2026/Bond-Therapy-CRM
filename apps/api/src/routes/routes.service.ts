@@ -16,7 +16,7 @@ export const MAX_GPS_ACCURACY_METERS = 100;
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const stopInclude = {
-  client: { select: { id: true, salonName: true, city: true, area: true, primaryContact: true, potential: true, latitude: true, longitude: true } },
+  client: { select: { id: true, salonName: true, city: true, area: true, primaryContact: true, potential: true, latitude: true, longitude: true, status: true } },
   activity: { include: { visitProof: { select: { distanceMeters: true, gpsVerified: true, capturedAt: true } } } },
 } satisfies Prisma.RouteStopInclude;
 const routeInclude = { stops: { orderBy: { sequence: 'asc' }, include: stopInclude } } satisfies Prisma.RouteInclude;

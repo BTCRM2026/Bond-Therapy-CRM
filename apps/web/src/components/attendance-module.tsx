@@ -15,7 +15,7 @@ import { Modal } from "@/components/ui/modal";
 import { SuccessToast } from "@/components/ui/toast";
 
 type DayStatus = "PRESENT" | "LATE" | "HALF_DAY" | "ABSENT" | "LEAVE" | "HOLIDAY" | "WEEKLY_OFF" | "NOT_PUNCHED" | "IN_PROGRESS";
-type TodayRecord = { punchInAt: string | null; punchOutAt: string | null; punchInVerified: boolean | null; punchOutVerified: boolean | null; officeCheckedIn: boolean; officeCheckedOut: boolean; visitCount: number; halfDayThresholdHours: number; status: DayStatus; workingHours: number | null; isLate: boolean; isEarlyCheckout: boolean; rulesApplied?: boolean; verifiedCalls?: number; fullDayCalls?: number; halfDayCalls?: number; reportSubmitted?: boolean; reportDeadlineAt?: string; dayNote?: string | null; gate?: { blocked: boolean; approved: boolean; requiredDate: string | null; message: string | null } };
+type TodayRecord = { punchInAt: string | null; punchOutAt: string | null; punchInVerified: boolean | null; punchOutVerified: boolean | null; officeCheckedIn: boolean; officeCheckedOut: boolean; visitCount: number; halfDayThresholdHours: number; status: DayStatus; workingHours: number | null; isLate: boolean; isEarlyCheckout: boolean; rulesApplied?: boolean; rulesStartOn?: string | null; verifiedCalls?: number; fullDayCalls?: number; halfDayCalls?: number; reportSubmitted?: boolean; reportDeadlineAt?: string; dayNote?: string | null; gate?: { blocked: boolean; approved: boolean; requiredDate: string | null; message: string | null } };
 type MonthlyRecord = { date: string; punchInAt: string | null; punchOutAt: string | null; status: DayStatus; workingHours: number | null; isLate: boolean; isEarlyCheckout: boolean };
 type Monthly = { period: { month: number; year: number }; summary: { present: number; late: number; halfDay: number; absent: number; leave: number; holiday: number; weeklyOff: number; totalHours: number }; records: MonthlyRecord[] };
 type RequestItem = { id: string; status: "PENDING" | "APPROVED" | "REJECTED"; reason: string; date?: string; startDate?: string; endDate?: string };
@@ -116,7 +116,10 @@ export function AttendanceModule() {
                 {today.dayNote && <p className="mt-1 text-xs text-warning">{today.dayNote}</p>}
                 {!today.reportSubmitted && today.status !== "WEEKLY_OFF" && today.status !== "HOLIDAY" && today.status !== "LEAVE" && <p className="mt-1 text-xs text-muted">Submit your daily report and tomorrow’s plan by 11 PM, or today counts as a half day.</p>}
               </>
-              : today?.status === "HALF_DAY" && <p className="mt-1 text-xs text-warning">Counts as a half day until you have worked {today.halfDayThresholdHours} hours between your first and last activity.</p>}
+              : <>
+                {today?.status === "HALF_DAY" && <p className="mt-1 text-xs text-warning">Counts as a half day until you have worked {today.halfDayThresholdHours} hours between your first and last activity.</p>}
+                {today?.rulesStartOn && <p className="mt-1.5 text-xs text-muted">Call and report rules (8 verified calls for a full day, report by 11 PM) start on {new Date(`${today.rulesStartOn}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long" })}.</p>}
+              </>}
             {locationMessage && <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-4 text-muted"><MapPin size={13} className="mt-0.5 shrink-0" />{locationMessage}</p>}
           </div>
         </div>

@@ -22,7 +22,7 @@ type Calculation = { id: string; userId: string; user: { id: string; name: strin
 
 const money = (value: number) => `₹${value.toLocaleString("en-IN")}`;
 const messageFrom = (data: unknown, fallback: string) => data && typeof data === "object" && "message" in data ? String((data as { message: unknown }).message) : fallback;
-const ROLE_OPTIONS = [{ value: "SALES_EXECUTIVE", label: "Sales Executive" }, { value: "SALES_MANAGER", label: "Sales Manager" }];
+const ROLE_OPTIONS = [{ value: "SALES_EXECUTIVE", label: "Sales Executive" }, { value: "SALES_MANAGER", label: "Area Sales Manager" }];
 const STATUS_TONE: Record<CalcStatus, string> = { CALCULATED: "bg-background text-muted", PENDING_APPROVAL: "bg-warning-soft text-warning", APPROVED: "bg-brand-soft text-brand-dark", REJECTED: "bg-red-50 text-danger", PAID: "bg-success-soft text-success" };
 const STATUS_LABEL: Record<CalcStatus, string> = { CALCULATED: "Calculated", PENDING_APPROVAL: "Pending approval", APPROVED: "Approved", REJECTED: "Rejected", PAID: "Paid" };
 

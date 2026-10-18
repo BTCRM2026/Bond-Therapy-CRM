@@ -24,7 +24,7 @@ type Plan = { id: string; staffId: string; staffName: string | null; targetYear:
 type StaffRow = { staffId: string; name: string; roleKey: string | null; plan: Plan | null; currentMonthAchievement: { targetValue: number; actual: number; achievementPercent: number } | null };
 type StatusFilter = "ALL" | "ASSIGNED" | "UNASSIGNED";
 
-const ROLE_LABELS: Record<string, string> = { SALES_MANAGER: "Sales Manager", SALES_EXECUTIVE: "Sales Executive" };
+const ROLE_LABELS: Record<string, string> = { SALES_MANAGER: "Area Sales Manager", SALES_EXECUTIVE: "Sales Executive" };
 const BASIS_LABELS: Record<CalcBasis, string> = { TOTAL_ELIGIBLE_SALES: "Total sales made", SALES_ABOVE_TARGET: "Sales above the target only", TARGET_AMOUNT: "The target amount" };
 const BASIS_SHORT: Record<CalcBasis, string> = { TOTAL_ELIGIBLE_SALES: "of total sales", SALES_ABOVE_TARGET: "of sales above target", TARGET_AMOUNT: "of target" };
 const TYPE_INFO: Record<IncentiveType, { label: string; hint: string }> = {

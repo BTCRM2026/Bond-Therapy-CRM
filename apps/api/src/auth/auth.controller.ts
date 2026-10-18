@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './login.dto.js';
 import { parsePortal, PORTAL_HEADER, portalCookieName } from '../common/portal.js';
+import { DEVICE_COOKIE, DEVICE_COOKIE_MAX_AGE_MS } from './device-rules.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
@@ -15,7 +16,10 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto, @Headers(PORTAL_HEADER) portalHeader: string | undefined, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const portal = parsePortal(portalHeader);
-    const result = await this.auth.login(dto, { ipAddress: request.ip, userAgent: request.get('user-agent') }, portal);
+    // The web server forwards the visitor's address, browser and device token, since the API only sees the web server.
+    const forwardedIp = request.get('x-client-ip')?.trim();
+    const result = await this.auth.login(dto, { ipAddress: forwardedIp || request.ip, userAgent: request.get('user-agent'), deviceToken: request.get('x-bt-device') ?? undefined }, portal);
+    if (result.deviceToken) response.cookie(DEVICE_COOKIE, result.deviceToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: DEVICE_COOKIE_MAX_AGE_MS });
     response.cookie(portalCookieName(portal), result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
