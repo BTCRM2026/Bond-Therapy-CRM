@@ -3,6 +3,7 @@
 import { CalendarRange, ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CompactPagination } from "@/components/ui/compact-pagination";
 import { Field, FormError } from "@/components/ui/field";
 import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 import { Modal } from "@/components/ui/modal";
@@ -12,6 +13,7 @@ import { type LeaveItem, type LeaveStatus, PaySplit, STATUS_LABEL, StatusBadge, 
 
 type Report = { month: string; paidAllowance: number; rows: Array<{ userId: string; name: string; days: number; paid: number; unpaid: number; requests: number }>; totals: { staff: number; days: number; paid: number; unpaid: number } };
 type Filter = LeaveStatus | "ALL";
+type QueuePage = { items: LeaveItem[]; total: number; page: number; pageSize: number; hasMore: boolean; counts: Record<LeaveStatus, number> };
 
 const textarea = "w-full resize-y rounded-lg border bg-white px-3 py-2.5 text-base leading-5 outline-none transition placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/10 sm:text-[13px]";
 const currentMonth = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; };
@@ -20,7 +22,9 @@ const shiftMonth = (month: string, by: number) => { const [year, index] = month.
 export function LeaveAdmin() {
   const [tab, setTab] = useState<"requests" | "deductions">("requests");
   const [filter, setFilter] = useState<Filter>("PENDING");
-  const [items, setItems] = useState<LeaveItem[] | null>(null);
+  const [data, setData] = useState<QueuePage | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [month, setMonth] = useState(currentMonth);
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState("");
@@ -29,9 +33,9 @@ export function LeaveAdmin() {
   const [rejecting, setRejecting] = useState<LeaveItem | null>(null);
 
   const loadItems = useCallback(async () => {
-    try { setItems(await leaveApi<LeaveItem[]>("/requests")); setError(""); }
+    try { const next = await leaveApi<QueuePage>(`/requests?page=${page}&pageSize=${pageSize}${filter === "ALL" ? "" : `&status=${filter}`}`); if (!next.items.length && page > 1) { setPage(page - 1); return; } setData(next); setError(""); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load leave requests."); }
-  }, []);
+  }, [page, pageSize, filter]);
   const loadReport = useCallback(async () => {
     try { setReport(await leaveApi<Report>(`/report?month=${month}`)); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load the salary report."); }
@@ -39,8 +43,10 @@ export function LeaveAdmin() {
   useEffect(() => { (async () => { await loadItems(); })(); }, [loadItems]);
   useEffect(() => { (async () => { await loadReport(); })(); }, [loadReport]);
 
-  const counts = useMemo(() => ({ PENDING: items?.filter((i) => i.status === "PENDING").length ?? 0, APPROVED: items?.filter((i) => i.status === "APPROVED").length ?? 0, REJECTED: items?.filter((i) => i.status === "REJECTED").length ?? 0, ALL: items?.length ?? 0 }), [items]);
-  const visible = useMemo(() => (items ?? []).filter((item) => filter === "ALL" || item.status === filter).sort((a, b) => (a.status === "PENDING" ? 0 : 1) - (b.status === "PENDING" ? 0 : 1) || b.startDate.localeCompare(a.startDate)), [items, filter]);
+  const items = data?.items ?? null;
+  const counts = useMemo(() => ({ PENDING: data?.counts.PENDING ?? 0, APPROVED: data?.counts.APPROVED ?? 0, REJECTED: data?.counts.REJECTED ?? 0, ALL: data ? data.counts.PENDING + data.counts.APPROVED + data.counts.REJECTED : 0 }), [data]);
+  const visible = items ?? [];
+  const changeFilter = (next: Filter) => { setFilter(next); setPage(1); };
 
   const decide = async (item: LeaveItem, status: "APPROVED" | "REJECTED", reviewNote?: string) => {
     setBusyId(item.id); setError("");
@@ -60,7 +66,7 @@ export function LeaveAdmin() {
     {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
     <div className="space-y-4">
       <KpiStrip columns={4}>
-        <KpiCell label="Pending requests" value={items ? counts.PENDING : "–"} detail="Waiting for a decision" tone={counts.PENDING ? "warning" : "neutral"} active={tab === "requests" && filter === "PENDING"} onClick={() => { setTab("requests"); setFilter("PENDING"); }} />
+        <KpiCell label="Pending requests" value={items ? counts.PENDING : "–"} detail="Waiting for a decision" tone={counts.PENDING ? "warning" : "neutral"} active={tab === "requests" && filter === "PENDING"} onClick={() => { setTab("requests"); changeFilter("PENDING"); }} />
         <KpiCell label="Leave days" value={report ? report.totals.days : "–"} detail={monthLabel(month)} />
         <KpiCell label="Paid days" value={report ? report.totals.paid : "–"} detail={`${report?.paidAllowance ?? 1} paid per person each month`} tone="success" />
         <KpiCell label="Unpaid · deduct" value={report ? report.totals.unpaid : "–"} detail="From salary this month" tone={report && report.totals.unpaid > 0 ? "warning" : "neutral"} active={tab === "deductions"} onClick={() => setTab("deductions")} />
@@ -74,8 +80,9 @@ export function LeaveAdmin() {
 
       {tab === "requests" && <>
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by status">
-          {filters.map(([key, label]) => <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)} className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors", filter === key ? "border-brand/30 bg-brand-soft text-brand-dark" : "bg-white text-muted hover:bg-background")}>{label}<span className="rounded-full bg-background px-1.5 text-[10px]">{counts[key]}</span></button>)}
+          {filters.map(([key, label]) => <button key={key} type="button" aria-pressed={filter === key} onClick={() => changeFilter(key)} className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors", filter === key ? "border-brand/30 bg-brand-soft text-brand-dark" : "bg-white text-muted hover:bg-background")}>{label}<span className="rounded-full bg-background px-1.5 text-[10px]">{counts[key]}</span></button>)}
         </div>
+        {data && data.total > 0 && <div className="flex justify-end"><CompactPagination page={data.page} pageSize={data.pageSize} total={data.total} hasMore={data.hasMore} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} /></div>}
         {!items && !error && <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-white" />)}</div>}
         {items && !visible.length && <section className="crm-surface px-5 py-14 text-center"><CalendarRange className="mx-auto text-subtle" size={26} /><p className="mt-3 text-sm font-semibold text-foreground">{filter === "PENDING" ? "No leave waiting for a decision" : `No ${filter === "ALL" ? "" : STATUS_LABEL[filter].toLowerCase() + " "}leave requests`}</p><p className="mt-1 text-xs text-muted">Requests from staff will appear here.</p></section>}
         {visible.length > 0 && <>

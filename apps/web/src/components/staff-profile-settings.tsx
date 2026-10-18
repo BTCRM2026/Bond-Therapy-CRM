@@ -13,7 +13,6 @@ import type { SessionUser } from "@/lib/session";
 type Props = { user: Pick<SessionUser, "name" | "email" | "loginId" | "department" | "manager" | "profile"> & { roleName: string } };
 
 const BLOOD_GROUPS = [["A_POSITIVE", "A+"], ["A_NEGATIVE", "A-"], ["B_POSITIVE", "B+"], ["B_NEGATIVE", "B-"], ["AB_POSITIVE", "AB+"], ["AB_NEGATIVE", "AB-"], ["O_POSITIVE", "O+"], ["O_NEGATIVE", "O-"]] as const;
-const PLACEHOLDER_EMAIL = /@pending\.bondtherapy\.local$/i;
 const PHONE = /^[0-9+() -]{7,20}$/;
 const pretty = (value: string) => value.toLowerCase().split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 const dateLabel = (value: string) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(value));
@@ -50,7 +49,10 @@ function StaffDetailsForm({ user }: { user: Props["user"] & { profile: NonNullab
   const locked = Boolean(profile.detailsSubmittedAt);
   const [form, setForm] = useState({
     mobile: profile.mobile ?? "",
-    email: PLACEHOLDER_EMAIL.test(user.email) ? "" : user.email,
+    email: user.email ?? "",
+    // Until the details are submitted, the joining date on file is only a placeholder, so staff enter their real one.
+    joiningDate: locked ? profile.joiningDate.slice(0, 10) : "",
+    workLocation: profile.workLocation ?? "",
     dateOfBirth: profile.dateOfBirth?.slice(0, 10) ?? "",
     bloodGroup: profile.bloodGroup ?? "",
     residentialAddress: profile.residentialAddress ?? "",
@@ -69,6 +71,8 @@ function StaffDetailsForm({ user }: { user: Props["user"] & { profile: NonNullab
     const next: Record<string, string> = {};
     if (!PHONE.test(form.mobile.trim())) next.mobile = "Enter a valid mobile number.";
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = "Enter a valid email address.";
+    if (!form.joiningDate || form.joiningDate > today || form.joiningDate < "1990-01-01") next.joiningDate = "Enter your joining date.";
+    if (form.workLocation.trim().length < 2) next.workLocation = "Enter your work location.";
     if (!form.dateOfBirth || form.dateOfBirth > today) next.dateOfBirth = "Enter your date of birth.";
     if (form.residentialAddress.trim().length < 5) next.residentialAddress = "Enter your residential address.";
     if (form.emergencyContactName.trim().length < 2) next.emergencyContactName = "Enter the emergency contact name.";
@@ -116,8 +120,6 @@ function StaffDetailsForm({ user }: { user: Props["user"] & { profile: NonNullab
             <Fixed label="Role" value={user.roleName} />
             <Fixed label="Job title" value={profile.jobTitle} />
             <Fixed label="Employment type" value={pretty(profile.employmentType)} />
-            <Fixed label="Joining date" value={dateLabel(profile.joiningDate)} />
-            <Fixed label="Work location" value={profile.workLocation ?? "—"} />
             {user.manager && <Fixed label="Reporting manager" value={user.manager.name} />}
             {profile.shiftStart && profile.shiftEnd && <Fixed label="Shift" value={`${profile.shiftStart} – ${profile.shiftEnd}`} />}
           </div>
@@ -129,6 +131,8 @@ function StaffDetailsForm({ user }: { user: Props["user"] & { profile: NonNullab
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5"><Field label="Mobile number *"><Input value={form.mobile} onChange={set("mobile")} type="tel" inputMode="tel" maxLength={20} readOnly={readOnly} className={readOnly ? "bg-background text-muted" : inputClass} aria-invalid={Boolean(errors.mobile)} /></Field>{err("mobile")}</div>
               <div className="space-y-1.5"><Field label="Email address *"><Input value={form.email} onChange={set("email")} type="email" inputMode="email" maxLength={254} readOnly={readOnly} placeholder={readOnly ? undefined : "you@example.com"} className={readOnly ? "bg-background text-muted" : inputClass} aria-invalid={Boolean(errors.email)} /></Field>{err("email")}</div>
+              <div className="space-y-1.5"><Field label="Joining date *"><Input value={form.joiningDate} onChange={set("joiningDate")} type="date" min="1990-01-01" max={today} readOnly={readOnly} className={readOnly ? "bg-background text-muted" : inputClass} aria-invalid={Boolean(errors.joiningDate)} /></Field>{err("joiningDate")}</div>
+              <div className="space-y-1.5"><Field label="Work location *"><Input value={form.workLocation} onChange={set("workLocation")} maxLength={120} readOnly={readOnly} placeholder={readOnly ? undefined : "e.g. Surat"} className={readOnly ? "bg-background text-muted" : inputClass} aria-invalid={Boolean(errors.workLocation)} /></Field>{err("workLocation")}</div>
               <div className="space-y-1.5 sm:col-span-2"><Field label="Residential address *"><textarea value={form.residentialAddress} onChange={set("residentialAddress")} rows={3} maxLength={500} readOnly={readOnly} className={`w-full resize-y rounded-lg border px-3 py-2.5 text-base leading-5 outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 sm:text-[13px] ${readOnly ? "bg-background text-muted" : "bg-white"}`} aria-invalid={Boolean(errors.residentialAddress)} /></Field>{err("residentialAddress")}</div>
             </div>
           </section>

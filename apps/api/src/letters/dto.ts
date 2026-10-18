@@ -1,4 +1,5 @@
-import { IsDateString, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { LETTER_TYPES, type LetterType } from './letter-types.js';
 
 export class CreateHrLetterDto {
@@ -12,6 +13,8 @@ export class CreateHrLetterDto {
 }
 
 export class ListHrLettersDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) pageSize = 20;
   @IsOptional() @IsIn(LETTER_TYPES) type?: LetterType;
   @IsOptional() @IsString() search?: string;
   @IsOptional() @IsIn(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'GENERATED', 'SENT', 'ACKNOWLEDGED', 'REJECTED', 'SUPERSEDED', 'CANCELLED']) status?: string;

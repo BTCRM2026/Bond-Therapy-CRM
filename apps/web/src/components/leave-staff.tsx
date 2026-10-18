@@ -4,6 +4,7 @@ import { CalendarRange, Info, LoaderCircle, Plus } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { CompactPagination } from "@/components/ui/compact-pagination";
 import { Field, FormError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
@@ -12,6 +13,7 @@ import { SuccessToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { type LeaveItem, type MonthSplit, PaySplit, StatusBadge, jsonInit, leaveApi, monthLabel, plural, rangeLabel } from "@/components/leave-shared";
 
+type LeavePage = { items: LeaveItem[]; total: number; page: number; pageSize: number; hasMore: boolean };
 type Summary = { month: string; paidAllowance: number; paidUsed: number; paidAvailable: number; unpaidDays: number; pending: number };
 type Preview = { totalDays: number; paidDays: number; unpaidDays: number; months: MonthSplit[] };
 
@@ -20,7 +22,10 @@ const isoDate = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset
 
 export function LeaveStaff() {
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [items, setItems] = useState<LeaveItem[] | null>(null);
+  const [data, setData] = useState<LeavePage | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const items = data?.items ?? null;
   const [error, setError] = useState("");
   const [applying, setApplying] = useState(false);
   const [notice, setNotice] = useState("");
@@ -37,10 +42,10 @@ export function LeaveStaff() {
 
   const load = useCallback(async () => {
     try {
-      const [nextSummary, nextItems] = await Promise.all([leaveApi<Summary>("/summary"), leaveApi<LeaveItem[]>("/mine")]);
-      setSummary(nextSummary); setItems(nextItems); setError("");
+      const [nextSummary, nextPage] = await Promise.all([leaveApi<Summary>("/summary"), leaveApi<LeavePage>(`/mine?page=${page}&pageSize=${pageSize}`)]);
+      if (!nextPage.items.length && page > 1) { setPage(page - 1); return; } setSummary(nextSummary); setData(nextPage); setError("");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load your leave."); }
-  }, []);
+  }, [page, pageSize]);
   useEffect(() => { (async () => { await load(); })(); }, [load]);
 
   const cancel = async (id: string) => {
@@ -68,13 +73,14 @@ export function LeaveStaff() {
 
       {error && <FormError message={error} />}
       {!items && !error && <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-white" />)}</div>}
-      {items && !items.length && <section className="crm-surface px-5 py-14 text-center">
+      {data && data.total === 0 && <section className="crm-surface px-5 py-14 text-center">
         <CalendarRange className="mx-auto text-subtle" size={26} />
         <p className="mt-3 text-sm font-semibold text-foreground">You haven’t applied for any leave</p>
         <p className="mt-1 text-xs text-muted">When you need time off, apply here and track the decision.</p>
         <Button className="mt-4" onClick={() => setApplying(true)}><Plus size={16} />Apply for leave</Button>
       </section>}
 
+      {data && data.total > 0 && <div className="flex items-center justify-between gap-3"><p className="text-xs text-muted">Your leave history</p><CompactPagination page={data.page} pageSize={data.pageSize} total={data.total} hasMore={data.hasMore} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} /></div>}
       {items && items.length > 0 && <>
         <section className="crm-surface hidden overflow-hidden md:block">
           <table className="w-full text-left text-[13px]">

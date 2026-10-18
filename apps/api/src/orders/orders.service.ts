@@ -5,7 +5,7 @@ import { recordAudit } from '../common/audit.util.js';
 import { validateInvoiceFile } from '../common/invoice-file.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { CreateOrderDto, ListOrdersDto, UpdateOrderDto, UpdateOrderStatusDto } from './dto.js';
+import type { CreateOrderDto, ListOrdersDto, UnverifyPaymentDto, UpdateOrderDto, UpdateOrderStatusDto, VerifyPaymentDto } from './dto.js';
 import { calculateOrder } from './order-calculation.js';
 import { renderOrderForm } from './order-form-pdf.js';
 
@@ -18,6 +18,7 @@ const orderInclude = {
   client: { select: { id: true, salonName: true, billingName: true, city: true, state: true, stateCode: true, gstin: true, fullAddress: true, pincode: true, primaryContact: true, email: true } },
   salesperson: { select: { id: true, name: true } },
   reviewedBy: { select: { id: true, name: true } },
+  paymentVerifiedBy: { select: { id: true, name: true } },
   distributor: { select: { id: true, businessName: true } },
   items: { include: { product: { select: { id: true, name: true, sku: true, unit: true, variant: true, hsnCode: true, stockOnHand: true } } } },
   invoice: { select: { id: true, invoiceNumber: true, status: true, amountPaid: true, balanceDue: true } },
@@ -168,6 +169,7 @@ export class OrdersService {
       || (this.isWarehouse(actor) || this.isAdmin(actor)) && order.status === 'CONFIRMED' && target === 'DISPATCHED';
     if (!allowed) throw new ConflictException(`Cannot move an order from ${order.status} to ${target}.`);
     if (['REJECTED', 'RETURNED_FOR_CORRECTION'].includes(target) && !dto.comment?.trim()) throw new ConflictException('A reason is required for this action.');
+    if (target === 'SUBMITTED' && !(await this.prisma.distributorInvoiceAttachment.findUnique({ where: { orderId: id }, select: { id: true } }))) throw new ConflictException('Attach the distributor’s bill before sending this order for verification.');
     if (target === 'DISTRIBUTOR_FULFILLED' && !dto.distributorInvoiceReference?.trim()) throw new ConflictException('Enter the Tally/Marg invoice number before confirming dispatch.');
     if (target === 'DISTRIBUTOR_FULFILLED') {
       const duplicate = await this.prisma.order.findFirst({ where: { id: { not: id }, distributorId: order.distributorId, distributorInvoiceFinancialYear: financialYear(), distributorInvoiceReference: dto.distributorInvoiceReference!.trim() }, select: { orderNumber: true } });
@@ -252,6 +254,48 @@ export class OrdersService {
     const saved = await this.prisma.distributorInvoiceAttachment.upsert({ where: { orderId: id }, create: { orderId: id, file: file.buffer, fileName: file.originalname, mime }, update: { file: file.buffer, fileName: file.originalname, mime }, select: { id: true, fileName: true, mime: true } });
     await recordAudit(this.prisma, { actorId: actor.id, action: 'DISTRIBUTOR_INVOICE_UPLOADED', entity: 'ORDER', entityId: id, details: { fileName: file.originalname, access }, ipAddress });
     return saved;
+  }
+
+  // The salesperson attaches the distributor's bill (a photo from the camera or gallery, or a PDF) before the order is sent for verification.
+  async uploadBill(actor: SessionUser, id: string, file: { buffer: Buffer; mimetype: string; originalname: string; size: number }, ipAddress?: string) {
+    if (!this.isSales(actor) && !this.isAdmin(actor)) throw new ForbiddenException('The bill is attached by the salesperson who took the order.');
+    const order = await this.prisma.order.findFirst({ where: { AND: [{ id }, this.visibility(actor)] }, select: { id: true, status: true } });
+    if (!order) throw new NotFoundException('Order not found or you do not have access to it.');
+    if (!['DRAFT', 'RETURNED_FOR_CORRECTION'].includes(order.status)) throw new ConflictException('The bill can be changed only before the order is sent for verification.');
+    const mime = validateInvoiceFile(file);
+    const saved = await this.prisma.distributorInvoiceAttachment.upsert({ where: { orderId: id }, create: { orderId: id, file: file.buffer, fileName: file.originalname || 'bill', mime }, update: { file: file.buffer, fileName: file.originalname || 'bill', mime }, select: { id: true, fileName: true, mime: true } });
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'ORDER_BILL_UPLOADED', entity: 'ORDER', entityId: id, details: { fileName: file.originalname, mime, size: file.size }, ipAddress });
+    return saved;
+  }
+
+  // Only an administrator can confirm that the money arrived. Until then the order does not count as a sale.
+  async verifyPayment(actor: SessionUser, id: string, dto: VerifyPaymentDto, ipAddress?: string) {
+    if (!this.isAdmin(actor)) throw new ForbiddenException('Only an administrator can confirm a payment.');
+    const order = await this.prisma.order.findUnique({ where: { id }, include: { distributorInvoiceAttachment: { select: { id: true } } } });
+    if (!order) throw new NotFoundException('Order not found.');
+    if (order.paymentVerifiedAt) throw new ConflictException('The payment for this order is already confirmed.');
+    if (['DRAFT', 'RETURNED_FOR_CORRECTION', 'REJECTED', 'CANCELLED'].includes(order.status)) throw new ConflictException('This order has not been sent for verification.');
+    if (!order.distributorInvoiceAttachment) throw new ConflictException('This order has no bill attached, so its payment cannot be confirmed.');
+    const now = new Date();
+    const advance = ['SUBMITTED', 'UNDER_REVIEW'].includes(order.status);
+    const claimed = await this.prisma.order.updateMany({
+      where: { id, version: dto.version, status: order.status, paymentVerifiedAt: null },
+      data: { paymentVerifiedAt: now, paymentVerifiedById: actor.id, paymentVerifiedNote: dto.note?.trim() || null, ...(advance ? { status: 'APPROVED' as const, approvedAt: now, reviewedById: actor.id } : {}), version: { increment: 1 } },
+    });
+    if (!claimed.count) throw new ConflictException('This order changed while you were reviewing it. Refresh and try again.');
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'ORDER_PAYMENT_VERIFIED', entity: 'ORDER', entityId: id, details: { orderNumber: order.orderNumber, totalAmount: order.totalAmount.toString(), note: dto.note?.trim() || null }, ipAddress });
+    return this.prisma.order.findUniqueOrThrow({ where: { id }, include: orderInclude });
+  }
+
+  async unverifyPayment(actor: SessionUser, id: string, dto: UnverifyPaymentDto, ipAddress?: string) {
+    if (!this.isAdmin(actor)) throw new ForbiddenException('Only an administrator can undo a payment confirmation.');
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order) throw new NotFoundException('Order not found.');
+    if (!order.paymentVerifiedAt) throw new ConflictException('The payment for this order has not been confirmed.');
+    const claimed = await this.prisma.order.updateMany({ where: { id, version: dto.version, paymentVerifiedAt: { not: null } }, data: { paymentVerifiedAt: null, paymentVerifiedById: null, paymentVerifiedNote: null, version: { increment: 1 } } });
+    if (!claimed.count) throw new ConflictException('This order changed while you were reviewing it. Refresh and try again.');
+    await recordAudit(this.prisma, { actorId: actor.id, action: 'ORDER_PAYMENT_UNVERIFIED', entity: 'ORDER', entityId: id, details: { orderNumber: order.orderNumber, reason: dto.reason.trim() }, ipAddress });
+    return this.prisma.order.findUniqueOrThrow({ where: { id }, include: orderInclude });
   }
 
   async distributorInvoice(actor: SessionUser, id: string) {

@@ -1,9 +1,10 @@
 "use client";
 
 import { Check, Download, Eye, FileBadge2, FileText, History, Plus, Search, Send, ShieldCheck, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { CompactPagination } from "@/components/ui/compact-pagination";
 import { Field, FormError } from "@/components/ui/field";
 import { FilterMenu } from "@/components/ui/filter-menu";
 import { FormActions } from "@/components/ui/form-actions";
@@ -31,14 +32,18 @@ type LetterRow = {
   generatedBy: { id: string; name: string };
 };
 
+type LettersPage = { items: LetterRow[]; total: number; page: number; pageSize: number; hasMore: boolean; stats: { total: number; thisMonth: number; byType: Record<string, number> } };
+const EMPTY_PAGE: LettersPage = { items: [], total: 0, page: 1, pageSize: 20, hasMore: false, stats: { total: 0, thisMonth: 0, byType: {} } };
 const messageFrom = (data: unknown, fallback: string) => (data && typeof data === "object" && "message" in data ? String((data as { message: unknown }).message) : fallback);
 const dateLabel = (value: string) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(value));
 const CATEGORY_ORDER = ["Hiring", "Compensation", "Compliance", "Exit"];
 const pretty = (value: string) => value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 const finalStatuses: LetterStatus[] = ["GENERATED", "SENT", "ACKNOWLEDGED"];
 
-export function LetterManagement({ initial }: { initial: LetterRow[] }) {
-  const [letters, setLetters] = useState(initial);
+export function LetterManagement({ initial }: { initial: LettersPage | null }) {
+  const [data, setData] = useState<LettersPage>(initial ?? EMPTY_PAGE);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -52,22 +57,29 @@ export function LetterManagement({ initial }: { initial: LetterRow[] }) {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  const reload = async () => {
-    const response = await fetch("/api/letters", { cache: "no-store" });
-    if (response.ok) setLetters(await response.json());
-  };
+  // Every change of filter or page asks the server for just that page of letters.
+  const reload = useCallback(async () => {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (search.trim()) params.set("search", search.trim());
+    if (typeFilter) params.set("type", typeFilter);
+    if (statusFilter) params.set("status", statusFilter);
+    const response = await fetch(`/api/letters?${params}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const next = await response.json() as LettersPage;
+    if (!next.items.length && page > 1) { setPage(page - 1); return; }
+    setData(next);
+  }, [page, pageSize, search, typeFilter, statusFilter]);
+  const firstLoad = useRef(Boolean(initial));
+  useEffect(() => {
+    if (firstLoad.current) { firstLoad.current = false; return; }
+    const timer = setTimeout(() => { void reload(); }, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [reload, search]);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return letters.filter((letter) => (!typeFilter || letter.type === typeFilter) && (!statusFilter || letter.status === statusFilter) && (!term || `${letter.recipientName} ${letter.letterNumber}`.toLowerCase().includes(term)));
-  }, [letters, search, typeFilter, statusFilter]);
-
-  const thisMonth = useMemo(() => {
-    const now = new Date();
-    return letters.filter((letter) => { const d = new Date(letter.createdAt ?? letter.issuedDate); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); }).length;
-  }, [letters]);
-  const hiringCount = useMemo(() => letters.filter((letter) => LETTER_CATEGORIES[letter.type] === "Hiring").length, [letters]);
-  const complianceCount = useMemo(() => letters.filter((letter) => LETTER_CATEGORIES[letter.type] === "Compliance").length, [letters]);
+  const letters = data.items;
+  const categoryCount = (category: string) => Object.entries(data.stats.byType).filter(([type]) => LETTER_CATEGORIES[type as LetterType] === category).reduce((sum, [, count]) => sum + count, 0);
+  const hiringCount = categoryCount("Hiring");
+  const complianceCount = categoryCount("Compliance");
 
   return (
     <>
@@ -75,8 +87,8 @@ export function LetterManagement({ initial }: { initial: LetterRow[] }) {
 
       <div className="space-y-4">
         <KpiStrip columns={4}>
-          <KpiCell label="Total letters" value={letters.length} detail="Official HR records" />
-          <KpiCell label="Issued this month" value={thisMonth} detail="Current month" tone="brand" />
+          <KpiCell label="Total letters" value={data.stats.total} detail="Official HR records" />
+          <KpiCell label="Issued this month" value={data.stats.thisMonth} detail="Current month" tone="brand" />
           <KpiCell label="Hiring letters" value={hiringCount} detail="Offer to confirmation" />
           <KpiCell label="Compliance letters" value={complianceCount} detail="Warnings and NOCs" />
         </KpiStrip>
@@ -84,16 +96,17 @@ export function LetterManagement({ initial }: { initial: LetterRow[] }) {
         <div className="flex flex-wrap gap-2">
           <label className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} />
-            <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search recipient or letter number" aria-label="Search letters" />
+            <Input className="pl-9" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search recipient or letter number" aria-label="Search letters" />
           </label>
-          <FilterMenu value={typeFilter} showLabelOnMobile ariaLabel="Filter by letter type" onSelect={setTypeFilter} options={[{ key: "", label: "All types" }, ...LETTER_TYPES.map((type) => ({ key: type, label: LETTER_LABELS[type] }))]} />
-          <FilterMenu value={statusFilter} showLabelOnMobile ariaLabel="Filter by document status" onSelect={setStatusFilter} options={[{ key: "", label: "All statuses" }, ...["DRAFT", "PENDING_APPROVAL", "APPROVED", "GENERATED", "SENT", "ACKNOWLEDGED", "REJECTED", "CANCELLED"].map((status) => ({ key: status, label: pretty(status) }))]} />
+          <FilterMenu value={typeFilter} showLabelOnMobile ariaLabel="Filter by letter type" onSelect={(value) => { setTypeFilter(value); setPage(1); }} options={[{ key: "", label: "All types" }, ...LETTER_TYPES.map((type) => ({ key: type, label: LETTER_LABELS[type] }))]} />
+          <FilterMenu value={statusFilter} showLabelOnMobile ariaLabel="Filter by document status" onSelect={(value) => { setStatusFilter(value); setPage(1); }} options={[{ key: "", label: "All statuses" }, ...["DRAFT", "PENDING_APPROVAL", "APPROVED", "GENERATED", "SENT", "ACKNOWLEDGED", "REJECTED", "CANCELLED"].map((status) => ({ key: status, label: pretty(status) }))]} />
+          {data.total > 0 && <CompactPagination page={data.page} pageSize={data.pageSize} total={data.total} hasMore={data.hasMore} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />}
         </div>
 
         <section className="crm-surface overflow-hidden">
-          {filtered.length ? <>
-            <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[900px] text-left text-[13px]"><thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><tr><th className="px-5 py-3">Document</th><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Issued</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y">{filtered.map((letter) => <tr key={letter.id} className="transition-colors hover:bg-brand-soft/30"><td className="px-5 py-3.5"><p className="font-semibold text-foreground">{LETTER_LABELS[letter.type]}</p><p className="mt-0.5 font-mono text-[11px] text-muted">{letter.letterNumber} · v{letter.version}</p></td><td className="px-4 py-3.5"><p className="font-medium text-foreground">{letter.recipientName}</p><p className="mt-0.5 text-xs text-muted">{letter.recipientDesignation || letter.recipientDepartment || "External recipient"}</p></td><td className="px-4 py-3.5"><StatusBadge value={letter.status} /></td><td className="px-4 py-3.5 text-xs text-muted">{dateLabel(letter.issuedDate)}</td><td className="px-5 py-3.5"><LetterActions letter={letter} onChanged={reload} /></td></tr>)}</tbody></table></div>
-            <div className="divide-y md:hidden">{filtered.map((letter) => <article key={letter.id} className="p-4"><div className="flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"><FileBadge2 size={17} /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">{LETTER_LABELS[letter.type]}</p><p className="mt-0.5 truncate font-mono text-[11px] text-muted">{letter.letterNumber} · v{letter.version}</p></div><StatusBadge value={letter.status} /></div><div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs"><div><p className="text-muted">Employee</p><p className="mt-1 truncate font-medium text-foreground">{letter.recipientName}</p></div><div><p className="text-muted">Issued</p><p className="mt-1 font-medium text-foreground">{dateLabel(letter.issuedDate)}</p></div></div><div className="mt-3"><LetterActions letter={letter} onChanged={reload} /></div></article>)}</div>
+          {letters.length ? <>
+            <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[900px] text-left text-[13px]"><thead className="border-b bg-background text-[10px] font-bold uppercase tracking-[0.1em] text-muted"><tr><th className="px-5 py-3">Document</th><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Issued</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y">{letters.map((letter) => <tr key={letter.id} className="transition-colors hover:bg-brand-soft/30"><td className="px-5 py-3.5"><p className="font-semibold text-foreground">{LETTER_LABELS[letter.type]}</p><p className="mt-0.5 font-mono text-[11px] text-muted">{letter.letterNumber} · v{letter.version}</p></td><td className="px-4 py-3.5"><p className="font-medium text-foreground">{letter.recipientName}</p><p className="mt-0.5 text-xs text-muted">{letter.recipientDesignation || letter.recipientDepartment || "External recipient"}</p></td><td className="px-4 py-3.5"><StatusBadge value={letter.status} /></td><td className="px-4 py-3.5 text-xs text-muted">{dateLabel(letter.issuedDate)}</td><td className="px-5 py-3.5"><LetterActions letter={letter} onChanged={reload} /></td></tr>)}</tbody></table></div>
+            <div className="divide-y md:hidden">{letters.map((letter) => <article key={letter.id} className="p-4"><div className="flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"><FileBadge2 size={17} /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">{LETTER_LABELS[letter.type]}</p><p className="mt-0.5 truncate font-mono text-[11px] text-muted">{letter.letterNumber} · v{letter.version}</p></div><StatusBadge value={letter.status} /></div><div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs"><div><p className="text-muted">Employee</p><p className="mt-1 truncate font-medium text-foreground">{letter.recipientName}</p></div><div><p className="text-muted">Issued</p><p className="mt-1 font-medium text-foreground">{dateLabel(letter.issuedDate)}</p></div></div><div className="mt-3"><LetterActions letter={letter} onChanged={reload} /></div></article>)}</div>
           </> : <div className="px-5 py-14 text-center"><FileText className="mx-auto text-subtle" size={28} /><p className="mt-3 text-sm font-semibold">No matching letters</p><p className="mt-1 text-xs text-muted">Create a letter or adjust the current search and filter.</p></div>}
         </section>
       </div>
@@ -156,7 +169,7 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [error, setError] = useState("");
   const [downloadUrl, setDownloadUrl] = useState("");
   const [staffUserId, setStaffUserId] = useState("");
-  const [staff, setStaff] = useState<Array<{ id: string; name: string; email: string; department: string | null; managerName: string | null; profile: { employeeCode: string; jobTitle: string; employmentType: string; joiningDate: string; workLocation: string | null } | null }>>([]);
+  const [staff, setStaff] = useState<Array<{ id: string; name: string; email: string | null; department: string | null; managerName: string | null; profile: { employeeCode: string; jobTitle: string; employmentType: string; joiningDate: string; workLocation: string | null } | null }>>([]);
 
   useEffect(() => { void fetch("/api/letters/options", { cache: "no-store" }).then((response) => response.ok ? response.json() : []).then(setStaff); }, []);
 

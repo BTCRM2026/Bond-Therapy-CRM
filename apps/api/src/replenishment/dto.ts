@@ -13,6 +13,9 @@ export class CreateReplenishmentDto {
 }
 
 export class ListReplenishmentDto {
+  // Optional: without a page the full list is returned, as before. With a page, results are paged.
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) pageSize?: number;
   @IsOptional() @IsEnum(ReplenishmentStatus) status?: ReplenishmentStatus;
   @IsOptional() @IsString() distributorId?: string;
 }

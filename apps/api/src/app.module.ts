@@ -31,6 +31,7 @@ import { ChatModule } from './chat/chat.module.js';
 import { StaffRequestsModule } from './staff-requests/staff-requests.module.js';
 import { LeaveModule } from './leave/leave.module.js';
 import { CapturesModule } from './captures/captures.module.js';
+import { TeamActivityModule } from './team-activity/team-activity.module.js';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { CapturesModule } from './captures/captures.module.js';
     StaffRequestsModule,
     LeaveModule,
     CapturesModule,
+    TeamActivityModule,
   ],
   controllers: [AppController],
 })

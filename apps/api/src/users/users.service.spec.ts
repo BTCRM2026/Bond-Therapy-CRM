@@ -46,7 +46,7 @@ describe('UsersService administrator password updates', () => {
     expect(prisma.user.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         loginId: 'new.staff.bt01',
-        email: 'new.staff.bt01@pending.bondtherapy.local',
+        email: null,
         staffProfile: { create: expect.objectContaining({ employeeCode: 'BT-01', mobile: '', jobTitle: 'Sales Manager' }) },
       }),
     }));

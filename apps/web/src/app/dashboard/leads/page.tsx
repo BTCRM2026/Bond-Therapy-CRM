@@ -4,6 +4,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { LeadsModule, type LeadListResponse } from "@/components/leads-module";
 import { PORTAL_HEADER } from "@/lib/portal";
 import { requireSession } from "@/lib/session";
+import { isStaffModuleEnabled } from "@/lib/staff-modules";
 
 const SALES_ROLE_KEYS = new Set(["SALES_MANAGER", "SALES_EXECUTIVE"]);
 
@@ -17,6 +18,7 @@ async function loadLeads() {
 
 export default async function LeadsPage() {
   const session = await requireSession("STAFF");
+  if (!isStaffModuleEnabled("/dashboard/leads")) redirect("/dashboard");
   if (!SALES_ROLE_KEYS.has(session.roles[0]?.key ?? "")) redirect("/dashboard/access-denied");
   const initial = await loadLeads();
   return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} roleKey={session.roles[0]?.key} headerTitle="Leads" headerSubtitle="Track enquiries from first contact to conversion" portal="STAFF"><LeadsModule initial={initial} /></DashboardShell>;

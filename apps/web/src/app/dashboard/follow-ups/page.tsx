@@ -4,6 +4,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { FollowUpsModule } from "@/components/follow-ups-module";
 import { PORTAL_HEADER } from "@/lib/portal";
 import { requireSession } from "@/lib/session";
+import { isStaffModuleEnabled } from "@/lib/staff-modules";
 
 const SALES_ROLE_KEYS = new Set(["SALES_MANAGER", "SALES_EXECUTIVE"]);
 
@@ -17,6 +18,7 @@ async function loadActivities() {
 
 export default async function FollowUpsPage() {
   const session = await requireSession("STAFF");
+  if (!isStaffModuleEnabled("/dashboard/follow-ups")) redirect("/dashboard");
   if (!SALES_ROLE_KEYS.has(session.roles[0]?.key ?? "")) redirect("/dashboard/access-denied");
   const initial = await loadActivities();
   return <DashboardShell userName={session.name} roleName={session.roles[0]?.name ?? "Staff"} roleKey={session.roles[0]?.key} headerTitle="Follow-ups" headerSubtitle="Visits, follow-ups, demos and samples due" portal="STAFF"><FollowUpsModule initial={initial} /></DashboardShell>;

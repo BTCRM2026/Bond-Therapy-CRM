@@ -9,13 +9,16 @@ import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
 import { LeaveService } from '../leave/leave.service.js';
 import { AttendanceService } from './attendance.service.js';
-import { AdminAttendanceListDto, AttendanceMonthQueryDto, HolidayDto, PunchDto, RequestCorrectionDto, RequestLeaveDto, ReviewRequestDto, UpdateOperationsSettingsDto } from './dto.js';
+import { AdminAttendanceListDto, ApproveDayStartDto, AttendanceMonthQueryDto, HolidayDto, PunchDto, RequestCorrectionDto, RequestLeaveDto, ReviewRequestDto, UpdateOperationsSettingsDto } from './dto.js';
 
 @Controller('attendance')
 @UseGuards(SessionGuard, PortalGuard, RolesGuard)
 @Portals(PortalType.ADMIN, PortalType.STAFF)
 export class AttendanceController {
   constructor(private readonly attendance: AttendanceService, private readonly leave: LeaveService) {}
+
+  @Get('day-gate')
+  dayGate(@CurrentUser() actor: SessionUser) { return this.attendance.dayGate(actor); }
 
   @Get('today')
   today(@CurrentUser() actor: SessionUser) { return this.attendance.today(actor); }
@@ -73,6 +76,13 @@ export class AttendanceController {
 
   @Get('admin/list')
   adminList(@CurrentUser() actor: SessionUser, @Query() query: AdminAttendanceListDto) { return this.attendance.adminList(actor, query); }
+
+  // Staff who cannot start today because yesterday's report is missing, and the administrator's approval to let them start.
+  @Get('admin/blocked')
+  blocked(@CurrentUser() actor: SessionUser) { return this.attendance.blockedStaff(actor); }
+
+  @Post('admin/day-approvals')
+  approveDayStart(@CurrentUser() actor: SessionUser, @Body() dto: ApproveDayStartDto, @Req() req: Request) { return this.attendance.approveDayStart(actor, dto.userId, dto.note, req.ip); }
 
   @Get('admin/employees/:id')
   employeeProfile(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Query() query: AttendanceMonthQueryDto) { return this.attendance.employeeProfile(actor, id, query.month, query.year); }

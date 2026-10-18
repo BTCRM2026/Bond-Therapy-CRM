@@ -18,6 +18,9 @@ export class SalesController {
   @Get('dashboard')
   dashboard(@CurrentUser() actor: SessionUser) { return this.sales.dashboard(actor); }
 
+  @Get('calls')
+  calls(@CurrentUser() actor: SessionUser, @Query() query: PerformanceQueryDto) { return this.sales.calls(actor, query.month, query.year); }
+
   @Get('performance')
   performance(@CurrentUser() actor: SessionUser, @Query() query: PerformanceQueryDto) { return this.sales.performance(actor, query.month, query.year); }
 }

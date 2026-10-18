@@ -32,7 +32,7 @@ type StaffProfile = {
 type StaffUser = {
   id: string;
   loginId: string;
-  email: string;
+  email: string | null;
   name: string;
   status: "ACTIVE" | "INACTIVE" | "LOCKED";
   department: string | null;
@@ -87,7 +87,7 @@ export function StaffManagement({ initialDirectory }: { initialDirectory: StaffD
     const term = search.trim().toLowerCase();
     return (directory?.users ?? []).filter((user) => {
       const role = user.roles[0];
-      return (roleFilter === "ALL" || role?.key === roleFilter) && (!term || `${user.name} ${user.loginId} ${user.email} ${user.profile?.employeeCode ?? ""} ${role?.name ?? ""}`.toLowerCase().includes(term));
+      return (roleFilter === "ALL" || role?.key === roleFilter) && (!term || `${user.name} ${user.loginId} ${user.email ?? ""} ${user.profile?.employeeCode ?? ""} ${role?.name ?? ""}`.toLowerCase().includes(term));
     });
   }, [directory, roleFilter, search]);
 
@@ -158,12 +158,12 @@ type StaffActionsProps = { user: StaffUser; busy: boolean; onEdit: () => void; o
 
 function StaffRow({ user, busy, onEdit, onPassword, onStatus, onDelete }: StaffActionsProps) {
   const role = user.roles[0];
-  return <tr className="transition-colors hover:bg-brand-soft/40"><td className="px-5 py-4"><p className="font-semibold text-foreground">{user.name}</p><p className="mt-0.5 text-xs text-muted">{user.profile?.employeeCode ? `${user.profile.employeeCode} · ` : ""}{user.loginId}</p><p className="mt-0.5 text-xs text-subtle">{user.email}</p></td><td className="px-4 py-4"><p className="font-medium text-foreground">{user.profile?.isTechnician ? "Technician" : role?.name}</p><p className="mt-0.5 text-xs text-muted">{pretty(user.department)}</p></td><td className="px-4 py-4"><p className="font-medium text-foreground">{pretty(user.dataScope)}</p><p className="mt-0.5 text-xs text-muted">{user.manager?.name ?? (role?.key === "SALES_EXECUTIVE" ? "No manager assigned" : role?.portal === "ADMIN" ? "Admin portal" : "Staff portal")}</p>{user.assignedDistributor && <p className="mt-0.5 text-xs text-brand">→ {user.assignedDistributor.businessName}</p>}</td><td className="px-4 py-4"><Status value={user.status} /></td><td className="px-4 py-4 text-xs text-muted">{lastLogin(user.lastLoginAt)}</td><td className="px-5 py-4"><div className="flex justify-end"><StaffActions user={user} busy={busy} onEdit={onEdit} onPassword={onPassword} onStatus={onStatus} onDelete={onDelete} /></div></td></tr>;
+  return <tr className="transition-colors hover:bg-brand-soft/40"><td className="px-5 py-4"><p className="font-semibold text-foreground">{user.name}</p><p className="mt-0.5 text-xs text-muted">{user.profile?.employeeCode ? `${user.profile.employeeCode} · ` : ""}{user.loginId}</p><p className="mt-0.5 text-xs text-subtle">{user.email ?? "Email not added yet"}</p></td><td className="px-4 py-4"><p className="font-medium text-foreground">{user.profile?.isTechnician ? "Technician" : role?.name}</p><p className="mt-0.5 text-xs text-muted">{pretty(user.department)}</p></td><td className="px-4 py-4"><p className="font-medium text-foreground">{pretty(user.dataScope)}</p><p className="mt-0.5 text-xs text-muted">{user.manager?.name ?? (role?.key === "SALES_EXECUTIVE" ? "No manager assigned" : role?.portal === "ADMIN" ? "Admin portal" : "Staff portal")}</p>{user.assignedDistributor && <p className="mt-0.5 text-xs text-brand">→ {user.assignedDistributor.businessName}</p>}</td><td className="px-4 py-4"><Status value={user.status} /></td><td className="px-4 py-4 text-xs text-muted">{lastLogin(user.lastLoginAt)}</td><td className="px-5 py-4"><div className="flex justify-end"><StaffActions user={user} busy={busy} onEdit={onEdit} onPassword={onPassword} onStatus={onStatus} onDelete={onDelete} /></div></td></tr>;
 }
 
 function StaffCard({ user, busy, onEdit, onPassword, onStatus, onDelete }: StaffActionsProps) {
   const role = user.roles[0];
-  return <article className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{user.name}</p><p className="mt-1 truncate text-xs text-muted">{user.profile?.employeeCode ? `${user.profile.employeeCode} · ` : ""}{user.loginId}</p><p className="mt-1 truncate text-xs text-subtle">{user.email}</p></div><Status value={user.status} /></div><dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs"><div><dt className="text-muted">Role</dt><dd className="mt-1 font-medium text-foreground">{user.profile?.isTechnician ? "Technician" : role?.name}</dd></div><div><dt className="text-muted">Department</dt><dd className="mt-1 font-medium text-foreground">{pretty(user.department)}</dd></div><div><dt className="text-muted">Record access</dt><dd className="mt-1 font-medium text-foreground">{pretty(user.dataScope)}</dd></div><div><dt className="text-muted">Manager</dt><dd className="mt-1 font-medium text-foreground">{user.manager?.name ?? "—"}</dd></div></dl><div className="mt-3 flex justify-end"><StaffActions user={user} busy={busy} onEdit={onEdit} onPassword={onPassword} onStatus={onStatus} onDelete={onDelete} /></div></article>;
+  return <article className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{user.name}</p><p className="mt-1 truncate text-xs text-muted">{user.profile?.employeeCode ? `${user.profile.employeeCode} · ` : ""}{user.loginId}</p><p className="mt-1 truncate text-xs text-subtle">{user.email ?? "Email not added yet"}</p></div><Status value={user.status} /></div><dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-background p-3 text-xs"><div><dt className="text-muted">Role</dt><dd className="mt-1 font-medium text-foreground">{user.profile?.isTechnician ? "Technician" : role?.name}</dd></div><div><dt className="text-muted">Department</dt><dd className="mt-1 font-medium text-foreground">{pretty(user.department)}</dd></div><div><dt className="text-muted">Record access</dt><dd className="mt-1 font-medium text-foreground">{pretty(user.dataScope)}</dd></div><div><dt className="text-muted">Manager</dt><dd className="mt-1 font-medium text-foreground">{user.manager?.name ?? "—"}</dd></div></dl><div className="mt-3 flex justify-end"><StaffActions user={user} busy={busy} onEdit={onEdit} onPassword={onPassword} onStatus={onStatus} onDelete={onDelete} /></div></article>;
 }
 
 function StaffActions({ user, busy, onEdit, onPassword, onStatus, onDelete }: StaffActionsProps) {
@@ -221,7 +221,7 @@ function StaffEditor({ mode, user, roles, managers, onClose, onSaved }: { mode: 
       const payload = {
         name: form.name,
         ...(create && form.loginId.trim() ? { loginId: form.loginId.trim() } : {}),
-        email: create ? form.email.trim() || undefined : form.email,
+        email: form.email.trim() || undefined,
         mobile: form.mobile.trim() || undefined,
         jobTitle: create ? form.jobTitle.trim() || undefined : form.jobTitle,
         employmentType: form.employmentType,
@@ -287,5 +287,5 @@ function DeleteEditor({ user, onClose, onDeleted }: { user: StaffUser; onClose: 
       await onDeleted();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to delete staff account."); setDeleting(false); }
   };
-  return <Modal maxWidth="max-w-xl" title="Delete staff account" subtitle="This action permanently removes the account and its active sessions." onClose={onClose}><div className="rounded-lg border border-red-100 bg-red-50 p-4"><p className="text-sm font-semibold text-foreground">{user.name}</p><p className="mt-1 text-xs text-muted">{user.loginId} · {user.email}</p></div><p className="mt-4 text-xs leading-5 text-muted">Use Deactivate if this person may need access again. Delete only when this account is no longer required.</p>{error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}<div className="mt-5 flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><button type="button" disabled={deleting} onClick={remove} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-danger px-4 text-[13px] font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50 sm:h-10">{deleting && <LoaderCircle className="animate-spin" size={16} />} {deleting ? "Deleting…" : "Delete account"}</button></div></Modal>;
+  return <Modal maxWidth="max-w-xl" title="Delete staff account" subtitle="This action permanently removes the account and its active sessions." onClose={onClose}><div className="rounded-lg border border-red-100 bg-red-50 p-4"><p className="text-sm font-semibold text-foreground">{user.name}</p><p className="mt-1 text-xs text-muted">{user.loginId}{user.email ? ` · ${user.email}` : ""}</p></div><p className="mt-4 text-xs leading-5 text-muted">Use Deactivate if this person may need access again. Delete only when this account is no longer required.</p>{error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-danger" role="alert">{error}</p>}<div className="mt-5 flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><button type="button" disabled={deleting} onClick={remove} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-danger px-4 text-[13px] font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50 sm:h-10">{deleting && <LoaderCircle className="animate-spin" size={16} />} {deleting ? "Deleting…" : "Delete account"}</button></div></Modal>;
 }

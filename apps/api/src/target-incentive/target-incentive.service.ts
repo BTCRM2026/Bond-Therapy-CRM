@@ -5,9 +5,9 @@ import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { PerformanceQueryDto, UpsertPlanDto } from './dto.js';
+import { countedOrders } from '../common/counted-orders.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
-const fulfilmentStatuses = ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED', 'DISTRIBUTOR_FULFILLED'] as const;
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
 type Season = { name: string; weightagePercent: number; startDate: string; endDate: string };
@@ -42,7 +42,7 @@ export class TargetIncentiveService {
   }
 
   private async actualSales(userId: string, start: Date, end: Date) {
-    const revenue = await this.prisma.order.aggregate({ where: { salespersonId: userId, createdAt: { gte: start, lt: end }, status: { in: [...fulfilmentStatuses] } }, _sum: { totalAmount: true } });
+    const revenue = await this.prisma.order.aggregate({ where: { salespersonId: userId, ...countedOrders(start, end) }, _sum: { totalAmount: true } });
     return Number(revenue._sum.totalAmount ?? 0);
   }
 
@@ -216,10 +216,10 @@ export class TargetIncentiveService {
     if (!plan) return { hasPlan: false as const, year: y };
     const [targets, orders] = await Promise.all([
       this.prisma.target.findMany({ where: { annualPlanId: plan.id, period: 'MONTHLY', periodYear: y }, select: { periodIndex: true, targetValue: true } }),
-      this.prisma.order.findMany({ where: { salespersonId: actor.id, createdAt: { gte: new Date(Date.UTC(y, 0, 1)), lt: new Date(Date.UTC(y + 1, 0, 1)) }, status: { in: [...fulfilmentStatuses] } }, select: { createdAt: true, totalAmount: true } }),
+      this.prisma.order.findMany({ where: { salespersonId: actor.id, ...countedOrders(new Date(Date.UTC(y, 0, 1)), new Date(Date.UTC(y + 1, 0, 1))) }, select: { paymentVerifiedAt: true, totalAmount: true } }),
     ]);
     const actual = new Array<number>(12).fill(0);
-    for (const order of orders) actual[order.createdAt.getUTCMonth()] += Number(order.totalAmount);
+    for (const order of orders) actual[order.paymentVerifiedAt!.getUTCMonth()] += Number(order.totalAmount);
     const months = Array.from({ length: 12 }, (_, i) => {
       const target = Number(targets.find((row) => row.periodIndex === i + 1)?.targetValue ?? 0);
       return { month: i + 1, target, actual: round2(actual[i]!), achievementPercent: target > 0 ? round2((actual[i]! / target) * 100) : 0 };

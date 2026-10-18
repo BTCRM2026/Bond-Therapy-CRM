@@ -4,7 +4,7 @@ import { fakeJpeg } from '../captures/jpeg.testkit.js';
 import { DailyReportsService } from './daily-reports.service.js';
 
 const actor = { id: 'staff-1', name: 'Ali', portal: 'STAFF', roles: [{ key: 'SALES_EXECUTIVE' }] } as never;
-const visit = { id: 'visit-1', client: { salonName: 'Glow Studio' }, visitProof: { checkInPhoto: Buffer.from('proof'), checkInPhotoMime: 'image/jpeg', checkInPhotoHash: 'f'.repeat(64) } };
+const visit = { id: 'visit-1', clientId: 'c1', checkInAt: new Date('2026-10-17T05:00:00Z'), checkOutAt: new Date('2026-10-17T05:30:00Z'), routeStop: { id: 'stop-1' }, client: { salonName: 'Glow Studio', city: 'Vadodara' }, visitProof: { distanceMeters: 8, checkInPhoto: Buffer.from('proof'), checkInPhotoMime: 'image/jpeg', checkInPhotoHash: 'f'.repeat(64) } };
 const base = { workingTown: 'Vadodara', tomorrowTown: 'Surat', tomorrowClientIds: [] as string[], calls: [{ visitActivityId: 'visit-1', customerName: 'x', customerType: 'NEW', result: 'ORDER', orderValue: 5000 }] };
 
 function build(visits: unknown[] = [visit]) {
@@ -19,13 +19,13 @@ function build(visits: unknown[] = [visit]) {
     route: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: 'route-1' }), update: vi.fn() },
     routeStop: { deleteMany: vi.fn(), createMany: vi.fn() },
     routeChangeLog: { create: vi.fn() },
-    dailySalesReport: { upsert: vi.fn().mockResolvedValue({ id: 'report-1' }), findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'report-1', calls: [], tomorrowRoute: null }) },
+    dailySalesReport: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue({ id: 'report-1' }), findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'report-1', calls: [], tomorrowRoute: null }) },
     auditLog: { create: vi.fn() },
     $transaction: vi.fn(),
   };
   prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma));
   const captures = { consume: vi.fn().mockResolvedValue(undefined) };
-  return { service: new DailyReportsService(prisma as unknown as PrismaService, captures as never), prisma, captures };
+  return { service: new DailyReportsService(prisma as unknown as PrismaService, captures as never, { gate: vi.fn().mockResolvedValue({ blocked: false }) } as never), prisma, captures };
 }
 
 describe('DailyReportsService visit-based reports', () => {
@@ -55,6 +55,22 @@ describe('DailyReportsService visit-based reports', () => {
     expect(upsert.create.tomorrowExtraStops).toEqual(['Royal Hair Studio', 'Glam Zone']);
     expect(prisma.route.create.mock.calls[0]![0].data.notes).toContain('Royal Hair Studio, Glam Zone');
     await expect(build().service.save(actor, { ...base } as never, [])).rejects.toThrow('at least one salon');
+  });
+});
+
+describe('DailyReportsService day rules', () => {
+  it('locks the day once a report is submitted', async () => {
+    const { service, prisma } = build();
+    prisma.dailySalesReport.findUnique.mockResolvedValue({ id: 'report-1' });
+    await expect(service.save(actor, { ...base, tomorrowNewSalons: ['A Salon'] } as never, [])).rejects.toThrow('locked');
+    expect(prisma.dailySalesReport.upsert).not.toHaveBeenCalled();
+  });
+
+  it('will not submit while a visit is still checked in, or while a visited salon is missing from the report', async () => {
+    const open = build([{ ...visit, checkOutAt: null }]);
+    await expect(open.service.save(actor, { ...base, tomorrowNewSalons: ['A Salon'] } as never, [])).rejects.toThrow('Check out of Glow Studio');
+    const other = { ...visit, id: 'visit-2', client: { salonName: 'Royal Studio', city: 'Vadodara' } };
+    await expect(build([visit, other]).service.save(actor, { ...base, tomorrowNewSalons: ['A Salon'] } as never, [])).rejects.toThrow('Add Royal Studio');
   });
 });
 

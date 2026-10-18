@@ -18,7 +18,7 @@ type RequestMeta = { ipAddress?: string; userAgent?: string };
 type AuthUser = {
   id: string;
   loginId: string;
-  email: string;
+  email: string | null;
   name: string;
   status: string;
   department: Department | null;
@@ -175,13 +175,15 @@ export class AuthService {
     if (PLACEHOLDER_EMAIL.test(email)) throw new BadRequestException('Enter your own email address.');
     const dateOfBirth = new Date(`${dto.dateOfBirth.slice(0, 10)}T00:00:00.000Z`);
     if (Number.isNaN(dateOfBirth.getTime()) || dateOfBirth > new Date() || dateOfBirth.getUTCFullYear() < 1930) throw new BadRequestException('Enter a valid date of birth.');
+    const joiningDate = new Date(`${dto.joiningDate.slice(0, 10)}T00:00:00.000Z`);
+    if (Number.isNaN(joiningDate.getTime()) || joiningDate > new Date() || joiningDate.getUTCFullYear() < 1990) throw new BadRequestException('Enter a valid joining date.');
     if (await this.prisma.user.findFirst({ where: { email, NOT: { id: user.id } }, select: { id: true } })) throw new BadRequestException('That email address is already in use.');
 
     const [, saved] = await this.prisma.$transaction([
       this.prisma.user.update({ where: { id: user.id }, data: { email } }),
       this.prisma.staffProfile.update({
         where: { userId: user.id },
-        data: { mobile: dto.mobile.trim(), dateOfBirth, bloodGroup: dto.bloodGroup ?? null, residentialAddress: dto.residentialAddress.trim(), emergencyContactName: dto.emergencyContactName.trim(), emergencyContactMobile: dto.emergencyContactMobile.trim(), detailsSubmittedAt: new Date() },
+        data: { mobile: dto.mobile.trim(), joiningDate, workLocation: dto.workLocation.trim(), dateOfBirth, bloodGroup: dto.bloodGroup ?? null, residentialAddress: dto.residentialAddress.trim(), emergencyContactName: dto.emergencyContactName.trim(), emergencyContactMobile: dto.emergencyContactMobile.trim(), detailsSubmittedAt: new Date() },
       }),
       this.prisma.auditLog.create({ data: { actorId: user.id, action: 'STAFF_DETAILS_SUBMIT', entity: 'USER', entityId: user.id, ipAddress } }),
     ]);

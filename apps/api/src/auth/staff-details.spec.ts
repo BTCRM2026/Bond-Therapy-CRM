@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AuthService } from './auth.service.js';
 
-const dto = { mobile: '9876543210', email: 'Ali@Example.com ', dateOfBirth: '1995-04-12', residentialAddress: '12 Main Road, Surat', emergencyContactName: 'Sara', emergencyContactMobile: '9876500000' };
+const dto = { mobile: '9876543210', email: 'Ali@Example.com ', dateOfBirth: '1995-04-12', joiningDate: '2024-06-03', workLocation: 'Surat', residentialAddress: '12 Main Road, Surat', emergencyContactName: 'Sara', emergencyContactMobile: '9876500000' };
 const staff = { id: 'u1', portal: 'STAFF' as const };
 
 function build(profile: { detailsSubmittedAt: Date | null } | null = { detailsSubmittedAt: null }, duplicate: unknown = null) {
@@ -27,6 +27,16 @@ describe('staff details one-time submission', () => {
     await expect(build().service.submitStaffDetails({ id: 'u1', portal: 'ADMIN' }, dto as never)).rejects.toThrow('staff portal');
     await expect(build().service.submitStaffDetails(staff, { ...dto, email: 'x@pending.bondtherapy.local' } as never)).rejects.toThrow('own email');
     await expect(build(undefined, { id: 'other' }).service.submitStaffDetails(staff, dto as never)).rejects.toThrow('already in use');
+  });
+
+  it('stores the joining date and work location the staff member enters', async () => {
+    const { service, prisma } = build();
+    await service.submitStaffDetails(staff, dto as never);
+    expect(prisma.staffProfile.update.mock.calls[0]![0].data).toMatchObject({ joiningDate: new Date('2024-06-03T00:00:00.000Z'), workLocation: 'Surat' });
+  });
+
+  it('rejects a future joining date', async () => {
+    await expect(build().service.submitStaffDetails(staff, { ...dto, joiningDate: '2999-01-01' } as never)).rejects.toThrow('joining date');
   });
 
   it('rejects a future date of birth', async () => {

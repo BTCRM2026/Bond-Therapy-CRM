@@ -54,8 +54,17 @@ export class ReplenishmentService {
 
   async list(actor: SessionUser, query: ListReplenishmentDto) {
     this.ensureAccess(actor);
-    const where = { AND: [this.visibility(actor, query.distributorId), query.status ? { status: query.status } : {}] } satisfies Prisma.ReplenishmentRequestWhereInput;
-    return this.prisma.replenishmentRequest.findMany({ where, include: requestInclude, omit: { invoiceFile: true }, orderBy: { createdAt: 'desc' } });
+    const visible = this.visibility(actor, query.distributorId);
+    const where = { AND: [visible, query.status ? { status: query.status } : {}] } satisfies Prisma.ReplenishmentRequestWhereInput;
+    // The distributor dashboards read the plain list; the admin screen asks for pages.
+    if (!query.page) return this.prisma.replenishmentRequest.findMany({ where, include: requestInclude, omit: { invoiceFile: true }, orderBy: { createdAt: 'desc' } });
+    const pageSize = query.pageSize ?? 10;
+    const [items, total, pendingCount] = await Promise.all([
+      this.prisma.replenishmentRequest.findMany({ where, include: requestInclude, omit: { invoiceFile: true }, orderBy: { createdAt: 'desc' }, skip: (query.page - 1) * pageSize, take: pageSize }),
+      this.prisma.replenishmentRequest.count({ where }),
+      this.prisma.replenishmentRequest.count({ where: { AND: [visible, { status: { in: ['REQUESTED', 'APPROVED'] } }] } }),
+    ]);
+    return { items, total, page: query.page, pageSize, hasMore: query.page * pageSize < total, pendingCount };
   }
 
   async create(actor: SessionUser, dto: CreateReplenishmentDto, ipAddress?: string) {

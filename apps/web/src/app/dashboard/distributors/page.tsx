@@ -20,7 +20,7 @@ export default async function DistributorsPage() {
   const isAdmin = session.roles.some((role) => role.key === "SUPER_ADMIN");
   if (!isAdmin) redirect("/dashboard");
 
-  const [distributors, requests] = await Promise.all([loadJson("/distributors"), loadJson("/replenishment")]);
+  const [distributors, requests] = await Promise.all([loadJson("/distributors"), loadJson("/replenishment?page=1&pageSize=10")]);
 
   return (
     <DashboardShell

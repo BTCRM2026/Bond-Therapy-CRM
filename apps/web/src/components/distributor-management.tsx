@@ -3,6 +3,7 @@
 import { Check, KeyRound, LoaderCircle, Plus, Search, Truck, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { CompactPagination } from "@/components/ui/compact-pagination";
 import { Button } from "@/components/ui/button";
 import { Field, FormError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -52,9 +53,13 @@ const messageFrom = (data: unknown, fallback: string) => (data && typeof data ==
 const STATUS_TONE: Record<string, string> = { ONBOARDING: "bg-warning-soft text-warning", ACTIVE: "bg-success-soft text-success", INACTIVE: "bg-gray-100 text-muted", REQUESTED: "bg-warning-soft text-warning", APPROVED: "bg-brand-soft text-brand", PICKING: "bg-brand-soft text-brand", PACKED: "bg-brand-soft text-brand", DISPATCHED: "bg-brand-soft text-brand", RECEIVED: "bg-success-soft text-success", PARTIALLY_RECEIVED: "bg-warning-soft text-warning", FULFILLED: "bg-success-soft text-success", REJECTED: "bg-red-50 text-danger" };
 const StatusBadge = ({ value }: { value: string }) => <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_TONE[value] ?? "bg-gray-100 text-muted"}`}>{value.charAt(0) + value.slice(1).toLowerCase()}</span>;
 
-export function DistributorManagement({ initialDistributors, initialRequests }: { initialDistributors: Distributor[]; initialRequests: ReplenishmentRequest[] }) {
+type RequestPage = { items: ReplenishmentRequest[]; total: number; page: number; pageSize: number; hasMore: boolean; pendingCount: number };
+const EMPTY_REQUESTS: RequestPage = { items: [], total: 0, page: 1, pageSize: 10, hasMore: false, pendingCount: 0 };
+
+export function DistributorManagement({ initialDistributors, initialRequests }: { initialDistributors: Distributor[]; initialRequests: RequestPage | ReplenishmentRequest[] }) {
   const [distributors, setDistributors] = useState(initialDistributors);
-  const [requests, setRequests] = useState(initialRequests);
+  const [requestPage, setRequestPage] = useState<RequestPage>(Array.isArray(initialRequests) ? EMPTY_REQUESTS : initialRequests);
+  const requests = requestPage.items;
   const [search, setSearch] = useState("");
   const [editor, setEditor] = useState<{ mode: "create" | "edit"; distributor?: Distributor } | null>(null);
   const [loginsFor, setLoginsFor] = useState<Distributor | null>(null);
@@ -74,17 +79,21 @@ export function DistributorManagement({ initialDistributors, initialRequests }: 
     const response = await fetch("/api/distributors", { cache: "no-store" });
     if (response.ok) setDistributors(await response.json());
   };
-  const reloadRequests = async () => {
-    const response = await fetch("/api/replenishment", { cache: "no-store" });
-    if (response.ok) setRequests(await response.json());
+  // Requests are loaded one page at a time, so the list stays quick as they build up.
+  const loadRequests = async (page = requestPage.page, pageSize = requestPage.pageSize) => {
+    const response = await fetch(`/api/replenishment?page=${page}&pageSize=${pageSize}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const next = await response.json() as RequestPage;
+    if (!next.items.length && page > 1) { await loadRequests(page - 1, pageSize); return; }
+    setRequestPage(next);
   };
+  const reloadRequests = () => loadRequests();
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return distributors.filter((distributor) => !term || `${distributor.businessName} ${distributor.contactName} ${distributor.territory ?? ""}`.toLowerCase().includes(term));
   }, [distributors, search]);
 
-  const pendingRequests = requests.filter((request) => request.status === "REQUESTED" || request.status === "APPROVED");
 
   const review = async (request: ReplenishmentRequest, action: "approve" | "reject" | "fulfill") => {
     setBusyId(request.id);
@@ -111,7 +120,7 @@ export function DistributorManagement({ initialDistributors, initialRequests }: 
         <KpiStrip columns={3}>
           <KpiCell label="Super Stockists" value={distributors.filter((d) => d.partnerType === "SUPER_STOCKIST").length} />
           <KpiCell label="Active" value={distributors.filter((d) => d.status === "ACTIVE").length} tone="success" />
-          <KpiCell label="Replenishment pending" value={pendingRequests.length} tone={pendingRequests.length ? "warning" : "neutral"} />
+          <KpiCell label="Replenishment pending" value={requestPage.pendingCount} tone={requestPage.pendingCount ? "warning" : "neutral"} />
         </KpiStrip>
 
         {error && <FormError message={error} />}
@@ -144,7 +153,7 @@ export function DistributorManagement({ initialDistributors, initialRequests }: 
         </section>
 
         <section className="crm-surface">
-          <div className="rounded-t-xl border-b px-5 py-4"><h2 className="text-sm font-semibold text-foreground">Mother Depot replenishment</h2><p className="mt-0.5 text-xs text-muted">Accept, invoice and dispatch Super Stockist requests</p></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b px-5 py-4"><div><h2 className="text-sm font-semibold text-foreground">Mother Depot replenishment</h2><p className="mt-0.5 text-xs text-muted">Accept, invoice and dispatch Super Stockist requests</p></div>{requestPage.total > 0 && <CompactPagination page={requestPage.page} pageSize={requestPage.pageSize} total={requestPage.total} hasMore={requestPage.hasMore} onPageChange={(page) => void loadRequests(page)} onPageSizeChange={(size) => void loadRequests(1, size)} />}</div>
           <div className="overflow-hidden rounded-b-xl">
             {requests.length ? (
               <div className="divide-y">{requests.map((request) => (

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ClientActivityStatus, ClientActivityType, ClientCategory, Prisma } from '@prisma/client';
 import { markFieldWorked } from '../attendance/field-attendance.js';
+import { DayRulesService } from '../day-rules/day-rules.service.js';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -19,7 +20,7 @@ const clientInclude = {
 
 @Injectable()
 export class ClientsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly dayRules: DayRulesService) {}
 
   private isAdmin(actor: SessionUser) {
     return actor.portal === 'ADMIN' && actor.roles.some((role) => role.key === 'SUPER_ADMIN');
@@ -183,6 +184,7 @@ export class ClientsService {
 
   async create(actor: SessionUser, dto: ClientDto, ipAddress?: string) {
     this.ensureAccess(actor);
+    if (actor.portal === 'STAFF') await this.dayRules.assertCanStart(actor.id);
     const duplicates = await this.possibleDuplicates(actor, dto);
     if (duplicates.length && !dto.continueOnDuplicate) throw new ConflictException({ message: 'Possible existing salon found. Review it before continuing.', candidates: duplicates });
     const assignments = await this.validateAssignments(actor, dto);

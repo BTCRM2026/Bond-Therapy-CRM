@@ -19,12 +19,12 @@ describe('AttendanceService status derivation', () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-24T05:00:00.000Z')); });
   afterEach(() => vi.useRealTimers());
   it('keeps today as not punched instead of marking the employee absent', async () => {
-    const service = new AttendanceService(prismaFor(null) as unknown as PrismaService);
+    const service = new AttendanceService(prismaFor(null) as unknown as PrismaService, { assertCanStart: vi.fn().mockResolvedValue(undefined), strictFrom: vi.fn().mockResolvedValue(null), facts: vi.fn().mockResolvedValue(new Map()), factsFor: vi.fn().mockReturnValue({ verifiedCalls: 0, reportSubmittedAt: null }), gate: vi.fn().mockResolvedValue({ blocked: false, approved: false, requiredDate: null, message: null }) } as never);
     await expect(service.today(actor)).resolves.toMatchObject({ status: 'NOT_PUNCHED', workingHours: null });
   });
 
   it('compares shift time in India rather than the server timezone', async () => {
-    const service = new AttendanceService(prismaFor({ punchInAt: new Date('2026-09-24T04:31:00.000Z'), punchOutAt: null }, '09:30') as unknown as PrismaService);
+    const service = new AttendanceService(prismaFor({ punchInAt: new Date('2026-09-24T04:31:00.000Z'), punchOutAt: null }, '09:30') as unknown as PrismaService, { assertCanStart: vi.fn().mockResolvedValue(undefined), strictFrom: vi.fn().mockResolvedValue(null), facts: vi.fn().mockResolvedValue(new Map()), factsFor: vi.fn().mockReturnValue({ verifiedCalls: 0, reportSubmittedAt: null }), gate: vi.fn().mockResolvedValue({ blocked: false, approved: false, requiredDate: null, message: null }) } as never);
     await expect(service.today(actor)).resolves.toMatchObject({ status: 'LATE', isLate: true });
   });
 });

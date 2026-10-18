@@ -86,3 +86,25 @@ describe('Replenishment supplier routing', () => {
     await expect(service.partnerDetail('too-short')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+describe('Replenishment list paging', () => {
+  const admin = { id: 'admin-1', portal: 'ADMIN', roles: [{ key: 'SUPER_ADMIN', name: 'Super Admin' }] } as SessionUser;
+  const build = () => {
+    const prisma = { replenishmentRequest: { findMany: vi.fn().mockResolvedValue([{ id: 'r1' }]), count: vi.fn().mockResolvedValueOnce(23).mockResolvedValueOnce(4) } };
+    return { service: new ReplenishmentService(prisma as unknown as PrismaService), prisma };
+  };
+
+  it('returns pages with the pending count when a page is asked for', async () => {
+    const { service, prisma } = build();
+    const result = await service.list(admin, { page: 2, pageSize: 10 }) as unknown as { total: number; hasMore: boolean; pendingCount: number };
+    expect(prisma.replenishmentRequest.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 10, take: 10 }));
+    expect(result).toMatchObject({ total: 23, hasMore: true, pendingCount: 4 });
+  });
+
+  it('still returns the plain list for the distributor dashboards', async () => {
+    const { service, prisma } = build();
+    const result = await service.list(admin, {});
+    expect(Array.isArray(result)).toBe(true);
+    expect(prisma.replenishmentRequest.findMany.mock.calls[0]![0]).not.toHaveProperty('take');
+  });
+});

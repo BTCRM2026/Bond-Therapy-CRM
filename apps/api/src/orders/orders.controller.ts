@@ -8,7 +8,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
-import { CreateOrderDto, ListOrdersDto, UpdateOrderDto, UpdateOrderStatusDto } from './dto.js';
+import { CreateOrderDto, ListOrdersDto, UnverifyPaymentDto, UpdateOrderDto, UpdateOrderStatusDto, VerifyPaymentDto } from './dto.js';
 import { OrdersService } from './orders.service.js';
 
 @Controller('orders')
@@ -40,6 +40,20 @@ export class OrdersController {
 
   @Patch(':id/status')
   updateStatus(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: UpdateOrderStatusDto, @Req() req: Request) { return this.orders.updateStatus(actor, id, dto, req.ip); }
+
+  // The salesperson's bill photo or PDF, and the administrator's confirmation that the payment arrived.
+  @Post(':id/bill')
+  @UseInterceptors(FileInterceptor('invoice', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  uploadBill(@CurrentUser() actor: SessionUser, @Param('id') id: string, @UploadedFile() file: { buffer: Buffer; mimetype: string; originalname: string; size: number } | undefined, @Req() req: Request) {
+    if (!file) throw new BadRequestException('Select a photo or PDF of the bill.');
+    return this.orders.uploadBill(actor, id, file, req.ip);
+  }
+
+  @Post(':id/verify-payment')
+  verifyPayment(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: VerifyPaymentDto, @Req() req: Request) { return this.orders.verifyPayment(actor, id, dto, req.ip); }
+
+  @Post(':id/unverify-payment')
+  unverifyPayment(@CurrentUser() actor: SessionUser, @Param('id') id: string, @Body() dto: UnverifyPaymentDto, @Req() req: Request) { return this.orders.unverifyPayment(actor, id, dto, req.ip); }
 
   @Post(':id/delivery-proof/:kind')
   @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))

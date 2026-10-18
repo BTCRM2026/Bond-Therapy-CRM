@@ -19,7 +19,7 @@ export default async function DistributorSettingsPage() {
       <ProfileSettings
         initialProfile={{
           name: session.name,
-          email: session.email,
+          email: session.email ?? "",
           loginId: session.loginId,
           roleName,
           portal: session.portal,

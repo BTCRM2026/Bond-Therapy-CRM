@@ -1,12 +1,15 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { countedOrders } from '../common/counted-orders.js';
+import { FULL_DAY_CALLS, HALF_DAY_CALLS, istDateKey } from '../day-rules/day-rules.js';
+import { DayRulesService } from '../day-rules/day-rules.service.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 
 @Injectable()
 export class SalesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly dayRules: DayRulesService) {}
 
   private ensureAccess(actor: SessionUser) {
     if (actor.portal !== 'STAFF' || !actor.roles.some((role) => salesRoles.has(role.key))) throw new ForbiddenException('Sales workspace is not available to this account.');
@@ -25,7 +28,7 @@ export class SalesService {
 
     const [target, ownOrders, openLeads, overdueFollowUps] = await Promise.all([
       this.prisma.salesTarget.findUnique({ where: { userId_periodYear_periodMonth: { userId: actor.id, periodYear: year, periodMonth: month } } }),
-      this.prisma.order.aggregate({ where: { salespersonId: actor.id, createdAt: { gte: start, lt: end }, status: { in: ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] } }, _sum: { totalAmount: true }, _count: true }),
+      this.prisma.order.aggregate({ where: { salespersonId: actor.id, ...countedOrders(start, end) }, _sum: { totalAmount: true }, _count: true }),
       this.prisma.lead.count({ where: { assignedToId: actor.id, status: { in: ['NEW', 'CONTACTED', 'QUALIFIED'] } } }),
       this.prisma.clientActivity.count({ where: { createdById: actor.id, status: 'OPEN', scheduledAt: { lt: now } } }),
     ]);
@@ -35,7 +38,7 @@ export class SalesService {
       const team = await this.prisma.user.findMany({ where: { OR: [{ id: actor.id }, { managerId: actor.id }] }, select: { id: true, name: true } });
       const teamIds = team.map((member) => member.id);
       const [orderSums, targets] = await Promise.all([
-        this.prisma.order.groupBy({ by: ['salespersonId'], where: { salespersonId: { in: teamIds }, createdAt: { gte: start, lt: end }, status: { in: ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] } }, _sum: { totalAmount: true }, _count: true }),
+        this.prisma.order.groupBy({ by: ['salespersonId'], where: { salespersonId: { in: teamIds }, ...countedOrders(start, end) }, _sum: { totalAmount: true }, _count: true }),
         this.prisma.salesTarget.findMany({ where: { userId: { in: teamIds }, periodYear: year, periodMonth: month } }),
       ]);
       leaderboard = team
@@ -58,6 +61,34 @@ export class SalesService {
     };
   }
 
+  // GPS-verified calls per day this month, against the daily goal (8 for a full day, 4 for a half day).
+  async calls(actor: SessionUser, monthParam?: number, yearParam?: number) {
+    this.ensureAccess(actor);
+    const now = new Date();
+    const todayKey = istDateKey(now);
+    const month = monthParam ?? Number(todayKey.slice(5, 7));
+    const year = yearParam ?? Number(todayKey.slice(0, 4));
+    const { start, end } = this.monthRange(month, year);
+    const facts = await this.dayRules.facts([actor.id], start, end);
+    const days: Array<{ date: string; calls: number }> = [];
+    for (let cursor = start.getTime(); cursor < end.getTime(); cursor += 86_400_000) {
+      const date = new Date(cursor).toISOString().slice(0, 10);
+      if (date > todayKey) break;
+      days.push({ date, calls: this.dayRules.factsFor(facts, actor.id, date).verifiedCalls });
+    }
+    const today = this.dayRules.factsFor(facts, actor.id, todayKey).verifiedCalls;
+    return {
+      period: { month, year },
+      goal: { fullDayCalls: FULL_DAY_CALLS, halfDayCalls: HALF_DAY_CALLS },
+      today: todayKey.startsWith(`${year}-${String(month).padStart(2, '0')}`) ? today : null,
+      total: days.reduce((sum, day) => sum + day.calls, 0),
+      fullDays: days.filter((day) => day.calls >= FULL_DAY_CALLS).length,
+      halfDays: days.filter((day) => day.calls >= HALF_DAY_CALLS && day.calls < FULL_DAY_CALLS).length,
+      shortDays: days.filter((day) => day.calls > 0 && day.calls < HALF_DAY_CALLS).length,
+      days,
+    };
+  }
+
   async performance(actor: SessionUser, monthParam?: number, yearParam?: number) {
     this.ensureAccess(actor);
     const now = new Date();
@@ -67,14 +98,14 @@ export class SalesService {
 
     const [target, revenue, newActiveClients, productiveVisits, callsAndVisits, leadsThisPeriod, productMixRaw] = await Promise.all([
       this.prisma.salesTarget.findUnique({ where: { userId_periodYear_periodMonth: { userId: actor.id, periodYear: year, periodMonth: month } } }),
-      this.prisma.order.aggregate({ where: { salespersonId: actor.id, createdAt: { gte: start, lt: end }, status: { in: ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] } }, _sum: { totalAmount: true }, _count: true }),
+      this.prisma.order.aggregate({ where: { salespersonId: actor.id, ...countedOrders(start, end) }, _sum: { totalAmount: true }, _count: true }),
       this.prisma.client.count({ where: { assignedSalespersonId: actor.id, status: 'ACTIVE', createdAt: { gte: start, lt: end } } }),
       this.prisma.clientActivity.count({ where: { createdById: actor.id, type: 'VISIT', status: 'COMPLETED', createdAt: { gte: start, lt: end } } }),
       this.prisma.clientActivity.count({ where: { createdById: actor.id, createdAt: { gte: start, lt: end } } }),
       this.prisma.lead.findMany({ where: { assignedToId: actor.id, createdAt: { gte: start, lt: end } }, select: { status: true } }),
       this.prisma.orderItem.groupBy({
         by: ['productId'],
-        where: { order: { salespersonId: actor.id, createdAt: { gte: start, lt: end }, status: { in: ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] } } },
+        where: { order: { salespersonId: actor.id, ...countedOrders(start, end) } },
         _sum: { quantity: true, lineTotal: true },
         orderBy: { _sum: { quantity: 'desc' } },
         take: 5,

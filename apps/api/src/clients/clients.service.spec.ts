@@ -13,7 +13,7 @@ describe('ClientsService client creation', () => {
       attendanceRecord: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue({}) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit-1' }) },
     };
-    const service = new ClientsService(prisma as unknown as PrismaService);
+    const service = new ClientsService(prisma as unknown as PrismaService, { assertCanStart: vi.fn() } as never);
 
     await service.create(
       { id: 'sales-1', portal: 'STAFF', roles: [{ key: 'SALES_EXECUTIVE' }] } as never,
@@ -40,7 +40,7 @@ describe('ClientsService client creation', () => {
       attendanceRecord: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue({}) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit-1' }) },
     };
-    const service = new ClientsService(prisma as unknown as PrismaService);
+    const service = new ClientsService(prisma as unknown as PrismaService, { assertCanStart: vi.fn() } as never);
     const actor = { id: 'sales-1', portal: 'STAFF', roles: [{ key: 'SALES_EXECUTIVE' }] } as never;
     await expect(service.create(actor, { salonName: 'Test Salon', category: 'SALON', primaryContact: '9876543210', city: 'Vadodara' } as never)).rejects.toThrow('Capture the salon location');
     expect(prisma.client.create).not.toHaveBeenCalled();

@@ -9,15 +9,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const passwordChanged = (await searchParams).passwordChanged === "1";
   return (
     <main
-      className="flex h-svh items-center justify-center overflow-hidden bg-cover bg-center p-3 sm:p-5 lg:p-8"
-      style={{ backgroundImage: "linear-gradient(rgba(247,244,239,.74),rgba(247,244,239,.82)),url('/brand/login-portal-products.png')" }}
+      className="crm-shell flex h-svh items-center justify-center overflow-hidden bg-cover bg-center p-3 sm:p-5 lg:p-8"
+      style={{ backgroundImage: "linear-gradient(rgba(245,246,246,.78),rgba(245,246,246,.86)),url('/brand/login-portal-products.png')", fontFamily: '"Inter Variable", Inter, Arial, sans-serif' }}
     >
-      <section className="grid h-[calc(100svh-24px)] min-h-0 w-full max-w-[600px] overflow-hidden rounded-xl border border-white/70 bg-white/95 shadow-[0_24px_60px_rgba(23,32,51,0.12),0_4px_16px_rgba(23,32,51,0.06)] backdrop-blur-sm sm:h-[calc(100svh-40px)] sm:max-h-[760px] lg:h-[calc(100svh-64px)] lg:max-h-[720px] lg:min-h-[620px] lg:max-w-[1120px] lg:grid-cols-[0.92fr_1.08fr] lg:gap-4 lg:p-4">
+      <section className="grid h-[calc(100svh-24px)] min-h-0 w-full max-w-[600px] overflow-hidden rounded-xl border border-white/70 bg-white/95 shadow-[0_16px_40px_rgba(32,35,38,0.08)] backdrop-blur-sm sm:h-[calc(100svh-40px)] sm:max-h-[760px] lg:h-[calc(100svh-64px)] lg:max-h-[720px] lg:min-h-[620px] lg:max-w-[1120px] lg:grid-cols-[0.92fr_1.08fr] lg:gap-4 lg:p-4">
         <div
           className="relative hidden overflow-hidden rounded-lg bg-cover bg-center p-8 lg:flex lg:flex-col lg:justify-between"
           style={{ backgroundImage: "url('/brand/login-product.jpeg')" }}
         >
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(128,90,43,.18)_0%,rgba(96,66,31,.42)_48%,rgba(45,36,28,.88)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(32,35,38,.16)_0%,rgba(32,35,38,.44)_48%,rgba(32,35,38,.88)_100%)]" />
           <BrandMark className="relative w-[165px] self-end brightness-0 invert lg:w-[170px] lg:self-start" />
           <div className="relative max-w-[430px] pb-1 text-white">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/75">One connected business workspace</p>

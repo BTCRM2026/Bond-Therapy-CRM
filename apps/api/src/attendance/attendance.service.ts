@@ -3,17 +3,22 @@ import { Prisma } from '@prisma/client';
 import type { CorrectionStatus, Department, LeaveStatus } from '@prisma/client';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
+import { dayReason, fieldDayStatus, FULL_DAY_CALLS, HALF_DAY_CALLS, reportCutoff } from '../day-rules/day-rules.js';
+import { DayRulesService } from '../day-rules/day-rules.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { AdminAttendanceListDto, HolidayDto, PunchDto, RequestCorrectionDto, ReviewRequestDto, UpdateOperationsSettingsDto } from './dto.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type DayStatus = 'PRESENT' | 'LATE' | 'HALF_DAY' | 'ABSENT' | 'LEAVE' | 'HOLIDAY' | 'WEEKLY_OFF' | 'NOT_PUNCHED';
+type DayStatus = 'PRESENT' | 'LATE' | 'HALF_DAY' | 'ABSENT' | 'LEAVE' | 'HOLIDAY' | 'WEEKLY_OFF' | 'NOT_PUNCHED' | 'IN_PROGRESS';
+// Present when the field day rules apply: the verified calls and the report decide the day (see day-rules.ts).
+type FieldRules = { dateKey: string; now: Date; verifiedCalls: number; reportSubmittedAt: Date | null };
+type Classified = { status: DayStatus; workingHours: number | null; isLate: boolean; isEarlyCheckout: boolean; verifiedCalls?: number; reportSubmitted?: boolean; reportOnTime?: boolean | null; dayNote?: string | null };
 
 @Injectable()
 export class AttendanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly dayRules: DayRulesService) {}
 
   private isAdmin(actor: SessionUser) {
     return actor.portal === 'ADMIN' && actor.roles.some((role) => role.key === 'SUPER_ADMIN');
@@ -69,10 +74,21 @@ export class AttendanceService {
     return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   }
 
-  private classifyDay(date: Date, record: { punchInAt: Date | null; punchOutAt: Date | null; fromVisits?: boolean } | null, ctx: { shiftStart: string | null; shiftEnd: string | null; isHoliday: boolean; isOnLeave: boolean; isWeeklyOff: boolean; lateThresholdMinutes: number; halfDayThresholdHours: number; isFuture: boolean }) {
+  private classifyDay(date: Date, record: { punchInAt: Date | null; punchOutAt: Date | null; fromVisits?: boolean; punchInLatitude?: unknown } | null, ctx: { shiftStart: string | null; shiftEnd: string | null; isHoliday: boolean; isOnLeave: boolean; isWeeklyOff: boolean; lateThresholdMinutes: number; halfDayThresholdHours: number; isFuture: boolean; rules?: FieldRules | null }): Classified {
     if (ctx.isHoliday) return { status: 'HOLIDAY' as DayStatus, workingHours: null as number | null, isLate: false, isEarlyCheckout: false };
     if (ctx.isWeeklyOff) return { status: 'WEEKLY_OFF' as DayStatus, workingHours: null, isLate: false, isEarlyCheckout: false };
     if (ctx.isOnLeave) return { status: 'LEAVE' as DayStatus, workingHours: null, isLate: false, isEarlyCheckout: false };
+    const legacy = this.classifyByHours(record, ctx);
+    if (ctx.rules) {
+      const officeWork = record?.punchInLatitude != null && Boolean(record.punchInAt);
+      const result = fieldDayStatus({ dateKey: ctx.rules.dateKey, now: ctx.rules.now, verifiedCalls: ctx.rules.verifiedCalls, reportSubmittedAt: ctx.rules.reportSubmittedAt, officeStatus: officeWork ? (legacy.status === 'HALF_DAY' ? 'HALF_DAY' : 'PRESENT') : null, hasActivity: Boolean(record?.punchInAt) || ctx.rules.verifiedCalls > 0 });
+      return { status: result.status, workingHours: legacy.workingHours, isLate: officeWork ? legacy.isLate : false, isEarlyCheckout: legacy.isEarlyCheckout, verifiedCalls: result.verifiedCalls, reportSubmitted: result.reportSubmitted, reportOnTime: result.reportOnTime, dayNote: dayReason(result) };
+    }
+    return legacy;
+  }
+
+  // The original rule: the hours between the first and last activity decide present, late or half day.
+  private classifyByHours(record: { punchInAt: Date | null; punchOutAt: Date | null; fromVisits?: boolean } | null, ctx: { shiftStart: string | null; shiftEnd: string | null; lateThresholdMinutes: number; halfDayThresholdHours: number; isFuture: boolean }): Classified {
     if (record?.punchInAt) {
       const workingHours = record.punchOutAt ? Math.round(((record.punchOutAt.getTime() - record.punchInAt.getTime()) / 3600000) * 100) / 100 : null;
       let isLate = false;
@@ -111,13 +127,19 @@ export class AttendanceService {
     this.ensureAccess(actor);
     const date = this.todayKey();
     const dayStart = new Date(date.getTime() - 330 * 60 * 1000);
-    const [record, settings, visitCount] = await Promise.all([
+    const dayKey = date.toISOString().slice(0, 10);
+    const [record, settings, visitCount, strictFrom, dayFacts, gate] = await Promise.all([
       this.prisma.attendanceRecord.findUnique({ where: { userId_date: { userId: actor.id, date } } }),
       this.settings(),
       this.prisma.clientActivity.count({ where: { createdById: actor.id, type: 'VISIT', checkInAt: { gte: dayStart, lt: new Date(dayStart.getTime() + 86_400_000) } } }),
+      this.dayRules.strictFrom(),
+      this.dayRules.facts([actor.id], date, new Date(date.getTime() + DAY_MS)),
+      this.dayRules.gate(actor.id),
     ]);
+    const facts = this.dayRules.factsFor(dayFacts, actor.id, dayKey);
+    const rules = strictFrom && date.getTime() >= strictFrom.getTime() ? { dateKey: dayKey, now: new Date(), verifiedCalls: facts.verifiedCalls, reportSubmittedAt: facts.reportSubmittedAt } : null;
     const ctx = await this.dayContext(actor.id, date, settings);
-    const classified = this.classifyDay(date, record, { ...ctx, lateThresholdMinutes: settings.lateThresholdMinutes, halfDayThresholdHours: Number(settings.halfDayThresholdHours), isFuture: true });
+    const classified = this.classifyDay(date, record, { ...ctx, lateThresholdMinutes: settings.lateThresholdMinutes, halfDayThresholdHours: Number(settings.halfDayThresholdHours), isFuture: true, rules });
     return {
       punchInAt: record?.punchInAt ?? null,
       punchOutAt: record?.punchOutAt ?? null,
@@ -129,6 +151,13 @@ export class AttendanceService {
       visitCount,
       halfDayThresholdHours: Number(settings.halfDayThresholdHours),
       ...classified,
+      rulesApplied: Boolean(rules),
+      verifiedCalls: facts.verifiedCalls,
+      fullDayCalls: FULL_DAY_CALLS,
+      halfDayCalls: HALF_DAY_CALLS,
+      reportSubmitted: Boolean(facts.reportSubmittedAt),
+      reportDeadlineAt: reportCutoff(dayKey).toISOString(),
+      gate,
     };
   }
 
@@ -146,6 +175,7 @@ export class AttendanceService {
 
   async punchIn(actor: SessionUser, dto: PunchDto, ipAddress?: string) {
     this.ensureAccess(actor);
+    if (!this.isAdmin(actor)) await this.dayRules.assertCanStart(actor.id);
     const date = this.todayKey();
     const existing = await this.prisma.attendanceRecord.findUnique({ where: { userId_date: { userId: actor.id, date } } });
     if (existing?.punchInLatitude != null) throw new ConflictException('You have already checked in at the office today.');
@@ -188,22 +218,27 @@ export class AttendanceService {
     const start = new Date(Date.UTC(year, month - 1, 1));
     const end = new Date(Date.UTC(year, month, 1));
     const today = this.todayKey();
-    const [records, settings, holidays, leaves, profile] = await Promise.all([
+    const [records, settings, holidays, leaves, profile, strictFrom, facts] = await Promise.all([
       this.prisma.attendanceRecord.findMany({ where: { userId, date: { gte: start, lt: end } }, orderBy: { date: 'asc' } }),
       this.settings(),
       this.prisma.holiday.findMany({ where: { date: { gte: start, lt: end } } }),
       this.prisma.leaveRequest.findMany({ where: { userId, status: 'APPROVED', startDate: { lt: end }, endDate: { gte: start } } }),
       this.prisma.staffProfile.findUnique({ where: { userId }, select: { shiftStart: true, shiftEnd: true } }),
+      this.dayRules.strictFrom(),
+      this.dayRules.facts([userId], start, end),
     ]);
     const weeklyOffDays = (settings.weeklyOffDays as number[] | null) ?? [0];
     const holidayDates = new Set(holidays.map((h) => h.date.getTime()));
-    const days: Array<{ date: string; punchInAt: string | null; punchOutAt: string | null; status: DayStatus; workingHours: number | null; isLate: boolean; isEarlyCheckout: boolean }> = [];
+    const days: Array<Classified & { date: string; punchInAt: string | null; punchOutAt: string | null }> = [];
     const lastDay = Math.min(end.getTime() - DAY_MS, today.getTime() < end.getTime() ? today.getTime() : end.getTime() - DAY_MS);
     for (let cursor = start.getTime(); cursor <= lastDay; cursor += DAY_MS) {
       const date = new Date(cursor);
       const record = records.find((r) => r.date.getTime() === cursor) ?? null;
       const isOnLeave = leaves.some((leave) => leave.startDate.getTime() <= cursor && leave.endDate.getTime() >= cursor);
-      const classified = this.classifyDay(date, record, { shiftStart: profile?.shiftStart ?? null, shiftEnd: profile?.shiftEnd ?? null, isHoliday: holidayDates.has(cursor), isOnLeave, isWeeklyOff: weeklyOffDays.includes(date.getUTCDay()), lateThresholdMinutes: settings.lateThresholdMinutes, halfDayThresholdHours: Number(settings.halfDayThresholdHours), isFuture: cursor === today.getTime() });
+      const dayKey = date.toISOString().slice(0, 10);
+      const dayFacts = this.dayRules.factsFor(facts, userId, dayKey);
+      const rules = strictFrom && cursor >= strictFrom.getTime() ? { dateKey: dayKey, now, verifiedCalls: dayFacts.verifiedCalls, reportSubmittedAt: dayFacts.reportSubmittedAt } : null;
+      const classified = this.classifyDay(date, record, { shiftStart: profile?.shiftStart ?? null, shiftEnd: profile?.shiftEnd ?? null, isHoliday: holidayDates.has(cursor), isOnLeave, isWeeklyOff: weeklyOffDays.includes(date.getUTCDay()), lateThresholdMinutes: settings.lateThresholdMinutes, halfDayThresholdHours: Number(settings.halfDayThresholdHours), isFuture: cursor === today.getTime(), rules });
       days.push({ date: date.toISOString(), punchInAt: record?.punchInAt?.toISOString() ?? null, punchOutAt: record?.punchOutAt?.toISOString() ?? null, ...classified });
     }
     const daysPresent = days.filter((d) => d.status === 'PRESENT' || d.status === 'LATE').length;
@@ -218,7 +253,7 @@ export class AttendanceService {
       earlyCheckout: days.filter((d) => d.isEarlyCheckout).length,
       totalHours: Math.round(days.reduce((sum, d) => sum + (d.workingHours ?? 0), 0) * 100) / 100,
     };
-    return { period: { month, year }, daysPresent, summary, records: days.filter((d) => d.punchInAt || d.status !== 'WEEKLY_OFF').map((d) => ({ date: d.date, punchInAt: d.punchInAt, punchOutAt: d.punchOutAt, status: d.status, workingHours: d.workingHours, isLate: d.isLate, isEarlyCheckout: d.isEarlyCheckout })).reverse() };
+    return { period: { month, year }, daysPresent, summary, records: days.filter((d) => d.punchInAt || d.status !== 'WEEKLY_OFF').map((d) => ({ date: d.date, punchInAt: d.punchInAt, punchOutAt: d.punchOutAt, status: d.status, workingHours: d.workingHours, isLate: d.isLate, isEarlyCheckout: d.isEarlyCheckout, verifiedCalls: d.verifiedCalls ?? null, dayNote: d.dayNote ?? null })).reverse() };
   }
 
   async requestCorrection(actor: SessionUser, dto: RequestCorrectionDto, ipAddress?: string) {
@@ -327,26 +362,58 @@ export class AttendanceService {
     this.ensureAdminAccess(actor);
     const staff = await this.prisma.user.findMany({ where: { status: 'ACTIVE', roles: { some: { role: { key: { in: [...salesRoles] } } } } }, select: { id: true, staffProfile: { select: { shiftStart: true, shiftEnd: true } } } });
     const date = this.todayKey();
-    const settings = await this.settings();
-    const [records, holiday] = await Promise.all([
-      this.prisma.attendanceRecord.findMany({ where: { userId: { in: staff.map((s) => s.id) }, date } }),
-      this.prisma.holiday.findUnique({ where: { date } }),
-    ]);
-    const leaves = await this.prisma.leaveRequest.findMany({ where: { userId: { in: staff.map((s) => s.id) }, status: 'APPROVED', startDate: { lte: date }, endDate: { gte: date } } });
-    const weeklyOffDays = (settings.weeklyOffDays as number[] | null) ?? [0];
-    const isWeeklyOff = weeklyOffDays.includes(date.getUTCDay());
+    const [days, holiday, settings] = await Promise.all([this.classifyStaffOnDate(date, staff), this.prisma.holiday.findUnique({ where: { date } }), this.settings()]);
+    const isWeeklyOff = ((settings.weeklyOffDays as number[] | null) ?? [0]).includes(date.getUTCDay());
     let present = 0; let late = 0; let onLeave = 0; let notPunched = 0;
-    for (const member of staff) {
-      const record = records.find((r) => r.userId === member.id);
-      if (holiday || isWeeklyOff) continue;
-      if (leaves.some((l) => l.userId === member.id)) { onLeave++; continue; }
-      if (record?.punchInAt) {
-        const classified = this.classifyDay(date, record, { shiftStart: member.staffProfile?.shiftStart ?? null, shiftEnd: member.staffProfile?.shiftEnd ?? null, isHoliday: false, isOnLeave: false, isWeeklyOff: false, lateThresholdMinutes: settings.lateThresholdMinutes, halfDayThresholdHours: Number(settings.halfDayThresholdHours), isFuture: true });
-        present++;
-        if (classified.isLate) late++;
-      } else { notPunched++; }
+    if (!holiday && !isWeeklyOff) {
+      for (const member of staff) {
+        const day = days.get(member.id)!;
+        if (day.isOnLeave) onLeave++;
+        else if (day.status === 'NOT_PUNCHED' || day.status === 'ABSENT') notPunched++;
+        else { present++; if (day.isLate) late++; }
+      }
     }
     return { total: staff.length, present, late, onLeave, notPunched, isHoliday: Boolean(holiday), isWeeklyOff, holidayName: holiday?.name ?? null };
+  }
+
+  // The day-start block: who cannot begin today until an administrator approves them, and the approval itself.
+  async dayGate(actor: SessionUser) {
+    this.ensureAccess(actor);
+    return this.dayRules.gate(actor.id);
+  }
+
+  async blockedStaff(actor: SessionUser) {
+    this.ensureAdminAccess(actor);
+    return this.dayRules.blockedToday();
+  }
+
+  async approveDayStart(actor: SessionUser, userId: string, note?: string, ipAddress?: string) {
+    this.ensureAdminAccess(actor);
+    return this.dayRules.approveStart(actor, userId, note, ipAddress);
+  }
+
+  // Day status for several staff on one date. Shared by the admin attendance list and the team activity board, so both always agree.
+  async classifyStaffOnDate(date: Date, staff: Array<{ id: string; staffProfile: { shiftStart: string | null; shiftEnd: string | null } | null }>) {
+    const settings = await this.settings();
+    const ids = staff.map((member) => member.id);
+    const [records, holiday, leaves, strictFrom, facts] = await Promise.all([
+      this.prisma.attendanceRecord.findMany({ where: { userId: { in: ids }, date } }),
+      this.prisma.holiday.findUnique({ where: { date } }),
+      this.prisma.leaveRequest.findMany({ where: { userId: { in: ids }, status: 'APPROVED', startDate: { lte: date }, endDate: { gte: date } } }),
+      this.dayRules.strictFrom(),
+      this.dayRules.facts(ids, date, new Date(date.getTime() + DAY_MS)),
+    ]);
+    const weeklyOffDays = (settings.weeklyOffDays as number[] | null) ?? [0];
+    const dayKey = date.toISOString().slice(0, 10);
+    const now = new Date();
+    return new Map(staff.map((member) => {
+      const record = records.find((item) => item.userId === member.id) ?? null;
+      const isOnLeave = leaves.some((item) => item.userId === member.id);
+      const dayFacts = this.dayRules.factsFor(facts, member.id, dayKey);
+      const rules = strictFrom && date.getTime() >= strictFrom.getTime() ? { dateKey: dayKey, now, verifiedCalls: dayFacts.verifiedCalls, reportSubmittedAt: dayFacts.reportSubmittedAt } : null;
+      const classified = this.classifyDay(date, record, { shiftStart: member.staffProfile?.shiftStart ?? null, shiftEnd: member.staffProfile?.shiftEnd ?? null, isHoliday: Boolean(holiday), isOnLeave, isWeeklyOff: weeklyOffDays.includes(date.getUTCDay()), lateThresholdMinutes: settings.lateThresholdMinutes, halfDayThresholdHours: Number(settings.halfDayThresholdHours), isFuture: date.getTime() >= this.todayKey().getTime(), rules });
+      return [member.id, { record, isOnLeave, ...classified }] as const;
+    }));
   }
 
   async adminList(actor: SessionUser, query: AdminAttendanceListDto) {
@@ -356,17 +423,9 @@ export class AttendanceService {
     if (query.department) staffWhere.department = query.department as Department;
     if (query.search) staffWhere.OR = [{ name: { contains: query.search } }, { loginId: { contains: query.search } }];
     const staff = await this.prisma.user.findMany({ where: staffWhere, select: { id: true, name: true, department: true, loginId: true, staffProfile: { select: { shiftStart: true, shiftEnd: true } } }, orderBy: { name: 'asc' } });
-    const settings = await this.settings();
-    const [records, holiday, leaves] = await Promise.all([
-      this.prisma.attendanceRecord.findMany({ where: { userId: { in: staff.map((s) => s.id) }, date } }),
-      this.prisma.holiday.findUnique({ where: { date } }),
-      this.prisma.leaveRequest.findMany({ where: { userId: { in: staff.map((s) => s.id) }, status: 'APPROVED', startDate: { lte: date }, endDate: { gte: date } } }),
-    ]);
-    const weeklyOffDays = (settings.weeklyOffDays as number[] | null) ?? [0];
+    const days = await this.classifyStaffOnDate(date, staff);
     const filteredRows = staff.map((member) => {
-      const record = records.find((r) => r.userId === member.id) ?? null;
-      const isOnLeave = leaves.some((l) => l.userId === member.id);
-      const classified = this.classifyDay(date, record, { shiftStart: member.staffProfile?.shiftStart ?? null, shiftEnd: member.staffProfile?.shiftEnd ?? null, isHoliday: Boolean(holiday), isOnLeave, isWeeklyOff: weeklyOffDays.includes(date.getUTCDay()), lateThresholdMinutes: settings.lateThresholdMinutes, halfDayThresholdHours: Number(settings.halfDayThresholdHours), isFuture: date.getTime() >= this.todayKey().getTime() });
+      const { record, isOnLeave: _isOnLeave, ...classified } = days.get(member.id)!;
       return { id: member.id, name: member.name, loginId: member.loginId, department: member.department, punchInAt: record?.punchInAt?.toISOString() ?? null, punchOutAt: record?.punchOutAt?.toISOString() ?? null, ...classified };
     }).filter((row) => !query.status || row.status === query.status);
     const total = filteredRows.length;

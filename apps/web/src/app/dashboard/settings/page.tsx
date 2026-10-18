@@ -31,7 +31,7 @@ export default async function SettingsPage() {
         : <div className="space-y-5"><ProfileSettings
         initialProfile={{
           name: session.name,
-          email: session.email,
+          email: session.email ?? "",
           loginId: session.loginId,
           roleName,
           portal: session.portal,

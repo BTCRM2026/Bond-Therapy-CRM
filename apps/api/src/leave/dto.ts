@@ -1,5 +1,5 @@
-import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -19,7 +19,12 @@ export class ReviewLeaveDto {
   @IsOptional() @Transform(trim) @IsString() @MaxLength(500) reviewNote?: string;
 }
 
-export class LeaveListDto {
+export class LeavePageDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) pageSize = 20;
+}
+
+export class LeaveListDto extends LeavePageDto {
   @IsOptional() @IsIn(['PENDING', 'APPROVED', 'REJECTED']) status?: 'PENDING' | 'APPROVED' | 'REJECTED';
 }
 

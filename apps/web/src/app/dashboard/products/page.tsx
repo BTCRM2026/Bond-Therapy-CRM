@@ -5,6 +5,7 @@ import { ProductManagement } from "@/components/product-management";
 import { ProductsCatalogue, type ProductListResponse } from "@/components/products-catalogue";
 import { PORTAL_HEADER, type PortalType } from "@/lib/portal";
 import { requireSession } from "@/lib/session";
+import { isStaffModuleEnabled } from "@/lib/staff-modules";
 
 const SALES_ROLE_KEYS = new Set(["SALES_MANAGER", "SALES_EXECUTIVE"]);
 
@@ -18,6 +19,7 @@ async function loadProducts(portal: PortalType) {
 
 export default async function ProductsPage() {
   const session = await requireSession();
+  if (session.portal === "STAFF" && !isStaffModuleEnabled("/dashboard/products")) redirect("/dashboard");
   const isAdmin = session.portal === "ADMIN" && session.roles.some((role) => role.key === "SUPER_ADMIN");
   const isSales = session.portal === "STAFF" && SALES_ROLE_KEYS.has(session.roles[0]?.key ?? "");
   const isAccounts = session.portal === "STAFF" && session.roles.some((role) => role.key === "ACCOUNTS_BILLING");

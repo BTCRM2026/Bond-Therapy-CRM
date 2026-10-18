@@ -30,7 +30,7 @@ function build({ client = salon as Record<string, unknown>, activity = null as u
   };
   prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma));
   const captures = { consume: vi.fn().mockResolvedValue(undefined) };
-  return { service: new RoutesService(prisma as unknown as PrismaService, captures as never), prisma, captures };
+  return { service: new RoutesService(prisma as unknown as PrismaService, captures as never, { assertCanStart: vi.fn() } as never), prisma, captures };
 }
 
 describe('RoutesService strict salon check-in', () => {
@@ -106,5 +106,22 @@ describe('RoutesService live camera guard on check-in', () => {
     await expect(service.startVisit(actor, today, 'stop-1', near, photo)).rejects.toThrow('in-app camera');
     expect(prisma.visitProof.upsert).not.toHaveBeenCalled();
     expect(prisma.attendanceRecord.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('RoutesService admin visits paging', () => {
+  it('pages the visit list but summarises every matching visit', async () => {
+    const { service, prisma } = build();
+    const admin = { id: 'admin-1', portal: 'ADMIN', roles: [{ key: 'SUPER_ADMIN' }] } as never;
+    Object.assign(prisma, {
+      routeStop: { ...prisma.routeStop, findMany: vi.fn().mockResolvedValue([{ id: 's1' }]), count: vi.fn().mockResolvedValueOnce(95).mockResolvedValue(10) },
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+      client: { ...prisma.client, findMany: vi.fn().mockResolvedValue([]) },
+    });
+    const result = await service.adminVisits(admin, { page: 3, pageSize: 20 } as never);
+    expect(prisma.routeStop.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 40, take: 20 }));
+    expect(result.summary.total).toBe(95);
+    expect(result).toMatchObject({ page: 3, pageSize: 20, hasMore: true });
+    expect(result.summary).toMatchObject({ completed: 10, pending: 10, gpsVerified: 10 });
   });
 });

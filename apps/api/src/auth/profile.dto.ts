@@ -42,6 +42,12 @@ export class StaffDetailsDto {
   @IsOptional() @IsIn(bloodGroups, { message: 'Select a valid blood group.' })
   bloodGroup?: (typeof bloodGroups)[number];
 
+  @IsDateString({}, { message: 'Enter your joining date.' })
+  joiningDate!: string;
+
+  @Transform(trim) @IsString() @MinLength(2, { message: 'Enter your work location.' }) @MaxLength(120)
+  workLocation!: string;
+
   @Transform(trim) @IsString() @MinLength(5, { message: 'Enter your residential address.' }) @MaxLength(500)
   residentialAddress!: string;
 

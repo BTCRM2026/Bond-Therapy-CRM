@@ -1,9 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CapturesService } from '../captures/captures.service.js';
 import { assertLiveCameraPhoto } from '../captures/live-photo.js';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
+import { DayRulesService } from '../day-rules/day-rules.service.js';
+import { FULL_DAY_CALLS, HALF_DAY_CALLS, reportCutoff } from '../day-rules/day-rules.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { needsNoOrderReason, summarizeDailyCalls } from './daily-reports.logic.js';
 import type { SaveDailyReportDto } from './dto.js';
@@ -18,7 +20,7 @@ const reportInclude = {
 
 @Injectable()
 export class DailyReportsService {
-  constructor(private readonly prisma: PrismaService, private readonly captures: CapturesService) {}
+  constructor(private readonly prisma: PrismaService, private readonly captures: CapturesService, private readonly dayRules: DayRulesService) {}
 
   private ensureAccess(actor: SessionUser) {
     if (actor.portal !== 'STAFF' || !actor.roles.some((role) => salesRoles.has(role.key))) throw new ForbiddenException('Daily reports are available only to the sales team.');
@@ -94,9 +96,13 @@ export class DailyReportsService {
       this.prisma.target.findFirst({ where: { scope: 'STAFF', scopeId: actor.id, metric: 'CALLS', period: 'MONTHLY', periodYear: date.getUTCFullYear(), periodIndex: date.getUTCMonth() + 1 }, select: { targetValue: true } }),
     ]);
     const visits = await this.todayVisits(actor, date);
+    const gate = await this.dayRules.gate(actor.id);
     return {
       date: this.dateKey(),
       visits,
+      // Rules shown on the report screen: the report locks once submitted, and 11 PM is the deadline for a full day.
+      rules: { fullDayCalls: FULL_DAY_CALLS, halfDayCalls: HALF_DAY_CALLS, deadlineAt: reportCutoff(this.dateKey()).toISOString(), locked: Boolean(report) },
+      gate,
       staff: { id: actor.id, name: actor.name, headquarter: context.headquarter },
       towns: context.towns,
       clients: context.clients,
@@ -109,6 +115,9 @@ export class DailyReportsService {
 
   async save(actor: SessionUser, dto: SaveDailyReportDto, photos: Array<{ fieldname: string; buffer: Buffer; mimetype: string; size: number }>, ipAddress?: string) {
     this.ensureAccess(actor);
+    const reportDate = this.dateFromKey(this.dateKey());
+    // The report is the end of the day: once it is submitted the day is locked.
+    if (await this.prisma.dailySalesReport.findUnique({ where: { staffId_reportDate: { staffId: actor.id, reportDate } }, select: { id: true } })) throw new ConflictException('Today’s report is already submitted and locked. Ask your administrator if something needs to change.');
     const context = await this.context(actor);
     if (!context.towns.includes(dto.workingTown) || !context.towns.includes(dto.tomorrowTown)) throw new BadRequestException('Select a town assigned to your territory.');
     if (dto.coworkerId && !context.coworkers.some((coworker) => coworker.id === dto.coworkerId)) throw new BadRequestException('Select an active sales coworker or Solo.');
@@ -146,10 +155,15 @@ export class DailyReportsService {
       if (call.result === 'ORDER' && (!call.orderValue || call.orderValue <= 0)) throw new BadRequestException(`Enter the order value for ${call.customerName}.`);
     }
 
-    const reportDate = this.dateFromKey(this.dateKey());
     const routeDate = this.tomorrow(reportDate);
     const visitIds = dto.calls.map((call) => call.visitActivityId).filter((id): id is string => Boolean(id));
     if (new Set(visitIds).size !== visitIds.length) throw new BadRequestException('A salon visit can appear only once in the report.');
+    // Every verified visit of the day must be closed and included before the day can be submitted.
+    const todays = await this.todayVisits(actor, reportDate);
+    const stillOpen = todays.filter((visit) => !visit.checkOutAt);
+    if (stillOpen.length) throw new BadRequestException(`Check out of ${stillOpen.map((visit) => visit.salonName).join(', ')} before submitting your report.`);
+    const left = todays.filter((visit) => !visitIds.includes(visit.activityId));
+    if (left.length) throw new BadRequestException(`Add ${left.map((visit) => visit.salonName).join(', ')} to your report: every salon you visited today must be included.`);
     const visits = visitIds.length ? await this.prisma.clientActivity.findMany({
       where: { id: { in: visitIds }, type: 'VISIT', createdById: actor.id, routeStop: { is: { route: { staffId: actor.id, routeDate: reportDate } } }, visitProof: { is: { gpsVerified: true } } },
       select: { id: true, client: { select: { salonName: true } }, visitProof: { select: { checkInPhoto: true, checkInPhotoMime: true, checkInPhotoHash: true } } },

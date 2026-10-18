@@ -1,14 +1,18 @@
 "use client";
 
 import {
+  CheckCircle2,
   Download,
+  FileText,
   LoaderCircle,
+  Paperclip,
   Plus,
   Search,
+  Send,
   ShoppingCart,
   X,
 } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -35,6 +39,9 @@ type Order = {
   subtotal: string;
   version: number;
   notes: string | null;
+  reviewComment?: string | null;
+  paymentVerifiedAt?: string | null;
+  distributorInvoiceAttachment?: { id: string; fileName: string; mime: string } | null;
   client: Client;
   items: Array<{ productId: string; quantity: number; product: Product }>;
 };
@@ -46,6 +53,90 @@ const message = (data: unknown, fallback: string) =>
   data && typeof data === "object" && "message" in data
     ? String((data as { message: unknown }).message)
     : fallback;
+
+// What the salesperson needs to know about an order: where it stands, and what to do next.
+function stage(order: Order): { label: string; tone: string } {
+  if (order.paymentVerifiedAt) return { label: "Payment confirmed", tone: "bg-success-soft text-success" };
+  if (order.status === "DRAFT") return { label: "Draft", tone: "bg-background text-muted" };
+  if (order.status === "RETURNED_FOR_CORRECTION") return { label: "Returned", tone: "bg-warning-soft text-warning" };
+  if (order.status === "REJECTED") return { label: "Rejected", tone: "bg-red-50 text-danger" };
+  if (order.status === "SUBMITTED" || order.status === "UNDER_REVIEW") return { label: "With admin", tone: "bg-brand-soft text-brand-dark" };
+  return { label: "Approved", tone: "bg-brand-soft text-brand-dark" };
+}
+
+// Attach the distributor's bill (camera, gallery or PDF) and send the order to the admin, who confirms the payment.
+function BillActions({ order, onChanged }: { order: Order; onChanged: () => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const editable = order.status === "DRAFT" || order.status === "RETURNED_FOR_CORRECTION";
+  const bill = order.distributorInvoiceAttachment;
+
+  const attach = async (file: File) => {
+    setBusy("upload");
+    setError("");
+    try {
+      const body = new FormData();
+      body.append("invoice", file);
+      const response = await fetch(`/api/orders/${order.id}/bill`, { method: "POST", body });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(message(data, "Could not attach the bill."));
+      onChanged();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not attach the bill.");
+    } finally {
+      setBusy("");
+      if (input.current) input.current.value = "";
+    }
+  };
+  const send = async () => {
+    setBusy("send");
+    setError("");
+    try {
+      const response = await fetch(`/api/orders/${order.id}/status`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "SUBMITTED", version: order.version }) });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(message(data, "Could not send this order."));
+      onChanged();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not send this order.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const note = order.paymentVerifiedAt ? "Payment confirmed by the admin. This sale now counts in your performance."
+    : order.status === "SUBMITTED" || order.status === "UNDER_REVIEW" ? "Waiting for the admin to confirm the payment."
+    : order.status === "RETURNED_FOR_CORRECTION" ? `Returned by the admin${order.reviewComment ? `: ${order.reviewComment}` : ""}. Fix it and send it again.`
+    : order.status === "REJECTED" ? `Rejected${order.reviewComment ? `: ${order.reviewComment}` : "."}`
+    : editable ? (bill ? "Bill attached. Send the order to the admin for payment confirmation." : "Attach the distributor’s bill to send this order. It counts as a sale once the admin confirms the payment.")
+    : "Approved. Waiting for the admin to confirm the payment.";
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 rounded-lg bg-background/70 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-start gap-2 text-xs text-muted">
+        {order.paymentVerifiedAt ? <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-success" /> : bill ? <FileText size={15} className="mt-0.5 shrink-0 text-brand" /> : <Paperclip size={15} className="mt-0.5 shrink-0 text-subtle" />}
+        <div className="min-w-0">
+          <p className="leading-5">{note}</p>
+          {bill && <a href={`/api/orders/${order.id}/bill`} target="_blank" rel="noreferrer" className="mt-0.5 inline-block max-w-full truncate font-semibold text-brand hover:underline">{bill.fileName}</a>}
+          {error && <p role="alert" className="mt-1 text-danger">{error}</p>}
+        </div>
+      </div>
+      {editable && (
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <input ref={input} type="file" accept="image/*,application/pdf" className="sr-only" aria-label="Choose the bill photo or PDF" onChange={(event) => { const file = event.target.files?.[0]; if (file) void attach(file); }} />
+          <Button type="button" variant="secondary" disabled={Boolean(busy)} onClick={() => input.current?.click()}>
+            {busy === "upload" ? <LoaderCircle size={15} className="animate-spin" /> : <Paperclip size={15} />}
+            {bill ? "Replace bill" : "Attach bill"}
+          </Button>
+          <Button type="button" disabled={Boolean(busy) || !bill} onClick={send}>
+            {busy === "send" ? <LoaderCircle size={15} className="animate-spin" /> : <Send size={15} />}
+            Send to admin
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function OrderFormModule() {
   const [orders, setOrders] = useState<Page<Order> | null>(null);
@@ -259,7 +350,8 @@ export function OrderFormModule() {
         createPortal(
           <Button onClick={() => start()}>
             <Plus size={16} />
-            New order form
+            <span className="hidden sm:inline">New order form</span>
+            <span className="sr-only sm:hidden">New order form</span>
           </Button>,
           headerSlot,
         )}
@@ -301,17 +393,15 @@ export function OrderFormModule() {
         ) : (
           <div className="divide-y">
             {orders.items.map((order) => (
-              <article
-                key={order.id}
-                className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"
-              >
+              <article key={order.id} className="px-4 py-3 sm:px-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold">
                       {order.orderNumber}
                     </span>
-                    <span className="rounded-full bg-background px-2 py-0.5 text-[11px] text-muted">
-                      {order.status.replaceAll("_", " ")}
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${stage(order).tone}`}>
+                      {stage(order).label}
                     </span>
                   </div>
                   <p className="mt-0.5 truncate text-sm text-muted">
@@ -347,6 +437,8 @@ export function OrderFormModule() {
                     </Button>
                   )}
                 </div>
+                </div>
+                <BillActions order={order} onChanged={() => setRefresh((value) => value + 1)} />
               </article>
             ))}
           </div>
@@ -413,7 +505,7 @@ export function OrderFormModule() {
             {saved ? (
               <div className="p-5">
                 <p className="rounded-lg border border-success/20 bg-success-soft p-3 text-sm text-success">
-                  Saved as a draft. You can download the PDF now or edit it later.
+                  Saved as a draft. Next, attach the distributor’s bill from the list and send it to the admin. You can also download the PDF.
                 </p>
                 <div className="mt-5 flex flex-wrap justify-end gap-2">
                   <Button type="button" variant="secondary" onClick={close}>

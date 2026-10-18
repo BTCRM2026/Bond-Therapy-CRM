@@ -20,7 +20,7 @@ const employeeCode = (number: number) => `BT-${String(number).padStart(2, '0')}`
 type PresentedUser = {
   id: string;
   loginId: string;
-  email: string;
+  email: string | null;
   name: string;
   status: string;
   department: Department | null;
@@ -121,7 +121,8 @@ export class UsersService {
       });
       const code = employeeCode(counter.nextNumber);
       const loginId = chosenLoginId ?? generatedLoginId(dto.name, code);
-      const email = suppliedEmail ?? `${loginId}@pending.bondtherapy.local`;
+      // Staff add their own email from Settings, so it stays empty until then.
+      const email = suppliedEmail ?? null;
       return tx.user.create({
         data: {
           loginId,

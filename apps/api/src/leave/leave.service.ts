@@ -3,7 +3,7 @@ import type { LeaveStatus, Prisma } from '@prisma/client';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { CreateLeaveDto, LeaveRangeDto, ReviewLeaveDto } from './dto.js';
+import type { CreateLeaveDto, LeavePageDto, LeaveRangeDto, ReviewLeaveDto } from './dto.js';
 
 // Policy: every calendar month includes 1 paid leave (no carry-forward). All other leave days are unpaid and deducted from salary.
 export const PAID_LEAVES_PER_MONTH = 1;
@@ -152,10 +152,14 @@ export class LeaveService {
     return { month: key, paidAllowance: PAID_LEAVES_PER_MONTH, paidUsed, paidAvailable: Math.max(0, PAID_LEAVES_PER_MONTH - paidUsed), unpaidDays: unpaid, pending };
   }
 
-  async mine(actor: SessionUser) {
+  async mine(actor: SessionUser, paging: LeavePageDto) {
     this.ensureStaff(actor);
-    const rows = await this.prisma.leaveRequest.findMany({ where: { userId: actor.id }, include: { reviewedBy: { select: { name: true } } }, orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }], take: 100 });
-    return Promise.all(rows.map((row) => this.present(row)));
+    const where = { userId: actor.id };
+    const [rows, total] = await Promise.all([
+      this.prisma.leaveRequest.findMany({ where, include: { reviewedBy: { select: { name: true } } }, orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }], skip: (paging.page - 1) * paging.pageSize, take: paging.pageSize }),
+      this.prisma.leaveRequest.count({ where }),
+    ]);
+    return { items: await Promise.all(rows.map((row) => this.present(row))), total, page: paging.page, pageSize: paging.pageSize, hasMore: paging.page * paging.pageSize < total };
   }
 
   async create(actor: SessionUser, dto: CreateLeaveDto, ipAddress?: string) {
@@ -181,15 +185,26 @@ export class LeaveService {
     return { ok: true };
   }
 
-  async listForReview(actor: SessionUser, status?: LeaveStatus) {
+  // Paged on the server. Counts cover the whole queue so the status chips stay accurate.
+  async listForReview(actor: SessionUser, query: LeavePageDto & { status?: LeaveStatus }) {
     this.ensureReviewer(actor);
-    const rows = await this.prisma.leaveRequest.findMany({
-      where: { ...(status ? { status } : {}), ...(this.isAdmin(actor) ? {} : { user: { managerId: actor.id } }) },
-      include: { user: { select: { id: true, name: true } }, reviewedBy: { select: { name: true } } },
-      orderBy: [{ status: 'asc' }, { startDate: 'desc' }],
-      take: 150,
-    });
-    return Promise.all(rows.map((row) => this.present(row)));
+    const scope: Prisma.LeaveRequestWhereInput = this.isAdmin(actor) ? {} : { user: { managerId: actor.id } };
+    const where: Prisma.LeaveRequestWhereInput = { ...scope, ...(query.status ? { status: query.status } : {}) };
+    const [rows, total, grouped] = await Promise.all([
+      this.prisma.leaveRequest.findMany({
+        where,
+        include: { user: { select: { id: true, name: true } }, reviewedBy: { select: { name: true } } },
+        // Newest first; the admin screen opens on the Pending filter, so waiting requests are what you see first.
+        orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+      this.prisma.leaveRequest.count({ where }),
+      this.prisma.leaveRequest.groupBy({ by: ['status'], where: scope, _count: { _all: true } }),
+    ]);
+    const items = await Promise.all(rows.map((row) => this.present(row)));
+    const count = (status: LeaveStatus) => grouped.find((row) => row.status === status)?._count._all ?? 0;
+    return { items, total, page: query.page, pageSize: query.pageSize, hasMore: query.page * query.pageSize < total, counts: { PENDING: count('PENDING'), APPROVED: count('APPROVED'), REJECTED: count('REJECTED') } };
   }
 
   async review(actor: SessionUser, id: string, dto: ReviewLeaveDto, ipAddress?: string) {

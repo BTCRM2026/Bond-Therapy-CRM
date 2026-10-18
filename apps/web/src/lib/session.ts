@@ -8,7 +8,7 @@ export type SessionUser = {
   id: string;
   name: string;
   loginId: string;
-  email: string;
+  email: string | null;
   status: string;
   department: "PURCHASE" | "SALES" | "ACCOUNTS_BILLING" | "WAREHOUSE" | "DEMO" | null;
   dataScope: "OWN" | "TEAM" | "DEPARTMENT" | "COMPANY";

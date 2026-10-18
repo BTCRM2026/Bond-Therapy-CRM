@@ -55,7 +55,7 @@ enum BloodGroup {
 model User {
   id                                String                        @id @default(cuid())
   loginId                           String                        @unique
-  email                             String                        @unique
+  email                             String?                       @unique
   name                              String
   passwordHash                      String
   status                            UserStatus                    @default(ACTIVE)
@@ -90,6 +90,9 @@ model User {
   leadsCreated                      Lead[]                        @relation("LeadCreator")
   ordersBooked                      Order[]                       @relation("OrderSalesperson")
   ordersReviewed                    Order[]                       @relation("OrderReviewer")
+  ordersPaymentVerified             Order[]                       @relation("OrderPaymentVerifier")
+  dayStartApprovals                 DayStartApproval[]            @relation("DayStartApprovalStaff")
+  dayStartApprovalsGiven            DayStartApproval[]            @relation("DayStartApprovalAdmin")
   invoicesGenerated                 Invoice[]                     @relation("InvoiceGenerator")
   paymentsRecorded                  Payment[]                     @relation("PaymentRecorder")
   billingSettingsUpdated            BillingSettings[]             @relation("BillingSettingsUpdater")
@@ -757,6 +760,11 @@ model Order {
   arrivedAt                       DateTime?
   deliveredAt                     DateTime?
   distributorFulfilledAt          DateTime?
+  // A sale counts in targets, incentives and performance only once an administrator has confirmed the payment arrived.
+  paymentVerifiedAt               DateTime?
+  paymentVerifiedById             String?
+  paymentVerifiedBy               User?                         @relation("OrderPaymentVerifier", fields: [paymentVerifiedById], references: [id], onDelete: SetNull)
+  paymentVerifiedNote             String?
   version                         Int                           @default(1)
   createdAt                       DateTime                      @default(now())
   updatedAt                       DateTime                      @updatedAt
@@ -771,6 +779,7 @@ model Order {
   @@unique([distributorId, distributorInvoiceFinancialYear, distributorInvoiceReference])
   @@index([clientId])
   @@index([salespersonId, createdAt])
+  @@index([salespersonId, paymentVerifiedAt])
   @@index([status])
   @@index([reviewedById])
   @@index([distributorId])
@@ -1177,6 +1186,8 @@ model OperationsSettings {
   lateThresholdMinutes  Int      @default(15)
   halfDayThresholdHours Decimal  @default(4) @db.Decimal(4, 2)
   weeklyOffDays         Json     @default("[0]")
+  // First day the field rules apply (8 verified calls = full day, 4 = half day, report by 11 PM). Earlier days keep the old hours-based rule.
+  strictDayRulesFrom    DateTime? @db.Date
   updatedById           String?
   updatedBy             User?    @relation("OperationsSettingsUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
   updatedAt             DateTime @updatedAt
@@ -1951,4 +1962,19 @@ model PhotoCapture {
 
   @@index([userId, createdAt])
   @@index([expiresAt])
+}
+
+// An administrator lets a salesperson start a day even though the previous working day's report was never submitted.
+model DayStartApproval {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation("DayStartApprovalStaff", fields: [userId], references: [id], onDelete: Cascade)
+  date         DateTime @db.Date
+  approvedById String
+  approvedBy   User     @relation("DayStartApprovalAdmin", fields: [approvedById], references: [id], onDelete: Restrict)
+  note         String?
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([approvedById])
 }

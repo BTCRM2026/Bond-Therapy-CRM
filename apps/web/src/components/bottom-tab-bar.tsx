@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Building2, ClipboardList, LayoutDashboard, Package, Settings, ShoppingCart, Truck, UsersRound } from "lucide-react";
+import { AlertTriangle, Building2, ClipboardList, LayoutDashboard, Navigation, Package, Settings, ShoppingCart, Truck, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PortalType } from "@/lib/portal-types";
@@ -33,7 +33,7 @@ export function BottomTabBar({ portal = "ADMIN", roleKey, distributionPartnerTyp
           { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
           { href: "/dashboard/clients", label: "Client Profile", icon: Building2, exact: false },
           { href: "/dashboard/daily-report", label: "Daily Report", icon: ClipboardList, exact: false },
-          { href: "/dashboard/order-form", label: "Order Form", icon: ShoppingCart, exact: false },
+          { href: "/dashboard/route", label: "My Route", icon: Navigation, exact: false },
         ]
       : isWarehouse
         ? [

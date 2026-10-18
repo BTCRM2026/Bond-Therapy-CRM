@@ -78,3 +78,26 @@ describe('LeaveService requests and approval', () => {
     await expect(build({ pendingRow: pending }).service.review(staff, 'l1', { status: 'APPROVED' })).rejects.toThrow('restricted');
   });
 });
+
+describe('LeaveService paging', () => {
+  const row = (id: string, status: string) => ({ id, userId: 'u1', startDate: day('2026-10-05'), endDate: day('2026-10-05'), reason: 'r', status, reviewNote: null, reviewedAt: null, createdAt: new Date(), totalDays: 1, paidDays: 1, unpaidDays: 0, breakdown: [{ month: '2026-10', days: 1, paid: 1, unpaid: 0 }], reviewedBy: null, user: { id: 'u1', name: 'Ali' } });
+
+  it('pages a staff member\u2019s own history at the database', async () => {
+    const { service, prisma } = build();
+    prisma.leaveRequest.findMany.mockResolvedValue([row('l1', 'APPROVED')]);
+    (prisma.leaveRequest as unknown as { count: unknown }).count = vi.fn().mockResolvedValue(25);
+    const result = await service.mine(staff, { page: 3, pageSize: 10 });
+    expect(prisma.leaveRequest.findMany.mock.calls[0]![0]).toMatchObject({ where: { userId: 'u1' }, skip: 20, take: 10 });
+    expect(result).toMatchObject({ total: 25, page: 3, pageSize: 10, hasMore: false });
+  });
+
+  it('pages the admin queue and counts every status for the whole queue', async () => {
+    const { service, prisma } = build();
+    prisma.leaveRequest.findMany.mockResolvedValue([row('l1', 'PENDING')]);
+    Object.assign(prisma.leaveRequest, { count: vi.fn().mockResolvedValue(45), groupBy: vi.fn().mockResolvedValue([{ status: 'PENDING', _count: { _all: 7 } }, { status: 'APPROVED', _count: { _all: 30 } }]) });
+    const result = await service.listForReview(admin, { page: 2, pageSize: 20, status: 'PENDING' });
+    expect(prisma.leaveRequest.findMany.mock.calls[1 - 1]![0]).toMatchObject({ where: { status: 'PENDING' }, skip: 20, take: 20 });
+    expect(result).toMatchObject({ total: 45, hasMore: true, counts: { PENDING: 7, APPROVED: 30, REJECTED: 0 } });
+    await expect(service.listForReview(staff, { page: 1, pageSize: 20 })).rejects.toThrow('restricted');
+  });
+});

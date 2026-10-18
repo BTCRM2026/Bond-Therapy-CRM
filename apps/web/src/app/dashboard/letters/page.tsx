@@ -7,11 +7,11 @@ import { requireSession } from "@/lib/session";
 
 async function loadLetters() {
   try {
-    const response = await fetch(`${process.env.API_INTERNAL_URL ?? "http://localhost:3001"}/letters`, { headers: { cookie: (await cookies()).toString(), [PORTAL_HEADER]: "ADMIN" }, cache: "no-store" });
-    if (!response.ok) return [];
+    const response = await fetch(`${process.env.API_INTERNAL_URL ?? "http://localhost:3001"}/letters?page=1&pageSize=20`, { headers: { cookie: (await cookies()).toString(), [PORTAL_HEADER]: "ADMIN" }, cache: "no-store" });
+    if (!response.ok) return null;
     return await response.json();
   } catch {
-    return [];
+    return null;
   }
 }
 

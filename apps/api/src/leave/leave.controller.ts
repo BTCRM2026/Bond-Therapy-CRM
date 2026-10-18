@@ -6,7 +6,7 @@ import { PortalGuard } from '../common/portal.guard.js';
 import { Portals } from '../common/portals.decorator.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
-import { CreateLeaveDto, LeaveListDto, LeaveMonthDto, LeaveRangeDto, ReviewLeaveDto } from './dto.js';
+import { CreateLeaveDto, LeaveListDto, LeaveMonthDto, LeavePageDto, LeaveRangeDto, ReviewLeaveDto } from './dto.js';
 import { LeaveService } from './leave.service.js';
 
 @Controller('leave')
@@ -23,14 +23,14 @@ export class LeaveController {
   preview(@CurrentUser() actor: SessionUser, @Query() query: LeaveRangeDto) { return this.leave.preview(actor, query); }
 
   @Get('mine')
-  mine(@CurrentUser() actor: SessionUser) { return this.leave.mine(actor); }
+  mine(@CurrentUser() actor: SessionUser, @Query() query: LeavePageDto) { return this.leave.mine(actor, query); }
 
   @Post()
   create(@CurrentUser() actor: SessionUser, @Body() dto: CreateLeaveDto, @Req() req: Request) { return this.leave.create(actor, dto, req.ip); }
 
   // Admin (and sales managers for their own team)
   @Get('requests')
-  requests(@CurrentUser() actor: SessionUser, @Query() query: LeaveListDto) { return this.leave.listForReview(actor, query.status); }
+  requests(@CurrentUser() actor: SessionUser, @Query() query: LeaveListDto) { return this.leave.listForReview(actor, query); }
 
   @Get('report')
   report(@CurrentUser() actor: SessionUser, @Query() query: LeaveMonthDto) { return this.leave.report(actor, query.month); }

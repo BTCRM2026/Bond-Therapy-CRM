@@ -53,3 +53,8 @@ export class AdminAttendanceListDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize = 20;
 }
+
+export class ApproveDayStartDto {
+  @IsString() @MinLength(1) @MaxLength(40) userId!: string;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
+}

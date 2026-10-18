@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsEnum, IsIn, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { VisitOutcome } from '@prisma/client';
 
 export class RouteStopInputDto {
@@ -45,6 +45,8 @@ export class SalonLocationDto {
 }
 
 export class AdminVisitsDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) pageSize = 20;
   @IsOptional() @IsString() date?: string;
   @IsOptional() @IsString() staffId?: string;
   @IsOptional() @IsString() territory?: string;

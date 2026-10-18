@@ -3,6 +3,7 @@ import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { GenerateIncentiveDto } from './dto.js';
+import { countedOrders } from '../common/counted-orders.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 
@@ -34,7 +35,7 @@ export class IncentivesService {
 
   private async eligibleRevenueFor(userId: string, month: number, year: number) {
     const { start, end } = this.monthRange(month, year);
-    const aggregate = await this.prisma.order.aggregate({ where: { salespersonId: userId, createdAt: { gte: start, lt: end }, status: { in: ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'] } }, _sum: { totalAmount: true } });
+    const aggregate = await this.prisma.order.aggregate({ where: { salespersonId: userId, ...countedOrders(start, end) }, _sum: { totalAmount: true } });
     return Number(aggregate._sum.totalAmount ?? 0);
   }
 

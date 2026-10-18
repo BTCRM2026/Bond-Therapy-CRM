@@ -4,9 +4,9 @@ import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ListTargetsDto, TargetDto } from './dto.js';
+import { countedOrders } from '../common/counted-orders.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
-const fulfilmentStatuses = ['APPROVED', 'INVOICE_GENERATED', 'STOCK_RESERVED', 'PICKING', 'PACKED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'CONFIRMED', 'DISPATCHED', 'DELIVERED', 'DISTRIBUTOR_FULFILLED'] as const;
 const productiveOutcomes = ['PRODUCTIVE', 'ORDER_GENERATED', 'QUOTATION_REQUIRED'] as const;
 
 @Injectable()
@@ -79,7 +79,7 @@ export class TargetsService {
     const clientFilter = userId ? { assignedSalespersonId: userId } : {};
 
     const [revenue, collection, newActiveSalons, visits, productiveVisits, calls, followUps] = await Promise.all([
-      this.prisma.order.aggregate({ where: { ...salespersonFilter, createdAt: { gte: start, lt: end }, status: { in: [...fulfilmentStatuses] } }, _sum: { totalAmount: true } }),
+      this.prisma.order.aggregate({ where: { ...salespersonFilter, ...countedOrders(start, end) }, _sum: { totalAmount: true } }),
       this.prisma.payment.aggregate({ where: { paymentDate: { gte: start, lt: end }, ...(userId ? { invoice: { order: { salespersonId: userId } } } : {}) }, _sum: { amount: true } }),
       this.prisma.client.count({ where: { ...clientFilter, status: 'ACTIVE', createdAt: { gte: start, lt: end } } }),
       this.prisma.clientActivity.count({ where: { ...activityFilter, type: 'VISIT', createdAt: { gte: start, lt: end } } }),
@@ -109,7 +109,7 @@ export class TargetsService {
     const [achieved, targets, productMixRaw] = await Promise.all([
       this.achievements(actor.id, start, end),
       this.prisma.target.findMany({ where: { scope: 'STAFF', scopeId: actor.id, period: 'MONTHLY', periodYear: year, periodIndex: month } }),
-      this.prisma.orderItem.groupBy({ by: ['productId'], where: { order: { salespersonId: actor.id, createdAt: { gte: start, lt: end }, status: { in: [...fulfilmentStatuses] } } }, _sum: { quantity: true, lineTotal: true }, orderBy: { _sum: { quantity: 'desc' } }, take: 5 }),
+      this.prisma.orderItem.groupBy({ by: ['productId'], where: { order: { salespersonId: actor.id, ...countedOrders(start, end) } }, _sum: { quantity: true, lineTotal: true }, orderBy: { _sum: { quantity: 'desc' } }, take: 5 }),
     ]);
     const products = productMixRaw.length ? await this.prisma.product.findMany({ where: { id: { in: productMixRaw.map((row) => row.productId) } }, select: { id: true, name: true } }) : [];
     const productMix = productMixRaw.map((row) => ({ productId: row.productId, name: products.find((p) => p.id === row.productId)?.name ?? 'Unknown product', quantity: row._sum.quantity ?? 0, revenue: Number(row._sum.lineTotal ?? 0) }));
@@ -125,7 +125,7 @@ export class TargetsService {
     const { start, end } = this.monthRange(month, year);
     const [achieved, productMixRaw, leadsThisPeriod] = await Promise.all([
       this.achievements(undefined, start, end),
-      this.prisma.orderItem.groupBy({ by: ['productId'], where: { order: { createdAt: { gte: start, lt: end }, status: { in: [...fulfilmentStatuses] } } }, _sum: { quantity: true, lineTotal: true }, orderBy: { _sum: { quantity: 'desc' } }, take: 8 }),
+      this.prisma.orderItem.groupBy({ by: ['productId'], where: { order: { ...countedOrders(start, end) } }, _sum: { quantity: true, lineTotal: true }, orderBy: { _sum: { quantity: 'desc' } }, take: 8 }),
       this.prisma.lead.findMany({ where: { createdAt: { gte: start, lt: end } }, select: { status: true } }),
     ]);
     const products = productMixRaw.length ? await this.prisma.product.findMany({ where: { id: { in: productMixRaw.map((row) => row.productId) } }, select: { id: true, name: true } }) : [];

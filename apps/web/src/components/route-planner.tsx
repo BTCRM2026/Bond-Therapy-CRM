@@ -1,5 +1,6 @@
 "use client";
 
+import { DayGateBanner } from "@/components/day-gate-banner";
 import { AlertTriangle, ArrowDown, ArrowUp, Calendar, CheckCircle2, Clock3, LoaderCircle, MapPin, Plus, RotateCcw, Star, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -114,6 +115,7 @@ export function RoutePlanner() {
   const route = routes[activeDate];
 
   return <div className="space-y-4">
+    <DayGateBanner />
     {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
     <div className="flex gap-1 rounded-lg border bg-white p-1">
       <button type="button" onClick={() => setTab("today")} className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${tab === "today" ? "bg-brand-soft text-brand-dark" : "text-muted hover:bg-background"}`}>Today · {dayLabel(today)}</button>

@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 export type SessionUser = {
   id: string;
   loginId: string;
-  email: string;
+  email: string | null;
   name: string;
   status: string;
   department: Department | null;

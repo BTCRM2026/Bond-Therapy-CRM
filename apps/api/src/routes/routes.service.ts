@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { markFieldWorked } from '../attendance/field-attendance.js';
+import { DayRulesService } from '../day-rules/day-rules.service.js';
 import { assertLiveCameraPhoto } from '../captures/live-photo.js';
 import { CapturesService } from '../captures/captures.service.js';
 import { recordAudit } from '../common/audit.util.js';
@@ -22,7 +23,7 @@ const routeInclude = { stops: { orderBy: { sequence: 'asc' }, include: stopInclu
 
 @Injectable()
 export class RoutesService {
-  constructor(private readonly prisma: PrismaService, private readonly captures: CapturesService) {}
+  constructor(private readonly prisma: PrismaService, private readonly captures: CapturesService, private readonly dayRules: DayRulesService) {}
 
   private isAdmin(actor: SessionUser) {
     return actor.portal === 'ADMIN' && actor.roles.some((role) => role.key === 'SUPER_ADMIN');
@@ -171,6 +172,8 @@ export class RoutesService {
 
   async startVisit(actor: SessionUser, dateStr: string, stopId: string, dto: StartVisitDto, file: { buffer: Buffer; mimetype: string; size: number }, ipAddress?: string) {
     this.ensureAccess(actor);
+    // The day cannot start while the last working day's report is missing, until an administrator approves it.
+    await this.dayRules.assertCanStart(actor.id);
     const { route } = await this.findOwnedRoute(actor, dateStr);
     if (!route) throw new NotFoundException('Route not found.');
     const stop = route.stops.find((item) => item.id === stopId);
@@ -234,21 +237,24 @@ export class RoutesService {
       ...clientFilter,
       ...(gpsVerified !== undefined ? { activity: { visitProof: { gpsVerified } } } : {}),
     };
-    const [items, staff, territoryRows] = await Promise.all([
-      this.prisma.routeStop.findMany({ where, include: { route: { include: { staff: { select: { id: true, name: true } } } }, client: { select: { id: true, salonName: true, city: true, area: true, territory: true } }, activity: { include: { visitProof: { select: { distanceMeters: true, gpsVerified: true, capturedAt: true } } } } }, orderBy: { activity: { checkInAt: 'desc' } }, take: 200 }),
+    const [items, total, staff, territoryRows, completed, pending, gpsVerifiedCount, photoCaptured, productive, ordersGenerated] = await Promise.all([
+      this.prisma.routeStop.findMany({ where, include: { route: { include: { staff: { select: { id: true, name: true } } } }, client: { select: { id: true, salonName: true, city: true, area: true, territory: true } }, activity: { include: { visitProof: { select: { distanceMeters: true, gpsVerified: true, capturedAt: true } } } } }, orderBy: { activity: { checkInAt: 'desc' } }, skip: (query.page - 1) * query.pageSize, take: query.pageSize }),
+      this.prisma.routeStop.count({ where }),
       this.prisma.user.findMany({ where: { status: 'ACTIVE', roles: { some: { role: { key: { in: [...salesRoles] } } } } }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
       this.prisma.client.findMany({ where: { territory: { not: null } }, select: { territory: true }, distinct: ['territory'], orderBy: { territory: 'asc' } }),
+      // The summary covers every matching visit, not only the page being shown.
+      this.prisma.routeStop.count({ where: { AND: [where, { status: 'VISITED' }] } }),
+      this.prisma.routeStop.count({ where: { AND: [where, { status: 'PLANNED' }] } }),
+      this.prisma.routeStop.count({ where: { AND: [where, { activity: { visitProof: { gpsVerified: true } } }] } }),
+      this.prisma.routeStop.count({ where: { AND: [where, { activity: { visitProof: { isNot: null } } }] } }),
+      this.prisma.routeStop.count({ where: { AND: [where, { activity: { visitOutcome: 'PRODUCTIVE' } }] } }),
+      this.prisma.routeStop.count({ where: { AND: [where, { activity: { visitOutcome: 'ORDER_GENERATED' } }] } }),
     ]);
     return {
-      summary: {
-        total: items.length,
-        completed: items.filter((item) => item.status === 'VISITED').length,
-        pending: items.filter((item) => item.status === 'PLANNED').length,
-        gpsVerified: items.filter((item) => item.activity?.visitProof?.gpsVerified === true).length,
-        photoCaptured: items.filter((item) => Boolean(item.activity?.visitProof)).length,
-        productive: items.filter((item) => item.activity?.visitOutcome === 'PRODUCTIVE').length,
-        ordersGenerated: items.filter((item) => item.activity?.visitOutcome === 'ORDER_GENERATED').length,
-      },
+      summary: { total, completed, pending, gpsVerified: gpsVerifiedCount, photoCaptured, productive, ordersGenerated },
+      page: query.page,
+      pageSize: query.pageSize,
+      hasMore: query.page * query.pageSize < total,
       items,
       filters: { staff, territories: territoryRows.map((row) => row.territory).filter(Boolean) },
     };

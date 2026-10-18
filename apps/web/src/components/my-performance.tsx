@@ -67,6 +67,7 @@ export function MyPerformance() {
   if (data && !data.hasPlan) return <div className="space-y-4">
     <PeriodTabs period={period} onChange={changePeriod} seasonal={false} />
     <EmptyState title="No annual target assigned yet" message="Your admin hasn't set an annual sales target for you. Check back once one is assigned." />
+    <CallsCard />
   </div>;
 
   const seasons = data && data.hasPlan && data.available ? data.plan.seasons : null;
@@ -83,7 +84,49 @@ export function MyPerformance() {
 
     {data && data.hasPlan && data.available && <PeriodOverview data={data} now={now} />}
     {trend && trend.hasPlan && <YearCharts trend={trend} />}
+    <CallsCard />
   </div>;
+}
+
+type CallsData = { period: { month: number; year: number }; goal: { fullDayCalls: number; halfDayCalls: number }; today: number | null; total: number; fullDays: number; halfDays: number; shortDays: number; days: Array<{ date: string; calls: number }> };
+
+// GPS-verified calls per day against the daily goal: 8 make a full day, 4 a half day.
+function CallsCard() {
+  const [calls, setCalls] = useState<CallsData | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/sales/calls", { cache: "no-store" });
+        if (!response.ok) throw new Error();
+        const data = await response.json() as CallsData;
+        if (!cancelled) setCalls(data);
+      } catch { if (!cancelled) setFailed(true); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  if (failed) return null;
+  if (!calls) return <div className="h-52 animate-pulse rounded-[10px] border bg-white" aria-busy="true" />;
+  const { fullDayCalls: full, halfDayCalls: half } = calls.goal;
+  const max = Math.max(full, ...calls.days.map((day) => day.calls));
+  return <section className="crm-surface overflow-hidden" aria-label="Calls">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-5"><div><h2 className="text-sm font-semibold text-foreground">Calls · {MONTHS[calls.period.month - 1]} {calls.period.year}</h2><p className="mt-0.5 text-xs text-muted">GPS-verified salon visits. {full} make a full day, {half} a half day.</p></div></div>
+    <KpiStrip columns={4} className="rounded-none border-0 border-b">
+      <KpiCell label="Today" value={calls.today == null ? "–" : `${calls.today}/${full}`} detail={calls.today != null && calls.today >= full ? "Full day reached" : calls.today != null && calls.today >= half ? "Half day reached" : "Keep going"} tone={calls.today != null && calls.today >= full ? "success" : "neutral"} />
+      <KpiCell label="Full days" value={calls.fullDays} detail={`${full}+ calls`} tone="success" />
+      <KpiCell label="Half days" value={calls.halfDays} detail={`${half}–${full - 1} calls`} tone="warning" />
+      <KpiCell label="Total calls" value={calls.total} detail="This month" />
+    </KpiStrip>
+    <div className="p-4 sm:p-5">
+      <div className="relative flex h-32 items-end gap-[3px] border-b" role="img" aria-label={`Verified calls per day this month. ${calls.fullDays} full days and ${calls.halfDays} half days.`}>
+        <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-success/50" style={{ bottom: `${(full / max) * 100}%` }} aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-warning/50" style={{ bottom: `${(half / max) * 100}%` }} aria-hidden="true" />
+        {calls.days.map((day) => <div key={day.date} className="flex h-full min-w-0 flex-1 items-end" title={`${day.date}: ${day.calls} ${day.calls === 1 ? "call" : "calls"}`}><div className={cn("w-full rounded-t-[3px]", day.calls >= full ? "bg-success" : day.calls >= half ? "bg-warning" : day.calls > 0 ? "bg-danger/60" : "bg-border")} style={{ height: `${Math.max(day.calls ? 4 : 2, (day.calls / max) * 100)}%` }} /></div>)}
+      </div>
+      <div className="mt-2 flex justify-between text-[11px] text-muted"><span>{calls.days[0]?.date.slice(8)} {SHORT[calls.period.month - 1]}</span><span className="flex flex-wrap justify-end gap-x-3"><span className="flex items-center gap-1"><i className="size-2 rounded-sm bg-success" />{full}+</span><span className="flex items-center gap-1"><i className="size-2 rounded-sm bg-warning" />{half}–{full - 1}</span><span className="flex items-center gap-1"><i className="size-2 rounded-sm bg-danger/60" />Under {half}</span></span></div>
+    </div>
+  </section>;
 }
 
 function PeriodOverview({ data, now }: { data: Extract<PerformanceResponse, { available: true }>; now: Date }) {

@@ -90,10 +90,20 @@ export class LettersService {
     return staff.map((user) => ({ id: user.id, name: user.name, email: user.email, department: user.department, managerName: user.manager?.name ?? null, roleKeys: user.roles.map((item) => item.role.key), profile: user.staffProfile }));
   }
 
+  // Paged on the server; the stats cover every letter so the summary tiles do not depend on the page or filters.
   async list(actor: SessionUser, query: ListHrLettersDto) {
     this.ensureAdmin(actor);
     const search = query.search?.trim();
-    return this.prisma.hrLetter.findMany({ where: { AND: [query.type ? { type: query.type } : {}, query.status ? { status: query.status as HrLetterStatus } : {}, search ? { OR: [{ recipientName: { contains: search } }, { letterNumber: { contains: search } }] } : {}] }, include: letterInclude, orderBy: { createdAt: 'desc' } });
+    const where: Prisma.HrLetterWhereInput = { AND: [query.type ? { type: query.type } : {}, query.status ? { status: query.status as HrLetterStatus } : {}, search ? { OR: [{ recipientName: { contains: search } }, { letterNumber: { contains: search } }] } : {}] };
+    const now = new Date();
+    const [items, total, byType, thisMonth, all] = await Promise.all([
+      this.prisma.hrLetter.findMany({ where, include: letterInclude, orderBy: { createdAt: 'desc' }, skip: (query.page - 1) * query.pageSize, take: query.pageSize }),
+      this.prisma.hrLetter.count({ where }),
+      this.prisma.hrLetter.groupBy({ by: ['type'], _count: { _all: true } }),
+      this.prisma.hrLetter.count({ where: { createdAt: { gte: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)) } } }),
+      this.prisma.hrLetter.count(),
+    ]);
+    return { items, total, page: query.page, pageSize: query.pageSize, hasMore: query.page * query.pageSize < total, stats: { total: all, thisMonth, byType: Object.fromEntries(byType.map((row) => [row.type, row._count._all])) } };
   }
 
   async create(actor: SessionUser, dto: CreateHrLetterDto, ipAddress?: string) {

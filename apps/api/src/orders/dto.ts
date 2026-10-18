@@ -26,6 +26,16 @@ export class ListOrdersDto {
   @IsOptional() @IsString() distributorId?: string;
 }
 
+export class VerifyPaymentDto {
+  @Type(() => Number) @IsInt() @Min(1) version!: number;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
+}
+
+export class UnverifyPaymentDto {
+  @Type(() => Number) @IsInt() @Min(1) version!: number;
+  @IsString() @MinLength(3, { message: 'Enter the reason for undoing the verification.' }) @MaxLength(300) reason!: string;
+}
+
 export class UpdateOrderStatusDto {
   @IsEnum(OrderStatus) status!: OrderStatus;
   @Type(() => Number) @IsInt() @Min(1) version!: number;

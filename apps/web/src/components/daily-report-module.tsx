@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, ClipboardCheck, IndianRupee, LoaderCircle, MapPin, Plus, Search, Store, Trash2, UserRound } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardCheck, Clock3, IndianRupee, Lock, LoaderCircle, MapPin, Plus, Search, Store, Trash2, TriangleAlert, UserRound } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ type CallType = "EXISTING" | "NEW";
 type CallResult = "ORDER" | "NO_ORDER" | "FOLLOW_UP";
 type Client = { id: string; salonName: string; city: string; area: string | null };
 type SavedCall = { id: string; visitActivityId: string | null; customerName: string; customerType: CallType; result: CallResult; orderValue: number | null; remark: string | null };
-type SavedReport = { id: string; workingTown: string; coworkerId: string | null; tomorrowTown: string; tomorrowExtraStops: string[] | null; noOrderReason: string | null; calls: SavedCall[]; tomorrowClients: Client[]; summary: Summary };
+type SavedReport = { id: string; submittedAt: string; workingTown: string; coworkerId: string | null; tomorrowTown: string; tomorrowExtraStops: string[] | null; noOrderReason: string | null; calls: SavedCall[]; tomorrowClients: Client[]; summary: Summary };
 type Visit = { activityId: string; stopId: string | null; clientId: string; salonName: string; city: string; checkInAt: string; checkOutAt: string | null; distanceMeters: number | null };
 type ReportData = {
   date: string;
@@ -24,6 +24,8 @@ type ReportData = {
   report: SavedReport | null;
   recent: SavedReport[];
   performance: { monthNewCalls: number; monthlyTarget: number | null };
+  rules: { fullDayCalls: number; halfDayCalls: number; deadlineAt: string; locked: boolean };
+  gate: { blocked: boolean; approved: boolean; requiredDate: string | null; message: string | null };
 };
 type CallRow = { key: string; existingCallId?: string; customerName: string; customerType: CallType; result: CallResult; orderValue: string; remark: string; photo: File | null; captureToken?: string; photoUrl?: string };
 type VisitInput = { result: CallResult; orderValue: string; remark: string };
@@ -53,6 +55,8 @@ export function DailyReportModule() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer); }, []);
 
   const load = async () => {
     setLoading(true);
@@ -95,6 +99,8 @@ export function DailyReportModule() {
   const monthNewCalls = Math.max(0, (data?.performance.monthNewCalls ?? 0) - (data?.report?.summary.newCalls ?? 0)) + summary.newCalls;
   const tomorrowClients = (data?.clients ?? []).filter((client) => client.city === tomorrowTown && (!clientSearch.trim() || `${client.salonName} ${client.area ?? ""}`.toLowerCase().includes(clientSearch.toLowerCase())));
   const hasOrder = summary.productiveCalls > 0;
+  const locked = Boolean(data?.report);
+  const openVisits = visits.filter((visit) => !visit.checkOutAt);
 
   const updateCall = (index: number, patch: Partial<CallRow>) => setCalls((current) => current.map((call, callIndex) => callIndex === index ? { ...call, ...patch } : call));
   const removeCall = (index: number) => setCalls((current) => current.filter((_, callIndex) => callIndex !== index));
@@ -109,6 +115,8 @@ export function DailyReportModule() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setError("");
+    if (locked) return setError("Today’s report is already submitted and locked.");
+    if (openVisits.length) return setError(`Check out of ${openVisits.map((visit) => visit.salonName).join(", ")} from My Route before submitting.`);
     if (!workingTown) return setError("Select today’s working town.");
     if (!visits.length && !calls.length) return setError("You have no salon visits yet. Check in at a salon from My Route, or add a call below.");
     const badVisit = visitList.findIndex(({ input }) => input.result === "ORDER" && Number(input.orderValue) <= 0);
@@ -127,7 +135,7 @@ export function DailyReportModule() {
       const response = await fetch("/api/daily-reports/today", { method: "POST", body: form });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(messageFrom(json, "Unable to submit the daily report."));
-      await load(); setNotice("Day submitted and tomorrow’s route is ready.");
+      await load(); setNotice("Day submitted. Tomorrow’s route is ready.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to submit the daily report."); }
     finally { setSaving(false); }
   };
@@ -138,6 +146,8 @@ export function DailyReportModule() {
   return <form onSubmit={submit} className="mx-auto max-w-6xl space-y-5 pb-4">
     {notice && <SuccessToast message={notice} onClose={() => setNotice("")} />}
     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-danger" role="alert">{error}</div>}
+    <DayRulesCard data={data} verified={visits.length} openVisits={openVisits.length} now={now} />
+    <fieldset disabled={locked} className="m-0 min-w-0 space-y-5 border-0 p-0">
 
     <section className="crm-surface overflow-hidden">
       <SectionHeader number="01" title="Basic information" subtitle="Your identity is filled from the Staff Portal." icon={UserRound} />
@@ -158,7 +168,7 @@ export function DailyReportModule() {
     </section>
 
     <section className="crm-surface overflow-hidden">
-      <SectionHeader number="03" title="Other calls" subtitle="Only for calls that are not on your route, such as a walk-in. A photo is needed." icon={Store} action={<Button type="button" variant="secondary" onClick={() => setCalls((current) => [...current, blankCall()])}><Plus size={15} />Add call</Button>} />
+      <SectionHeader number="03" title="Other calls" subtitle="Only for calls that are not on your route, such as a walk-in. A photo is needed. They do not count towards your 8 verified calls." icon={Store} action={<Button type="button" variant="secondary" onClick={() => setCalls((current) => [...current, blankCall()])}><Plus size={15} />Add call</Button>} />
       {calls.length === 0
         ? <p className="px-5 py-6 text-center text-xs text-muted">No extra calls. Your salon visits above are enough for most days.</p>
         : <div className="divide-y">{calls.map((call, index) => <CallCard key={call.key} call={call} index={index} canRemove onChange={(patch) => updateCall(index, patch)} onRemove={() => removeCall(index)} onError={setError} />)}</div>}
@@ -198,11 +208,39 @@ export function DailyReportModule() {
       </div>
     </section>
 
-    <div className="sticky bottom-[calc(60px+env(safe-area-inset-bottom))] z-20 flex flex-col gap-2 rounded-xl border bg-white/95 p-3 shadow-[0_-6px_20px_rgba(29,39,48,0.06)] backdrop-blur sm:flex-row sm:items-center sm:justify-between lg:bottom-4">
-      <p className="text-xs text-muted">One tap saves today’s visits and sets tomorrow’s route.</p>
-      <Button type="submit" disabled={saving} className="w-full sm:w-auto">{saving ? <LoaderCircle size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}{saving ? "Submitting…" : data.report ? "Update day" : "Submit day"}</Button>
-    </div>
+    </fieldset>
+
+    {!locked && <div className="sticky bottom-[calc(60px+env(safe-area-inset-bottom))] z-20 flex flex-col gap-2 rounded-xl border bg-white/95 p-3 shadow-[0_-6px_20px_rgba(29,39,48,0.06)] backdrop-blur sm:flex-row sm:items-center sm:justify-between lg:bottom-4">
+      <p className="text-xs text-muted">{openVisits.length ? `Check out of ${openVisits.map((visit) => visit.salonName).join(", ")} from My Route first.` : "Submitting closes today and sets tomorrow’s route. It cannot be changed afterwards."}</p>
+      <Button type="submit" disabled={saving || openVisits.length > 0} className="w-full sm:w-auto">{saving ? <LoaderCircle size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}{saving ? "Submitting…" : "Submit day"}</Button>
+    </div>}
   </form>;
+}
+
+function DayRulesCard({ data, verified, openVisits, now }: { data: ReportData; verified: number; openVisits: number; now: number }) {
+  const { fullDayCalls, halfDayCalls, deadlineAt, locked } = data.rules;
+  const left = new Date(deadlineAt).getTime() - now;
+  const late = left <= 0;
+  const outcome = verified >= fullDayCalls ? "Full day" : verified >= halfDayCalls ? "Half day" : "Absent";
+  const countdown = left > 3_600_000 ? `${Math.floor(left / 3_600_000)} h ${Math.floor((left % 3_600_000) / 60_000)} min left` : `${Math.max(0, Math.ceil(left / 60_000))} min left`;
+  const percent = Math.min(100, Math.round((verified / fullDayCalls) * 100));
+  return <section className="crm-surface overflow-hidden" aria-label="Today's rules">
+    {data.gate.blocked && <div role="alert" className="flex items-start gap-2.5 border-b border-danger/20 bg-red-50 px-4 py-3 text-xs text-danger sm:px-5"><TriangleAlert size={15} className="mt-0.5 shrink-0" /><p>{data.gate.message}</p></div>}
+    {locked
+      ? <div className="flex items-start gap-3 bg-success-soft/50 px-4 py-4 sm:px-5"><Lock size={16} className="mt-0.5 shrink-0 text-success" /><div><p className="text-sm font-semibold text-foreground">Day submitted and locked</p><p className="mt-0.5 text-xs text-muted">{data.report?.submittedAt ? `Submitted at ${clock(data.report.submittedAt)}. ` : ""}Tomorrow’s route is ready in My Route.</p></div></div>
+      : <div className="grid gap-4 p-4 sm:grid-cols-[1.2fr_1fr] sm:p-5">
+        <div>
+          <div className="flex items-baseline justify-between gap-3"><p className="text-xs font-semibold text-foreground">GPS-verified calls today</p><p className="text-sm font-semibold text-foreground">{verified} <span className="font-normal text-muted">of {fullDayCalls}</span></p></div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-background" role="progressbar" aria-label="Verified calls" aria-valuemin={0} aria-valuemax={fullDayCalls} aria-valuenow={Math.min(verified, fullDayCalls)}><div className="h-full rounded-full bg-brand transition-[width] duration-200" style={{ width: `${percent}%` }} /></div>
+          <p className="mt-2 text-xs text-muted">Counts as <strong className="text-foreground">{outcome}</strong> right now. {fullDayCalls} calls make a full day, {halfDayCalls} make a half day, fewer than {halfDayCalls} is an absent day.</p>
+        </div>
+        <div className={`rounded-lg px-3.5 py-3 ${late ? "bg-warning-soft/60" : "bg-background"}`}>
+          <p className="flex items-center gap-2 text-xs font-semibold text-foreground"><Clock3 size={14} className={late ? "text-warning" : "text-brand"} />Submit by 11:00 PM</p>
+          <p className="mt-1 text-xs text-muted">{late ? "The deadline has passed. Today can count as a half day at most." : `${countdown}. Late or missing means a half day, and you will need admin approval to start tomorrow.`}</p>
+          {openVisits > 0 && <p className="mt-2 text-xs font-medium text-warning">{openVisits} {openVisits === 1 ? "visit is" : "visits are"} still checked in. Check out from My Route first.</p>}
+        </div>
+      </div>}
+  </section>;
 }
 
 function VisitCard({ visit, input, index, onChange }: { visit: Visit; input: VisitInput; index: number; onChange: (patch: Partial<VisitInput>) => void }) {
@@ -211,7 +249,7 @@ function VisitCard({ visit, input, index, onChange }: { visit: Visit; input: Vis
       <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-dark">{index + 1}</span>
       <h3 className="min-w-0 truncate text-sm font-semibold">{visit.salonName}</h3>
       <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[10px] font-semibold text-success"><CheckCircle2 size={11} />GPS verified</span>
-      <span className="text-xs text-muted">Arrived {clock(visit.checkInAt)}{visit.checkOutAt ? ` · Left ${clock(visit.checkOutAt)}` : " · still checked in"}</span>
+      <span className="text-xs text-muted">Arrived {clock(visit.checkInAt)}{visit.checkOutAt ? ` · Left ${clock(visit.checkOutAt)}` : <span className="font-medium text-warning"> · still checked in</span>}</span>
     </div>
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">
       <label className="space-y-1.5 xl:col-span-3"><span className="text-xs font-medium">Result</span><select className={control} value={input.result} onChange={(event) => onChange({ result: event.target.value as CallResult, orderValue: event.target.value === "ORDER" ? input.orderValue : "" })}><option value="ORDER">Order</option><option value="NO_ORDER">No order</option><option value="FOLLOW_UP">Follow-up</option></select></label>

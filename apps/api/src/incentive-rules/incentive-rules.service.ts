@@ -5,6 +5,7 @@ import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { IncentiveRuleDto, IncentiveRuleVersionDto, RejectCalculationDto, RunCalculationDto } from './dto.js';
+import { countedOrders } from '../common/counted-orders.js';
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const OPEN_STATUSES = new Set(['CALCULATED', 'PENDING_APPROVAL']);
@@ -152,13 +153,13 @@ export class IncentiveRulesService {
         transactions.push({ userId: payment.invoice.order.salespersonId, sourceId: payment.id, sourceReference: payment.invoice.invoiceNumber, sourceDate: payment.paymentDate, eligibleAmount: amount });
       }
     } else {
-      const orders = await this.prisma.order.findMany({ where: { status: 'DELIVERED', deliveredAt: { gte: rangeStart, lt: rangeEnd } }, include: salespersonWithRoles });
+      const orders = await this.prisma.order.findMany({ where: countedOrders(rangeStart, rangeEnd), include: salespersonWithRoles });
       for (const order of orders) {
         const roleKeys = order.salesperson.roles.map((r) => r.role.key);
         if (!roleAllowed(roleKeys)) continue;
         const amount = Number(order.totalAmount);
         if (!withinThreshold(amount)) continue;
-        transactions.push({ userId: order.salespersonId, sourceId: order.id, sourceReference: order.orderNumber, sourceDate: order.deliveredAt!, eligibleAmount: amount });
+        transactions.push({ userId: order.salespersonId, sourceId: order.id, sourceReference: order.orderNumber, sourceDate: order.paymentVerifiedAt!, eligibleAmount: amount });
       }
     }
 
