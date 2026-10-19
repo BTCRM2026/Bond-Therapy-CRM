@@ -37,6 +37,7 @@ type Client = {
   category: string;
   clientType: string;
   status: string;
+  profileIncomplete?: boolean;
   ownerName: string | null;
   managerName: string | null;
   primaryContact: string;
@@ -89,6 +90,7 @@ export function ClientsModule({
   const [search, setSearch] = useState("");
   const [clientType, setClientType] = useState("");
   const [category, setCategory] = useState("");
+  const [unfilled, setUnfilled] = useState("");
   const [potential, setPotential] = useState("");
   const [notice, setNotice] = useState("");
   const [page, setPage] = useState(1);
@@ -117,6 +119,7 @@ export function ClientsModule({
         if (clientType) params.set("clientType", clientType);
         if (category) params.set("category", category);
         if (potential) params.set("potential", potential);
+        if (unfilled) params.set("profileIncomplete", "true");
         const response = await fetch(`/api/clients?${params}`, {
           cache: "no-store",
         });
@@ -134,7 +137,7 @@ export function ClientsModule({
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [page, search, clientType, category, potential]);
+  }, [page, search, clientType, category, potential, unfilled]);
   const clearFilters = () => {
     setSearch("");
     setClientType("");
@@ -176,6 +179,7 @@ export function ClientsModule({
             <>
               <FilterMenu value={clientType} fullWidth showLabelOnMobile ariaLabel="Filter clients by type" onSelect={(value) => { setClientType(value); setPage(1); }} options={[{ key: "", label: "All client types" }, { key: "NEW_CLIENT", label: "New client" }, { key: "EXISTING_CLIENT", label: "Existing client" }]} />
               <FilterMenu value={category} fullWidth showLabelOnMobile ariaLabel="Filter clients by category" onSelect={(value) => { setCategory(value); setPage(1); }} options={[{ key: "", label: "All categories" }, { key: "SALON", label: "Salon" }, { key: "UNISEX", label: "Unisex" }, { key: "STUDIO", label: "Studio" }, { key: "ACADEMY", label: "Academy" }]} />
+              <FilterMenu value={unfilled} fullWidth showLabelOnMobile ariaLabel="Filter clients by profile" onSelect={(value) => { setUnfilled(value); setPage(1); }} options={[{ key: "", label: "All profiles" }, { key: "true", label: "Profile not filled" }]} />
             </>
           ) : (
             <FilterMenu value={potential} fullWidth showLabelOnMobile ariaLabel="Filter clients by potential" onSelect={(value) => { setPotential(value); setPage(1); }} options={[{ key: "", label: "All potential" }, { key: "HIGH", label: "High potential" }, { key: "MEDIUM", label: "Medium potential" }, { key: "LOW", label: "Low potential" }]} />
@@ -881,7 +885,7 @@ function StaffClientList({ items }: { items: Client[] }) {
             {items.map((client) => (
               <tr key={client.id} className="transition-colors hover:bg-brand-soft/40">
                 <td className="px-5 py-4">
-                  <Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-foreground hover:text-brand">{client.salonName}</Link>
+                  <Link href={`/dashboard/clients/${client.id}`} className="font-semibold text-foreground hover:text-brand">{client.salonName}</Link>{client.profileIncomplete && <span className="ml-2 inline-flex rounded-full bg-warning-soft px-2 py-0.5 align-middle text-[10px] font-semibold text-warning">Profile not filled</span>}
                   <p className="mt-0.5 text-xs text-muted">{client.ownerName ?? "Owner not added"}</p>
                 </td>
                 <td className="px-4 py-4 text-muted">{client.primaryContact}</td>
@@ -904,7 +908,7 @@ function StaffClientList({ items }: { items: Client[] }) {
           <article key={client.id} className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <Link href={`/dashboard/clients/${client.id}`} className="block truncate text-sm font-semibold text-foreground hover:text-brand">{client.salonName}</Link>
+                <Link href={`/dashboard/clients/${client.id}`} className="block truncate text-sm font-semibold text-foreground hover:text-brand">{client.salonName}{client.profileIncomplete ? " · profile not filled" : ""}</Link>
                 <p className="mt-1 text-xs text-muted">{client.ownerName ?? "Owner not added"}</p>
               </div>
               <PotentialBadge value={client.potential} />

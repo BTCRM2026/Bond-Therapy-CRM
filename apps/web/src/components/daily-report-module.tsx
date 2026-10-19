@@ -10,7 +10,7 @@ import { SuccessToast } from "@/components/ui/toast";
 
 type CallType = "EXISTING" | "NEW";
 type CallResult = "ORDER" | "NO_ORDER" | "FOLLOW_UP";
-type Client = { id: string; salonName: string; city: string; area: string | null };
+type Client = { id: string; salonName: string; city: string; area: string | null; profileIncomplete?: boolean };
 type SavedCall = { id: string; visitActivityId: string | null; customerName: string; customerType: CallType; result: CallResult; orderValue: number | null; remark: string | null };
 type SavedReport = { id: string; submittedAt: string; workingTown: string; coworkerId: string | null; tomorrowTown: string; tomorrowExtraStops: string[] | null; noOrderReason: string | null; calls: SavedCall[]; tomorrowClients: Client[]; summary: Summary };
 type Visit = { activityId: string; stopId: string | null; clientId: string; salonName: string; city: string; checkInAt: string; checkOutAt: string | null; distanceMeters: number | null };
@@ -97,7 +97,7 @@ export function DailyReportModule() {
     };
   }, [calls, visits, visitInputs]);
   const monthNewCalls = Math.max(0, (data?.performance.monthNewCalls ?? 0) - (data?.report?.summary.newCalls ?? 0)) + summary.newCalls;
-  const tomorrowClients = (data?.clients ?? []).filter((client) => client.city === tomorrowTown && (!clientSearch.trim() || `${client.salonName} ${client.area ?? ""}`.toLowerCase().includes(clientSearch.toLowerCase())));
+  const tomorrowClients = (data?.clients ?? []).filter((client) => !client.profileIncomplete && client.city === tomorrowTown && (!clientSearch.trim() || `${client.salonName} ${client.area ?? ""}`.toLowerCase().includes(clientSearch.toLowerCase())));
   const hasOrder = summary.productiveCalls > 0;
   const locked = Boolean(data?.report);
   // Before the strict rules start, a day with no calls can still be submitted so tomorrow's route can be planned.

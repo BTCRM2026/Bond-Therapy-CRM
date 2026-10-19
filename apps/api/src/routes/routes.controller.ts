@@ -8,7 +8,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { SessionGuard } from '../common/session.guard.js';
 import type { SessionUser } from '../common/session.util.js';
-import { AdminVisitsDto, CompleteVisitDto, SalonLocationDto, SaveRouteDto, StartVisitDto, StopStatusDto, AddSalonByNameDto } from './dto.js';
+import { AdminVisitsDto, CompleteVisitDto, SalonLocationDto, SaveRouteDto, StartVisitDto, StopStatusDto, AddSalonByNameDto, CompleteSalonProfileDto } from './dto.js';
 import { RoutesService } from './routes.service.js';
 
 @Controller('routes')
@@ -64,6 +64,11 @@ export class RoutesController {
   @Post(':date/stops/:stopId/complete')
   complete(@CurrentUser() actor: SessionUser, @Param('date') date: string, @Param('stopId') stopId: string, @Body() dto: CompleteVisitDto, @Req() req: Request) {
     return this.routes.completeVisit(actor, date, stopId, dto, req.ip);
+  }
+
+  @Post(':date/stops/:stopId/complete-profile')
+  completeProfile(@CurrentUser() actor: SessionUser, @Param('date') date: string, @Param('stopId') stopId: string, @Body() dto: CompleteSalonProfileDto, @Req() req: Request) {
+    return this.routes.completeSalonProfile(actor, date, stopId, dto, req.ip);
   }
 
   @Post(':date/stops/:stopId/salon-location')

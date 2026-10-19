@@ -151,3 +151,30 @@ describe('RoutesService salons added by name', () => {
     await expect(service.addSalonByName({ id: 'admin-1', portal: 'ADMIN', roles: [{ key: 'SUPER_ADMIN' }] } as never, dto)).rejects.toThrow();
   });
 });
+
+describe('RoutesService profile filled at the salon', () => {
+  const unfilled = { ...salon, latitude: null, longitude: null, city: 'Surat', profileIncomplete: true };
+  const profile = { salonName: 'Royal Hair Studio', category: 'SALON', ownerName: 'Meena Shah', primaryContact: '9876543210', fullAddress: '12 Ring Road, Surat', city: 'Surat', area: 'Adajan', latitude: 21.19, longitude: 72.79, accuracy: 20 } as never;
+
+  it('fills the profile from the salon, saves the phone’s GPS as its location and makes it a normal client', async () => {
+    const { service, prisma } = build({ client: unfilled });
+    prisma.client.update.mockResolvedValue({ id: 'client-1', salonName: 'Royal Hair Studio', profileIncomplete: false });
+    await service.completeSalonProfile(actor, today, 'stop-1', profile);
+    expect(prisma.client.update.mock.calls[0]![0].data).toMatchObject({ salonName: 'Royal Hair Studio', ownerName: 'Meena Shah', primaryContact: '9876543210', latitude: 21.19, longitude: 72.79, status: 'ACTIVE', profileIncomplete: false, locationSetById: 'staff-1' });
+  });
+
+  it('refuses a salon whose profile is already filled, or a weak GPS signal', async () => {
+    const filled = build();
+    await expect(filled.service.completeSalonProfile(actor, today, 'stop-1', profile)).rejects.toThrow('already filled');
+    const weak = build({ client: unfilled });
+    await expect(weak.service.completeSalonProfile(actor, today, 'stop-1', { ...(profile as object), accuracy: 400 } as never)).rejects.toThrow('GPS signal is too weak');
+    expect(weak.prisma.client.update).not.toHaveBeenCalled();
+  });
+
+  it('does not let anyone check in at a salon until its profile has been filled', async () => {
+    const { service, prisma, captures } = build({ client: unfilled });
+    await expect(service.startVisit(actor, today, 'stop-1', near, photo)).rejects.toThrow('client profile first');
+    expect(prisma.visitProof.upsert).not.toHaveBeenCalled();
+    expect(captures.consume).not.toHaveBeenCalled();
+  });
+});

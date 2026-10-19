@@ -57,8 +57,9 @@ export class OrdersService {
 
   private clientVisibility(actor: SessionUser): Prisma.ClientWhereInput {
     if (this.isAdmin(actor)) return {};
-    if (actor.dataScope === 'TEAM') return { OR: [{ assignedSalespersonId: actor.id }, { createdById: actor.id }, { assignedSalesperson: { managerId: actor.id } }] };
-    return { OR: [{ assignedSalespersonId: actor.id }, { createdById: actor.id }] };
+    // An order needs a filled client profile, so salons typed into a route and not yet filled are left out.
+    if (actor.dataScope === 'TEAM') return { AND: [{ profileIncomplete: false }, { OR: [{ assignedSalespersonId: actor.id }, { createdById: actor.id }, { assignedSalesperson: { managerId: actor.id } }] }] };
+    return { AND: [{ profileIncomplete: false }, { OR: [{ assignedSalespersonId: actor.id }, { createdById: actor.id }] }] };
   }
 
   async list(actor: SessionUser, query: ListOrdersDto) {

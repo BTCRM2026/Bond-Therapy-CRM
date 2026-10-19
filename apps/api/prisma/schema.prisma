@@ -464,6 +464,8 @@ model Client {
   category                  ClientCategory
   clientType                ClientType        @default(NEW_CLIENT)
   status                    ClientStatus      @default(ACTIVE)
+  // True for a salon a salesperson typed into their route before it had a profile. It stays out of the client list until the profile is filled at the salon.
+  profileIncomplete         Boolean           @default(false)
   ownerName                 String?
   managerName               String?
   primaryContact            String

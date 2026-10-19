@@ -64,7 +64,7 @@ export class DailyReportsService {
     const assignedWhere = this.assignedClientWhere(actor.id);
     const [profile, clients, assignments, coworkers] = await Promise.all([
       this.prisma.staffProfile.findUnique({ where: { userId: actor.id }, select: { workLocation: true } }),
-      this.prisma.client.findMany({ where: assignedWhere, select: { id: true, salonName: true, city: true, area: true }, orderBy: [{ city: 'asc' }, { salonName: 'asc' }] }),
+      this.prisma.client.findMany({ where: assignedWhere, select: { id: true, salonName: true, city: true, area: true, profileIncomplete: true }, orderBy: [{ city: 'asc' }, { salonName: 'asc' }] }),
       this.prisma.territoryAssignment.findMany({ where: { userId: actor.id, endDate: null, territory: { isActive: true } }, select: { territory: { select: { city: { select: { name: true } } } } } }),
       this.prisma.user.findMany({ where: { id: { not: actor.id }, status: 'ACTIVE', roles: { some: { role: { key: { in: [...salesRoles] }, portal: 'STAFF', isActive: true } } } }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
     ]);
@@ -198,7 +198,7 @@ export class DailyReportsService {
       for (const name of newSalons) {
         const match = context.clients.find((client) => client.city === dto.tomorrowTown && client.salonName.trim().toLowerCase() === name.toLowerCase());
         if (match) { typedIds.push(match.id); continue; }
-        const created = await tx.client.create({ data: { salonName: name, category: 'SALON', primaryContact: '', city: dto.tomorrowTown, status: 'PROSPECT', assignedSalespersonId: actor.id, createdById: actor.id } });
+        const created = await tx.client.create({ data: { salonName: name, category: 'SALON', primaryContact: '', city: dto.tomorrowTown, status: 'PROSPECT', profileIncomplete: true, assignedSalespersonId: actor.id, createdById: actor.id } });
         typedIds.push(created.id);
       }
       const stopClientIds = [...new Set([...clientIds, ...typedIds])];

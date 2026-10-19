@@ -7,7 +7,7 @@ import { CapturesService } from '../captures/captures.service.js';
 import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { AdminVisitsDto, CompleteVisitDto, SalonLocationDto, SaveRouteDto, StartVisitDto, StopStatusDto, AddSalonByNameDto } from './dto.js';
+import { AdminVisitsDto, CompleteSalonProfileDto, CompleteVisitDto, SalonLocationDto, SaveRouteDto, StartVisitDto, StopStatusDto, AddSalonByNameDto } from './dto.js';
 
 // Arrival must be within this distance of the salon's saved location unless an administrator has set another radius.
 export const DEFAULT_VISIT_RADIUS_METERS = 100;
@@ -16,7 +16,7 @@ export const MAX_GPS_ACCURACY_METERS = 100;
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const stopInclude = {
-  client: { select: { id: true, salonName: true, city: true, area: true, primaryContact: true, potential: true, latitude: true, longitude: true, status: true } },
+  client: { select: { id: true, salonName: true, city: true, area: true, primaryContact: true, potential: true, latitude: true, longitude: true, status: true, profileIncomplete: true } },
   activity: { include: { visitProof: { select: { distanceMeters: true, gpsVerified: true, capturedAt: true } } } },
 } satisfies Prisma.RouteStopInclude;
 const routeInclude = { stops: { orderBy: { sequence: 'asc' }, include: stopInclude } } satisfies Prisma.RouteInclude;
@@ -65,11 +65,11 @@ export class RoutesService {
     if (actor.portal !== 'STAFF') throw new ForbiddenException('Salons are added by the salesperson who will visit them.');
     const name = dto.name.trim().replace(/\s+/g, ' ');
     const city = dto.city.trim().replace(/\s+/g, ' ');
-    const select = { id: true, salonName: true, city: true, area: true, potential: true, beat: { select: { id: true, name: true } } } as const;
+    const select = { id: true, salonName: true, city: true, area: true, potential: true, profileIncomplete: true, beat: { select: { id: true, name: true } } } as const;
     const mine = await this.prisma.client.findMany({ where: { status: { not: 'INACTIVE' }, OR: [{ assignedSalespersonId: actor.id }, { createdById: actor.id }] }, select });
     const same = mine.find((salon) => salon.salonName.trim().toLowerCase() === name.toLowerCase() && salon.city.trim().toLowerCase() === city.toLowerCase());
     if (same) return { ...same, existing: true };
-    const created = await this.prisma.client.create({ data: { salonName: name, category: 'SALON', primaryContact: '', city, status: 'PROSPECT', assignedSalespersonId: actor.id, createdById: actor.id }, select });
+    const created = await this.prisma.client.create({ data: { salonName: name, category: 'SALON', primaryContact: '', city, status: 'PROSPECT', profileIncomplete: true, assignedSalespersonId: actor.id, createdById: actor.id }, select });
     await this.recordAudit(actor, 'ROUTE_SALON_ADDED_BY_NAME', created.id, { salonName: name, city }, ipAddress);
     return { ...created, existing: false };
   }
@@ -84,7 +84,7 @@ export class RoutesService {
           { beat: { territory: { assignments: { some: { userId: actor.id, endDate: null } } } } },
         ],
       },
-      select: { id: true, salonName: true, city: true, area: true, potential: true, beat: { select: { id: true, name: true } } },
+      select: { id: true, salonName: true, city: true, area: true, potential: true, profileIncomplete: true, beat: { select: { id: true, name: true } } },
       orderBy: { salonName: 'asc' },
     });
   }
@@ -195,6 +195,7 @@ export class RoutesService {
     const stop = route.stops.find((item) => item.id === stopId);
     if (!stop) throw new NotFoundException('Route stop not found.');
     if (stop.status !== 'PLANNED') throw new BadRequestException('This stop is no longer active.');
+    if (stop.client.profileIncomplete) throw new BadRequestException(`Add ${stop.client.salonName}’s client profile first, then check in.`);
 
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) throw new BadRequestException('Capture a JPG, PNG, or WebP photo.');
     if (file.size > 8 * 1024 * 1024) throw new BadRequestException('Photo must be 8 MB or smaller.');
@@ -325,6 +326,26 @@ export class RoutesService {
 
   // One-time fallback for salons that have no saved location: the staff member stands at the salon and saves it.
   // Once saved it is locked; only an administrator can change it (same rule as the client profile).
+  // The salesperson stands at a salon that was typed into the route and fills its profile. The phone's GPS becomes the salon's location,
+  // and from now on the salon is a normal client: it appears in the client list and the visit can be checked in.
+  async completeSalonProfile(actor: SessionUser, dateStr: string, stopId: string, dto: CompleteSalonProfileDto, ipAddress?: string) {
+    this.ensureAccess(actor);
+    if (actor.portal !== 'STAFF') throw new ForbiddenException('The profile is filled by the salesperson at the salon.');
+    await this.dayRules.assertCanStart(actor.id);
+    const { route } = await this.findOwnedRoute(actor, dateStr);
+    const stop = route?.stops.find((item) => item.id === stopId);
+    if (!stop) throw new NotFoundException('Route stop not found.');
+    if (!stop.client.profileIncomplete) throw new BadRequestException('This salon’s profile is already filled.');
+    this.checkAccuracy(dto.accuracy);
+    const client = await this.prisma.client.update({
+      where: { id: stop.clientId },
+      data: { salonName: dto.salonName, category: dto.category, ownerName: dto.ownerName, primaryContact: dto.primaryContact, fullAddress: dto.fullAddress, city: dto.city, area: dto.area || null, latitude: dto.latitude, longitude: dto.longitude, locationSetAt: new Date(), locationSetById: actor.id, status: 'ACTIVE', profileIncomplete: false, version: { increment: 1 } },
+      select: { id: true, salonName: true, city: true, area: true, primaryContact: true, potential: true, latitude: true, longitude: true, status: true, profileIncomplete: true },
+    });
+    await this.recordAudit(actor, 'ROUTE_SALON_PROFILE_COMPLETED', stopId, { clientId: stop.clientId, salonName: dto.salonName, latitude: dto.latitude, longitude: dto.longitude }, ipAddress);
+    return client;
+  }
+
   async setSalonLocation(actor: SessionUser, dateStr: string, stopId: string, dto: SalonLocationDto, ipAddress?: string) {
     this.ensureAccess(actor);
     const { route } = await this.findOwnedRoute(actor, dateStr);

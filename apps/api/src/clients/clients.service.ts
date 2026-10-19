@@ -33,10 +33,12 @@ export class ClientsService {
 
   private visibility(actor: SessionUser): Prisma.ClientWhereInput {
     if (this.isAdmin(actor)) return {};
+    // A salon typed into a route stays out of the client list until its profile has been filled at the salon.
+    const filled: Prisma.ClientWhereInput = { profileIncomplete: false };
     const trainer = actor.roles.some((role) => role.key === 'DEMO_TEAM');
-    if (trainer) return { OR: [{ assignedTrainerId: actor.id }, { createdById: actor.id }] };
-    if (actor.dataScope === 'TEAM') return { OR: [{ assignedSalespersonId: actor.id }, { createdById: actor.id }, { assignedSalesperson: { managerId: actor.id } }] };
-    return { OR: [{ assignedSalespersonId: actor.id }, { createdById: actor.id }] };
+    if (trainer) return { AND: [filled, { OR: [{ assignedTrainerId: actor.id }, { createdById: actor.id }] }] };
+    if (actor.dataScope === 'TEAM') return { AND: [filled, { OR: [{ assignedSalespersonId: actor.id }, { createdById: actor.id }, { assignedSalesperson: { managerId: actor.id } }] }] };
+    return { AND: [filled, { OR: [{ assignedSalespersonId: actor.id }, { createdById: actor.id }] }] };
   }
 
   private whereFor(actor: SessionUser, id: string): Prisma.ClientWhereInput {
@@ -61,6 +63,7 @@ export class ClientsService {
       { city: { contains: search } }, { area: { contains: search } }, { headquarter: { contains: search } }, { usedProducts: { contains: search } },
     ] });
     if (query.status) filters.push({ status: query.status });
+    if (query.profileIncomplete === 'true' && this.isAdmin(actor)) filters.push({ profileIncomplete: true });
     if (query.category) filters.push({ category: query.category });
     if (query.clientType) filters.push({ clientType: query.clientType });
     if (query.potential) filters.push({ potential: query.potential });

@@ -15,6 +15,8 @@ export class ListClientsDto {
   @IsOptional() @IsEnum(ClientPotential) potential?: ClientPotential;
   @IsOptional() @IsEnum(CustomerSegment) customerSegment?: CustomerSegment;
   @IsOptional() @IsString() city?: string;
+  // Administrators only: show the salons whose profile was never filled.
+  @IsOptional() @IsIn(['true']) profileIncomplete?: 'true';
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) pageSize = 20;
 }

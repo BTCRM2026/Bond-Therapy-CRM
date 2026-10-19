@@ -1,6 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
-import { VisitOutcome } from '@prisma/client';
+import { ClientCategory, VisitOutcome } from '@prisma/client';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value);
 
@@ -41,6 +41,20 @@ export class CompleteVisitDto {
 export class StartVisitDto {
   // The one-time pass issued when the in-app camera opened.
   @IsOptional() @IsString() @MaxLength(100) captureToken?: string;
+  @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude!: number;
+  @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude!: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) accuracy?: number;
+}
+
+// The profile a salesperson fills in at a salon that was typed into the route by name. The location is the phone's GPS at that moment.
+export class CompleteSalonProfileDto {
+  @Transform(trim) @IsString() @MinLength(2, { message: 'Enter the salon name.' }) @MaxLength(160) salonName!: string;
+  @IsEnum(ClientCategory, { message: 'Choose the salon type.' }) category!: ClientCategory;
+  @Transform(trim) @IsString() @MinLength(2, { message: 'Enter the owner name.' }) @MaxLength(120) ownerName!: string;
+  @Transform(trim) @IsString() @MinLength(7, { message: 'Enter a valid contact number.' }) @MaxLength(20) primaryContact!: string;
+  @Transform(trim) @IsString() @MinLength(5, { message: 'Enter the salon address.' }) @MaxLength(500) fullAddress!: string;
+  @Transform(trim) @IsString() @MinLength(2, { message: 'Enter the town.' }) @MaxLength(100) city!: string;
+  @IsOptional() @Transform(trim) @IsString() @MaxLength(120) area?: string;
   @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude!: number;
   @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude!: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) accuracy?: number;
