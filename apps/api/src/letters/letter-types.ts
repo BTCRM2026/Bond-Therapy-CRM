@@ -1,7 +1,7 @@
 export const LETTER_TYPES = ['OFFER', 'APPOINTMENT', 'PROBATION', 'CONFIRMATION', 'INTERNSHIP', 'PROMOTION', 'SALARY_INCREMENT', 'WARNING', 'NOC', 'EXPERIENCE', 'RESIGNATION_ACCEPTANCE', 'RELIEVING', 'TERMINATION'] as const;
 export type LetterType = (typeof LETTER_TYPES)[number];
 
-export const COMPENSATION_LETTER_TYPES = ['OFFER', 'APPOINTMENT', 'PROMOTION', 'SALARY_INCREMENT'] as const;
+export const COMPENSATION_LETTER_TYPES = ['APPOINTMENT', 'PROMOTION', 'SALARY_INCREMENT'] as const;
 export const SALARY_COMPONENTS = [
   { key: 'basic', label: 'Basic', part: 'A' },
   { key: 'hra', label: 'HRA', part: 'A' },
@@ -51,12 +51,12 @@ export type LetterFieldDef = { key: string; label: string; type: 'text' | 'date'
 
 export const LETTER_FIELDS: Record<LetterType, LetterFieldDef[]> = {
   OFFER: [
-    { key: 'recipientAddress', label: 'Recipient address', type: 'textarea', required: false },
+    { key: 'recipientAddress', label: 'Recipient address', type: 'textarea', required: true },
     { key: 'designation', label: 'Designation', type: 'text', required: true },
     { key: 'department', label: 'Department', type: 'text', required: true },
-    { key: 'ctc', label: 'Annual CTC', type: 'money', required: true },
-    { key: 'joiningDate', label: 'Proposed joining date', type: 'date', required: true },
     { key: 'workLocation', label: 'Work location', type: 'text', required: true },
+    { key: 'joiningDate', label: 'Join on or before', type: 'date', required: true },
+    { key: 'ctc', label: 'Annual CTC (INR)', type: 'money', required: true },
   ],
   APPOINTMENT: [
     { key: 'designation', label: 'Designation', type: 'text', required: true },

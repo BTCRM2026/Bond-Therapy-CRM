@@ -225,17 +225,17 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
   }
 
   return (
-    <Modal title="Create HR document" subtitle="Employee data is loaded from the CRM and locked into the document snapshot" onClose={onClose} maxWidth="max-w-4xl">
+    <Modal title="Create HR document" subtitle={type === "OFFER" ? "Select a staff record to pre-fill details, then review and edit the offer." : "Employee data is loaded from the CRM and locked into the document snapshot"} onClose={onClose} maxWidth={type === "OFFER" ? "max-w-2xl" : "max-w-4xl"}>
       <form className="space-y-4" onSubmit={submit} noValidate>
         <Field label="Letter type">
           <FilterMenu value={type} fullWidth showLabelOnMobile ariaLabel="Select letter type" onSelect={(value) => { setType(value); setDetails({}); if (staffUserId) selectStaff(staffUserId); }} options={CATEGORY_ORDER.flatMap((category) => LETTER_TYPES.filter((item) => LETTER_CATEGORIES[item] === category).map((item) => ({ key: item, label: `${LETTER_LABELS[item]} · ${category}` })))} />
         </Field>
 
-        <div className="rounded-lg border bg-background px-4 py-3"><p className="text-xs font-semibold text-foreground">Official document controls</p><p className="mt-1 text-xs leading-5 text-muted">The reference number is generated automatically as BT-HRL-YYYY-0001. Content length and date ranges are validated to protect the one-page layout.</p></div>
+        {type !== "OFFER" && <div className="rounded-lg border bg-background px-4 py-3"><p className="text-xs font-semibold text-foreground">Official document controls</p><p className="mt-1 text-xs leading-5 text-muted">The reference number is generated automatically as BT-HRL-YYYY-0001. Content length and date ranges are validated to protect the one-page layout.</p></div>}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Employee record"><select value={staffUserId} onChange={(event) => selectStaff(event.target.value)} className="h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:border-brand"><option value="">External / pre-employment recipient</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.name} · {person.profile?.employeeCode ?? person.email}</option>)}</select></Field>
-          <Field label="Recipient name"><Input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} required minLength={2} readOnly={Boolean(staffUserId)} /></Field>
+          <Field label={type === "OFFER" ? "Pre-fill from staff (optional)" : "Employee record"}><select value={staffUserId} onChange={(event) => selectStaff(event.target.value)} className="h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:border-brand"><option value="">External / pre-employment recipient</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.name} · {person.profile?.employeeCode ?? person.email}</option>)}</select></Field>
+          <Field label="Recipient name *"><Input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} required minLength={2} readOnly={Boolean(staffUserId) && type !== "OFFER"} /></Field>
           <Field label="Issued date"><Input type="date" value={issuedDate} onChange={(event) => setIssuedDate(event.target.value)} required /></Field>
         </div>
 
@@ -244,7 +244,7 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
             <div key={field.key} className={field.type === "textarea" ? "sm:col-span-2" : ""}>
               <Field label={`${field.label}${field.required ? " *" : ""}`}>
                 {field.type === "textarea" ? (
-                  <textarea value={details[field.key] ?? ""} onChange={(event) => setField(field.key)(event.target.value)} required={field.required} rows={3} placeholder={field.placeholder} className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/10" />
+                  <textarea value={details[field.key] ?? ""} onChange={(event) => setField(field.key)(event.target.value)} required={field.required} maxLength={field.key === "recipientAddress" ? 240 : undefined} rows={field.key === "recipientAddress" ? 2 : 3} placeholder={field.placeholder} className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/10" />
                 ) : (
                   <Input type={field.type === "date" ? "date" : field.type === "money" ? "number" : "text"} min={field.type === "money" ? 0 : undefined} value={details[field.key] ?? ""} onChange={(event) => setField(field.key)(event.target.value)} required={field.required} placeholder={field.placeholder} />
                 )}
