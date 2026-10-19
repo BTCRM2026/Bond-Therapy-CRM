@@ -169,7 +169,7 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [error, setError] = useState("");
   const [downloadUrl, setDownloadUrl] = useState("");
   const [staffUserId, setStaffUserId] = useState("");
-  const [staff, setStaff] = useState<Array<{ id: string; name: string; email: string | null; department: string | null; managerName: string | null; profile: { employeeCode: string; jobTitle: string; employmentType: string; joiningDate: string; workLocation: string | null } | null }>>([]);
+  const [staff, setStaff] = useState<Array<{ id: string; name: string; email: string | null; department: string | null; managerName: string | null; profile: { employeeCode: string; jobTitle: string; employmentType: string; joiningDate: string; workLocation: string | null; residentialAddress: string | null } | null }>>([]);
 
   useEffect(() => { void fetch("/api/letters/options", { cache: "no-store" }).then((response) => response.ok ? response.json() : []).then(setStaff); }, []);
 
@@ -184,7 +184,7 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
     const person = staff.find((item) => item.id === id);
     if (!person) return;
     setRecipientName(person.name);
-    setDetails((current) => ({ ...current, designation: person.profile?.jobTitle ?? "", department: person.department ? pretty(person.department) : "", employmentType: person.profile?.employmentType ? pretty(person.profile.employmentType) : "", joiningDate: person.profile?.joiningDate?.slice(0, 10) ?? "", workLocation: person.profile?.workLocation ?? "", reportingManager: person.managerName ?? "" }));
+    setDetails((current) => ({ ...current, recipientAddress: person.profile?.residentialAddress ?? "", designation: person.profile?.jobTitle ?? "", department: person.department ? pretty(person.department) : "", employmentType: person.profile?.employmentType ? pretty(person.profile.employmentType) : "", joiningDate: person.profile?.joiningDate?.slice(0, 10) ?? "", workLocation: person.profile?.workLocation ?? "", reportingManager: person.managerName ?? "" }));
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -253,7 +253,7 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
           ))}
         </div>
 
-        {hasCompensation && <CompensationEditor details={details} setField={setField} total={total} ctcMonthly={ctcMonthly} ctcAnnual={ctcAnnual} />}
+        {hasCompensation && <CompensationEditor details={details} setField={setField} total={total} ctcMonthly={ctcMonthly} ctcAnnual={ctcAnnual} showInPdf={type === "APPOINTMENT"} />}
 
         {error && <FormError message={error} />}
         <FormActions saving={saving} onClose={onClose} label="Save draft" />
@@ -262,10 +262,10 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
   );
 }
 
-function CompensationEditor({ details, setField, total, ctcMonthly, ctcAnnual }: { details: Record<string, string>; setField: (key: string) => (value: string) => void; total: (part: "A" | "B" | "C", period: "Monthly" | "Annual") => number; ctcMonthly: number; ctcAnnual: number }) {
+function CompensationEditor({ details, setField, total, ctcMonthly, ctcAnnual, showInPdf }: { details: Record<string, string>; setField: (key: string) => (value: string) => void; total: (part: "A" | "B" | "C", period: "Monthly" | "Annual") => number; ctcMonthly: number; ctcAnnual: number; showInPdf: boolean }) {
   const money = (value: number) => `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
   return <section className="overflow-hidden rounded-xl border bg-white">
-    <div className="border-b bg-background px-4 py-3"><h3 className="text-sm font-semibold text-foreground">Compensation structure</h3><p className="mt-1 text-xs text-muted">Enter the approved monthly and annual figures. Blank or zero components will not appear in the final PDF.</p></div>
+    <div className="border-b bg-background px-4 py-3"><h3 className="text-sm font-semibold text-foreground">Compensation structure</h3><p className="mt-1 text-xs text-muted">{showInPdf ? "Enter the approved monthly and annual figures. Blank or zero components will not appear in the final PDF." : "Enter the approved figures to calculate annual CTC. The salary table will not appear in this letter."}</p></div>
     <div className="overflow-x-auto"><div className="min-w-[620px]">
       <div className="grid grid-cols-[1fr_180px_180px] border-b px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted"><span>Salary component</span><span>Monthly (INR)</span><span>Annual (INR)</span></div>
       {(["A", "B", "C"] as const).map((part) => <div key={part}>

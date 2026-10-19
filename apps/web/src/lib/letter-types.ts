@@ -49,12 +49,12 @@ export type LetterFieldDef = { key: string; label: string; type: 'text' | 'date'
 
 export const LETTER_FIELDS: Record<LetterType, LetterFieldDef[]> = {
   OFFER: [
+    { key: 'recipientAddress', label: 'Recipient address', type: 'textarea', required: false },
     { key: 'designation', label: 'Designation', type: 'text', required: true },
     { key: 'department', label: 'Department', type: 'text', required: true },
     { key: 'ctc', label: 'Annual CTC', type: 'money', required: true },
     { key: 'joiningDate', label: 'Proposed joining date', type: 'date', required: true },
     { key: 'workLocation', label: 'Work location', type: 'text', required: true },
-    { key: 'employmentType', label: 'Employment type', type: 'text', required: true },
   ],
   APPOINTMENT: [
     { key: 'designation', label: 'Designation', type: 'text', required: true },

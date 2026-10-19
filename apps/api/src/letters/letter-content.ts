@@ -61,11 +61,16 @@ export function buildLetterContent(
   switch (type) {
     case 'OFFER':
       return {
-        subject: `Offer of employment - ${name}`,
+        subject: 'Offer of Employment',
         paragraphs: [
-          `We are pleased to offer you the position of ${strong(d.designation)} in the ${strong(d.department)} department at ${company}. Your proposed joining date is ${strong(dateFmt(d.joiningDate))}, your primary work location will be ${strong(d.workLocation)}, and the employment type is ${strong(d.employmentType)}.`,
-          `Your monthly gross earnings (Total A) will be ${strong(money(d.monthlyGross))} and annual cost to company will be ${strong(money(d.ctc))}, subject to statutory deductions and applicable Company policies. A detailed appointment letter will be issued after completion of joining formalities and verification of documents.`,
-          `Please confirm your acceptance within the period communicated by Human Resources. We look forward to welcoming you and to a productive professional association.`,
+          `We are pleased to offer you the position of ${strong(d.designation)} in ${strong(d.department)} at our ${strong(d.workLocation)}. This offer follows your application and successful interview and is made based on the terms and conditions discussed and mutually agreed upon.`,
+          `Your annual CTC will be ${strong(money(d.ctc))}, as discussed and agreed upon. You will join us on or before ${strong(dateFmt(d.joiningDate))}.`,
+          'A detailed appointment letter outlining your terms of employment will be provided to you on your joining date. Please ensure you bring photocopies of your testimonials and certificates, recent passport-sized photographs, and the original certificates for verification.',
+          'Kindly return the duplicate copy of this letter, duly signed, as a token of your acceptance.',
+          'Please note that this offer is dependent upon the successful completion of a medical examination and verification that you have not been involved in any legal disputes or ethical violations in the past or currently.',
+          'The Basic Salary shall be structured in compliance with the applicable Labour Codes and related rules and shall form a minimum of 50% of the total remuneration, subject to statutory requirements and amendments from time to time.',
+          'We look forward to your positive response and to welcoming you to our team.',
+          'Congratulations once again!',
         ],
       };
     case 'APPOINTMENT':

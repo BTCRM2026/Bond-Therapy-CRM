@@ -15,3 +15,15 @@ describe('HR appointment content', () => {
     expect(content.sections?.flatMap((section) => section.paragraphs).join(' ')).toContain('CRM records');
   });
 });
+
+describe('HR offer content', () => {
+  it('uses employee-specific details without printing a salary breakdown', () => {
+    const content = buildLetterContent('OFFER', { name: 'Asha Patel' }, { designation: 'Trainee', department: 'Export', workLocation: 'Mumbai HO', joiningDate: '2026-09-03', ctc: '600000' }, snapshot);
+    expect(content.subject).toBe('Offer of Employment');
+    expect(content.paragraphs.join(' ')).toContain('Trainee</strong> in <strong>Export</strong> at our <strong>Mumbai HO');
+    expect(content.paragraphs.join(' ')).toContain('INR 6,00,000');
+    expect(content.paragraphs.join(' ')).toContain('03 September 2026');
+    expect(content.paragraphs.join(' ')).toContain('Congratulations once again!');
+    expect(content.paragraphs.join(' ')).not.toContain('monthly gross');
+  });
+});
