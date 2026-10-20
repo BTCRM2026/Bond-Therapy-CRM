@@ -154,7 +154,7 @@
   },
   {
     "kind": "paragraph",
-    "text": "You shall be on probation for a period of six months from the date of joining. During the probation period, your performance, conduct and suitability for the position will be observed and reviewed. Upon satisfactory completion of the probation period, you will be confirmed in writing. The Company may, at its discretion, extend the probation period. You shall continue to be treated as a probationer until your confirmation is communicated to you in writing."
+    "text": "You shall be on probation for a period of {{PROBATION_PERIOD}} from the date of joining. During the probation period, your performance, conduct and suitability for the position will be observed and reviewed. Upon satisfactory completion of the probation period, you will be confirmed in writing. The Company may, at its discretion, extend the probation period. You shall continue to be treated as a probationer until your confirmation is communicated to you in writing."
   },
   {
     "kind": "paragraph",
@@ -162,7 +162,7 @@
   },
   {
     "kind": "paragraph",
-    "text": "During the probation period, either party may terminate the employment by giving the applicable notice period or salary in lieu of notice, as specified in Clause 6 – Notice Period, subject to applicable law and Company policy."
+    "text": "During the probation period, either party may terminate the employment by giving the applicable notice period or salary in lieu of notice, as specified in the Notice Period section of this letter, subject to applicable law and Company policy."
   },
   {
     "kind": "paragraph",
@@ -176,24 +176,16 @@
     "kind": "table",
     "rows": [
       [
-        "Level",
-        "During Probation",
-        "After Confirmation"
+        "Stage",
+        "Notice period"
       ],
       [
-        "Office Assistant & Trainee",
-        "One Month",
-        "One Month"
+        "During probation",
+        "{{NOTICE_DURING_PROBATION}}"
       ],
       [
-        "Jr. Executive & up to Sr. Executive",
-        "One Month",
-        "Two Months"
-      ],
-      [
-        "Assistant Manager & above",
-        "One Month",
-        "Three Months"
+        "After confirmation",
+        "{{NOTICE_AFTER_CONFIRMATION}}"
       ]
     ]
   },
@@ -295,7 +287,7 @@
   },
   {
     "kind": "paragraph",
-    "text": "Your employment with the Company is on a full-time basis. You are expected to devote your working time, attention and skills to the Company's business and responsibilities assigned to you. You shall not undertake any other employment, business, professional assignment or remunerative activity that conflicts with your duties or interests of the Company without prior written approval from Management."
+    "text": "Your employment with the Company is on the basis stated under Employment Type in the Particulars of Appointment. You are expected to devote your agreed working time, attention and skills to the Company's business and responsibilities assigned to you. You shall not undertake any other employment, business, professional assignment or remunerative activity that conflicts with your duties or interests of the Company without prior written approval from Management."
   },
   {
     "kind": "paragraph",
@@ -331,7 +323,7 @@
   },
   {
     "kind": "paragraph",
-    "text": "During and after employment, you shall maintain confidentiality regarding the Company's confidential, proprietary and commercially sensitive information, including client and traveller information, employee information, supplier/vendor information, pricing and commercial information, travel itineraries and booking information, business plans and strategies, financial information, Company systems, passwords and access credentials, and internal documents, records and correspondence."
+    "text": "During and after employment, you shall maintain confidentiality regarding the Company's confidential, proprietary and commercially sensitive information, including salon and distributor details, customer and employee information, product formulations and technical materials, supplier information, pricing and commercial terms, sales and inventory records, business plans and strategies, financial information, Company systems, passwords and access credentials, and internal documents, records and correspondence."
   },
   {
     "kind": "paragraph",
@@ -646,10 +638,6 @@
   {
     "kind": "paragraph",
     "text": "Note: Statutory contributions, deductions and benefits shall be calculated and applied as per prevailing law and the employee's eligibility."
-  },
-  {
-    "kind": "paragraph",
-    "text": "For Kairamya Journeys LLP"
   },
   {
     "kind": "paragraph",

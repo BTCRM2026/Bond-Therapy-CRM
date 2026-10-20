@@ -232,6 +232,7 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
         </Field>
 
         {type !== "OFFER" && <div className="rounded-lg border bg-background px-4 py-3"><p className="text-xs font-semibold text-foreground">Official document controls</p><p className="mt-1 text-xs leading-5 text-muted">The reference number is generated automatically. Review every employee detail before saving the letter.</p></div>}
+        {type === "APPOINTMENT" && <p className="text-xs leading-5 text-muted">Enter the probation and notice periods approved for this employee. The letter uses these exact terms; no company-wide values are assumed.</p>}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={type === "OFFER" ? "Pre-fill from staff (optional)" : "Employee record"}><select value={staffUserId} onChange={(event) => selectStaff(event.target.value)} className="h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:border-brand"><option value="">External / pre-employment recipient</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.name} · {person.profile?.employeeCode ?? person.email}</option>)}</select></Field>

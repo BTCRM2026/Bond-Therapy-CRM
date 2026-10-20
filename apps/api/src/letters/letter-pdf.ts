@@ -108,9 +108,13 @@ function renderAppointmentReferenceHtml(data: LetterPdfData) {
   const company = data.snapshot.company;
   const employee = data.snapshot.employee;
   const date = (value?: string) => value ? `${value.slice(8, 10)}-${value.slice(5, 7)}-${value.slice(0, 4)}` : '';
+  const probationMonths = Number(d.probationMonths);
+  const probationPeriod = Number.isInteger(probationMonths) && probationMonths > 0 ? `${probationMonths} ${probationMonths === 1 ? 'month' : 'months'}` : 'six months';
   const text = (value: string) => escapeHtml(value
     .replaceAll('TREEBOND COSMETIC PVT LTD', company.legalName)
-    .replaceAll('Kairamya Journeys LLP', company.legalName)
+    .replaceAll('{{PROBATION_PERIOD}}', probationPeriod)
+    .replaceAll('{{NOTICE_DURING_PROBATION}}', d.noticeDuringProbation || 'One Month')
+    .replaceAll('{{NOTICE_AFTER_CONFIRMATION}}', d.noticeAfterConfirmation || 'As stated in the original appointment terms')
     .replaceAll('(Designation & Department)', `${d.designation} in the ${d.department} department`)
     .replaceAll('07.09.2026', date(d.joiningDate))
     .replaceAll("the Company's Office", d.workLocation || 'the Company office')
@@ -136,6 +140,7 @@ function renderAppointmentReferenceHtml(data: LetterPdfData) {
   const blocks = appointmentReference.slice(4).map((block) => {
     if (block.kind === 'table') {
       if (block.rows[0]?.[0] === 'Particulars') return salary;
+      if (block.rows[0]?.[0] === 'Stage' && !d.noticeDuringProbation) return '<table class="document-table"><tbody><tr><th>Level</th><th>During Probation</th><th>After Confirmation</th></tr><tr><td>Office Assistant &amp; Trainee</td><td>One Month</td><td>One Month</td></tr><tr><td>Jr. Executive &amp; up to Sr. Executive</td><td>One Month</td><td>Two Months</td></tr><tr><td>Assistant Manager &amp; above</td><td>One Month</td><td>Three Months</td></tr></tbody></table>';
       const rows = block.rows.map((row, index) => `<tr>${row.map((cell, column) => {
         const value = block.rows[0]?.[0] === 'Particular' && column === 1 && index > 0 ? (values[row[0]] || cell) : cell;
         return index === 0 ? `<th>${text(value)}</th>` : `<td>${text(value)}</td>`;
@@ -144,7 +149,7 @@ function renderAppointmentReferenceHtml(data: LetterPdfData) {
     }
     const line = block.text;
     if (line === 'For TREEBOND COSMETIC PVT LTD') return stamp;
-    if (line === 'For Kairamya Journeys LLP' || line === 'Authorised Signatory') return '';
+    if (line === 'Authorised Signatory') return '';
     if (line === 'EMPLOYEE ACCEPTANCE') return `<h2>${text(line)}</h2>`;
     if (line.startsWith('I, (Name),')) return `<p>${text(line.replace('(Name)', data.recipientName))}</p>`;
     if (line === 'Employee Name:') return `<p>Employee Name: ${escapeHtml(data.recipientName)}</p>`;

@@ -31,7 +31,7 @@ describe('Offer Letter creation', () => {
 describe('Appointment Letter creation', () => {
   const appointment: CreateHrLetterDto = {
     type: 'APPOINTMENT', recipientName: 'Asha Patel', recipientDesignation: 'Sales Executive', recipientDepartment: 'Sales', issuedDate: '2026-10-19',
-    details: { recipientAddress: 'Surat, Gujarat', designation: 'Sales Executive', department: 'Sales', joiningDate: '2026-10-01', workLocation: 'Surat', employmentType: 'Permanent', reportingManager: 'Sales Manager', basicMonthly: '20000', employeePfMonthly: '1800', employerPfMonthly: '1800' },
+    details: { recipientAddress: 'Surat, Gujarat', designation: 'Sales Executive', department: 'Sales', joiningDate: '2026-10-01', workLocation: 'Surat', employmentType: 'Permanent', probationMonths: '3', noticeDuringProbation: '30 days', noticeAfterConfirmation: '2 months', reportingManager: 'Sales Manager', basicMonthly: '20000', employeePfMonthly: '1800', employerPfMonthly: '1800' },
   };
 
   it('calculates the Word annexure totals and rejects impossible deductions', () => {
@@ -39,6 +39,14 @@ describe('Appointment Letter creation', () => {
     expect(service['normalizeAndValidate'](appointment)).toMatchObject({ appointmentTemplateVersion: 'WORD_2026', basicAnnual: '240000', employeePfAnnual: '21600', totalAMonthly: '20000', totalBMonthly: '1800', netMonthly: '18200', totalCMonthly: '1800', ctcMonthly: '21800', ctcAnnual: '261600' });
     expect(service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, basicAnnual: '1', hraMonthly: '1234.56' } })).toMatchObject({ basicAnnual: '240000', hraAnnual: '14814.72' });
     expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, employeePfMonthly: '21000' } })).toThrow('deductions cannot exceed');
+  });
+
+  it('requires approved employee-specific probation and notice terms', () => {
+    const service = new LettersService({} as PrismaService);
+    expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, probationMonths: '' } })).toThrow('probation period');
+    expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, probationMonths: 'six' } })).toThrow('whole number');
+    expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, noticeDuringProbation: 'one month' } })).toThrow('number and unit');
+    expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, noticeAfterConfirmation: '' } })).toThrow('notice after confirmation');
   });
 
   it('uses edited employee details and the Treebond company identity', async () => {
