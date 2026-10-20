@@ -11,7 +11,7 @@ import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
 import { KpiCell, KpiStrip } from "@/components/ui/kpi-strip";
 import { Modal } from "@/components/ui/modal";
-import { COMPENSATION_LETTER_TYPES, LETTER_CATEGORIES, LETTER_FIELDS, LETTER_LABELS, LETTER_TYPES, SALARY_COMPONENTS, type LetterType } from "@/lib/letter-types";
+import { APPOINTMENT_SALARY_COMPONENTS, COMPENSATION_LETTER_TYPES, LETTER_CATEGORIES, LETTER_FIELDS, LETTER_LABELS, LETTER_TYPES, SALARY_COMPONENTS, type LetterType } from "@/lib/letter-types";
 
 type LetterStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "GENERATED" | "SENT" | "ACKNOWLEDGED" | "REJECTED" | "SUPERSEDED" | "CANCELLED";
 
@@ -169,7 +169,7 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [error, setError] = useState("");
   const [downloadUrl, setDownloadUrl] = useState("");
   const [staffUserId, setStaffUserId] = useState("");
-  const [staff, setStaff] = useState<Array<{ id: string; name: string; email: string | null; department: string | null; managerName: string | null; profile: { employeeCode: string; jobTitle: string; employmentType: string; joiningDate: string; workLocation: string | null; residentialAddress: string | null } | null }>>([]);
+  const [staff, setStaff] = useState<Array<{ id: string; name: string; email: string | null; department: string | null; managerName: string | null; profile: { employeeCode: string; jobTitle: string; employmentType: string; joiningDate: string; dateOfBirth: string | null; workLocation: string | null; residentialAddress: string | null } | null }>>([]);
 
   useEffect(() => { void fetch("/api/letters/options", { cache: "no-store" }).then((response) => response.ok ? response.json() : []).then(setStaff); }, []);
 
@@ -179,12 +179,12 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const ctcMonthly = total("A", "Monthly") + total("B", "Monthly") + total("C", "Monthly");
   const ctcAnnual = total("A", "Annual") + total("B", "Annual") + total("C", "Annual");
   const setField = (key: string) => (value: string) => setDetails((current) => ({ ...current, [key]: value }));
-  const selectStaff = (id: string) => {
+  const selectStaff = (id: string, selectedType = type) => {
     setStaffUserId(id);
     const person = staff.find((item) => item.id === id);
     if (!person) return;
     setRecipientName(person.name);
-    setDetails((current) => ({ ...current, recipientAddress: person.profile?.residentialAddress ?? "", designation: person.profile?.jobTitle ?? "", department: person.department ? pretty(person.department) : "", employmentType: person.profile?.employmentType ? pretty(person.profile.employmentType) : "", joiningDate: person.profile?.joiningDate?.slice(0, 10) ?? "", workLocation: person.profile?.workLocation ?? "", reportingManager: person.managerName ?? "" }));
+    setDetails((current) => ({ ...current, recipientAddress: person.profile?.residentialAddress ?? "", employeeCode: person.profile?.employeeCode ?? "", designation: person.profile?.jobTitle ?? "", department: person.department ? pretty(person.department) : "", employmentType: person.profile?.employmentType ? pretty(person.profile.employmentType) : "", joiningDate: selectedType === "APPOINTMENT" ? current.joiningDate || "2026-10-01" : person.profile?.joiningDate?.slice(0, 10) ?? current.joiningDate ?? "", dateOfBirth: person.profile?.dateOfBirth?.slice(0, 10) ?? "", workLocation: person.profile?.workLocation ?? "", reportingManager: person.managerName ?? "" }));
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -225,22 +225,22 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
   }
 
   return (
-    <Modal title="Create HR document" subtitle={type === "OFFER" ? "Select a staff record to pre-fill details, then review and edit the offer." : "Employee data is loaded from the CRM and locked into the document snapshot"} onClose={onClose} maxWidth={type === "OFFER" ? "max-w-2xl" : "max-w-4xl"}>
+    <Modal title="Create HR document" subtitle={type === "OFFER" || type === "APPOINTMENT" ? "Pre-fill from a staff record, then review and edit the employee details." : "Employee data is loaded from the CRM and locked into the document snapshot"} onClose={onClose} maxWidth={type === "OFFER" ? "max-w-2xl" : "max-w-4xl"}>
       <form className="space-y-4" onSubmit={submit} noValidate>
         <Field label="Letter type">
-          <FilterMenu value={type} fullWidth showLabelOnMobile ariaLabel="Select letter type" onSelect={(value) => { setType(value); setDetails({}); if (staffUserId) selectStaff(staffUserId); }} options={CATEGORY_ORDER.flatMap((category) => LETTER_TYPES.filter((item) => LETTER_CATEGORIES[item] === category).map((item) => ({ key: item, label: `${LETTER_LABELS[item]} · ${category}` })))} />
+          <FilterMenu value={type} fullWidth showLabelOnMobile ariaLabel="Select letter type" onSelect={(value) => { setType(value); setDetails(value === "APPOINTMENT" ? { joiningDate: "2026-10-01" } : {}); if (staffUserId) selectStaff(staffUserId, value); }} options={CATEGORY_ORDER.flatMap((category) => LETTER_TYPES.filter((item) => LETTER_CATEGORIES[item] === category).map((item) => ({ key: item, label: `${LETTER_LABELS[item]} · ${category}` })))} />
         </Field>
 
-        {type !== "OFFER" && <div className="rounded-lg border bg-background px-4 py-3"><p className="text-xs font-semibold text-foreground">Official document controls</p><p className="mt-1 text-xs leading-5 text-muted">The reference number is generated automatically as BT-HRL-YYYY-0001. Content length and date ranges are validated to protect the one-page layout.</p></div>}
+        {type !== "OFFER" && <div className="rounded-lg border bg-background px-4 py-3"><p className="text-xs font-semibold text-foreground">Official document controls</p><p className="mt-1 text-xs leading-5 text-muted">The reference number is generated automatically. Review every employee detail before saving the letter.</p></div>}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={type === "OFFER" ? "Pre-fill from staff (optional)" : "Employee record"}><select value={staffUserId} onChange={(event) => selectStaff(event.target.value)} className="h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:border-brand"><option value="">External / pre-employment recipient</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.name} · {person.profile?.employeeCode ?? person.email}</option>)}</select></Field>
-          <Field label="Recipient name *"><Input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} required minLength={2} readOnly={Boolean(staffUserId) && type !== "OFFER"} /></Field>
+          <Field label="Recipient name *"><Input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} required minLength={2} readOnly={Boolean(staffUserId) && type !== "OFFER" && type !== "APPOINTMENT"} /></Field>
           <Field label="Issued date"><Input type="date" value={issuedDate} onChange={(event) => setIssuedDate(event.target.value)} required /></Field>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {fields.filter((field) => !(hasCompensation && (field.key === "ctc" || field.key === "newCtc"))).map((field) => (
+          {fields.filter((field) => !((hasCompensation || type === "APPOINTMENT") && (field.key === "ctc" || field.key === "newCtc"))).map((field) => (
             <div key={field.key} className={field.type === "textarea" ? "sm:col-span-2" : ""}>
               <Field label={`${field.label}${field.required ? " *" : ""}`}>
                 {field.type === "textarea" ? (
@@ -254,6 +254,7 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
         </div>
 
         {hasCompensation && <CompensationEditor details={details} setField={setField} total={total} ctcMonthly={ctcMonthly} ctcAnnual={ctcAnnual} showInPdf={type === "APPOINTMENT"} />}
+        {type === "APPOINTMENT" && <AppointmentSalaryEditor details={details} setField={setField} />}
 
         {error && <FormError message={error} />}
         <FormActions saving={saving} onClose={onClose} label="Save draft" />
@@ -275,5 +276,23 @@ function CompensationEditor({ details, setField, total, ctcMonthly, ctcAnnual, s
       </div>)}
       <div className="grid grid-cols-[1fr_180px_180px] border-t-2 border-foreground/20 bg-brand-soft px-4 py-3 text-sm font-bold text-foreground"><span>Cost to Company (A + B + C)</span><span>{money(ctcMonthly)}</span><span>{money(ctcAnnual)}</span></div>
     </div></div>
+  </section>;
+}
+
+function AppointmentSalaryEditor({ details, setField }: { details: Record<string, string>; setField: (key: string) => (value: string) => void }) {
+  const annual = (monthly: string) => monthly && Number.isFinite(Number(monthly)) ? String(Number((Number(monthly) * 12).toFixed(2))) : "";
+  const sum = (part: "A" | "B" | "C", period: "Monthly" | "Annual") => APPOINTMENT_SALARY_COMPONENTS.filter((item) => item.part === part).reduce((total, item) => total + (Number(period === "Annual" ? annual(details[`${item.key}Monthly`] ?? "") : details[`${item.key}Monthly`]) || 0), 0);
+  const amount = (value: number) => `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  const summary = (label: string, monthly: number, annual: number) => <div className="grid grid-cols-[minmax(0,1fr)_1fr_1fr] gap-2 border-t bg-background px-4 py-2 text-xs font-semibold text-foreground sm:grid-cols-[minmax(0,1fr)_150px_150px] sm:text-sm" key={label}><span>{label}</span><span className="text-right">{amount(monthly)}</span><span className="text-right">{amount(annual)}</span></div>;
+  return <section className="overflow-hidden rounded-xl border bg-white" aria-label="Annexure A salary break-up">
+    <div className="border-b bg-background px-4 py-3"><h3 className="text-sm font-semibold text-foreground">Annexure A · Salary break-up</h3><p className="mt-1 text-xs text-muted">Enter approved monthly amounts. Annual figures are calculated as monthly × 12; blank or zero rows are omitted from the PDF.</p></div>
+    <div className="grid grid-cols-[minmax(0,1fr)_1fr_1fr] gap-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted sm:grid-cols-[minmax(0,1fr)_150px_150px]"><span>Particulars</span><span className="text-right">Per month</span><span className="text-right">Annual</span></div>
+    {(["A", "B", "C"] as const).map((part) => <div key={part}>
+      <div className="border-t bg-background/70 px-4 py-2 text-xs font-semibold text-foreground">{part === "A" ? "A. Earnings" : part === "B" ? "B. Employee deductions" : "C. Employer contributions / benefits"}</div>
+      {APPOINTMENT_SALARY_COMPONENTS.filter((item) => item.part === part).map((item) => <div key={item.key} className="grid grid-cols-2 items-center gap-2 border-t px-4 py-2 sm:grid-cols-[minmax(0,1fr)_150px_150px]"><label className="col-span-2 text-xs text-foreground sm:col-span-1" htmlFor={`${item.key}Monthly`}>{item.label}</label><Input id={`${item.key}Monthly`} type="number" min={0} step="0.01" value={details[`${item.key}Monthly`] ?? ""} onChange={(event) => setField(`${item.key}Monthly`)(event.target.value)} placeholder="Monthly" /><Input type="text" aria-label={`${item.label} annual, calculated`} value={annual(details[`${item.key}Monthly`] ?? "")} placeholder="Auto × 12" className="bg-background text-muted" readOnly /></div>)}
+      {summary(part === "A" ? "Gross Earnings (A)" : part === "B" ? "Total Deductions (B)" : "Employer Contributions / Benefits (C)", sum(part, "Monthly"), sum(part, "Annual"))}
+      {part === "B" && summary("Net Salary (A-B)", sum("A", "Monthly") - sum("B", "Monthly"), sum("A", "Annual") - sum("B", "Annual"))}
+    </div>)}
+    {summary("CTC (A+C)", sum("A", "Monthly") + sum("C", "Monthly"), sum("A", "Annual") + sum("C", "Annual"))}
   </section>;
 }

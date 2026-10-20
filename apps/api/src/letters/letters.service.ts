@@ -6,7 +6,7 @@ import { recordAudit } from '../common/audit.util.js';
 import type { SessionUser } from '../common/session.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateHrLetterDto, HrLetterActionDto, ListHrLettersDto } from './dto.js';
-import { COMPENSATION_LETTER_TYPES, LETTER_FIELDS, LETTER_LABELS, SALARY_COMPONENTS, type LetterType } from './letter-types.js';
+import { APPOINTMENT_SALARY_COMPONENTS, COMPENSATION_LETTER_TYPES, LETTER_FIELDS, LETTER_LABELS, SALARY_COMPONENTS, type LetterType } from './letter-types.js';
 import { renderLetterPdf } from './letter-pdf.js';
 
 const FINAL_STATUSES: HrLetterStatus[] = ['GENERATED', 'SENT', 'ACKNOWLEDGED'];
@@ -32,11 +32,27 @@ export class LettersService {
 
   private normalizeAndValidate(dto: CreateHrLetterDto) {
     const normalized = Object.fromEntries(Object.entries(dto.details ?? {}).map(([key, value]) => [key, value?.toString().trim() ?? '']));
-    if (dto.type === 'OFFER') normalized.recipientAddress = normalized.recipientAddress?.replace(/\s+/g, ' ') ?? '';
+    if (dto.type === 'OFFER' || dto.type === 'APPOINTMENT') normalized.recipientAddress = normalized.recipientAddress?.replace(/\s+/g, ' ') ?? '';
     if (dto.type === 'OFFER' && dto.recipientName.trim().length < 2)
       throw new BadRequestException('Enter the recipient name before saving this Offer Letter.');
     if (dto.type === 'OFFER' && (!Number.isFinite(Number(normalized.ctc)) || Number(normalized.ctc) <= 0))
       throw new BadRequestException('Enter a valid annual CTC greater than zero for this Offer Letter.');
+    if (dto.type === 'APPOINTMENT') {
+      for (const item of APPOINTMENT_SALARY_COMPONENTS) {
+        const raw = normalized[`${item.key}Monthly`];
+        if (raw && (!Number.isFinite(Number(raw)) || Number(raw) < 0)) throw new BadRequestException(`${item.label} monthly must be a valid non-negative amount.`);
+        const annual = Number(((Number(raw) || 0) * 12).toFixed(2));
+        if (!Number.isFinite(annual)) throw new BadRequestException(`${item.label} monthly amount is too large.`);
+        normalized[`${item.key}Annual`] = String(annual);
+      }
+      const sum = (part: 'A' | 'B' | 'C', period: 'Monthly' | 'Annual') => APPOINTMENT_SALARY_COMPONENTS.filter((item) => item.part === part).reduce((total, item) => total + (Number(normalized[`${item.key}${period}`]) || 0), 0);
+      const aMonthly = sum('A', 'Monthly'); const aAnnual = sum('A', 'Annual');
+      const bMonthly = sum('B', 'Monthly'); const bAnnual = sum('B', 'Annual');
+      const cMonthly = sum('C', 'Monthly'); const cAnnual = sum('C', 'Annual');
+      if (aMonthly <= 0 || aAnnual <= 0) throw new BadRequestException('Enter the approved monthly and annual earnings before saving this Appointment Letter.');
+      if (bMonthly > aMonthly || bAnnual > aAnnual) throw new BadRequestException('Employee deductions cannot exceed gross earnings.');
+      Object.assign(normalized, { appointmentTemplateVersion: 'WORD_2026', totalAMonthly: String(aMonthly), totalAAnnual: String(aAnnual), totalBMonthly: String(bMonthly), totalBAnnual: String(bAnnual), totalCMonthly: String(cMonthly), totalCAnnual: String(cAnnual), netMonthly: String(aMonthly - bMonthly), netAnnual: String(aAnnual - bAnnual), ctcMonthly: String(aMonthly + cMonthly), ctcAnnual: String(aAnnual + cAnnual), ctc: String(aAnnual + cAnnual) });
+    }
     if ((COMPENSATION_LETTER_TYPES as readonly string[]).includes(dto.type)) {
       for (const item of SALARY_COMPONENTS) for (const period of ['Monthly', 'Annual']) {
         const raw = normalized[`${item.key}${period}`];
@@ -84,8 +100,8 @@ export class LettersService {
     const roleKeys = staff?.roles.map((item) => item.role.key) ?? [];
     const roleTrack = staff?.department === 'SALES' || roleKeys.some((key) => key.includes('SALES')) ? 'SALES' as const : staff?.department === 'DEMO' || roleKeys.some((key) => /TECH|DEMO|EDUCAT/.test(key)) ? 'TECHNICAL' as const : 'GENERAL' as const;
     return {
-      employee: { id: staff?.id ?? null, name: dto.type === 'OFFER' ? dto.recipientName.trim() : staff?.name ?? dto.recipientName.trim(), employeeCode: staff?.staffProfile?.employeeCode ?? null, designation: dto.type === 'OFFER' ? dto.recipientDesignation?.trim() ?? null : staff?.staffProfile?.jobTitle ?? dto.recipientDesignation?.trim() ?? null, department: dto.type === 'OFFER' ? dto.recipientDepartment?.trim() ?? null : staff?.department ?? dto.recipientDepartment?.trim() ?? null, employmentType: staff?.staffProfile?.employmentType ?? null, workLocation: staff?.staffProfile?.workLocation ?? null, reportingManager: staff?.manager?.name ?? null, joiningDate: staff?.staffProfile?.joiningDate?.toISOString().slice(0, 10) ?? null, email: staff?.email ?? null, mobile: staff?.staffProfile?.mobile ?? null, roleKeys, roleTrack },
-      company: dto.type === 'OFFER'
+      employee: { id: staff?.id ?? null, name: dto.type === 'OFFER' || dto.type === 'APPOINTMENT' ? dto.recipientName.trim() : staff?.name ?? dto.recipientName.trim(), employeeCode: staff?.staffProfile?.employeeCode ?? null, designation: dto.type === 'OFFER' || dto.type === 'APPOINTMENT' ? dto.recipientDesignation?.trim() ?? null : staff?.staffProfile?.jobTitle ?? dto.recipientDesignation?.trim() ?? null, department: dto.type === 'OFFER' || dto.type === 'APPOINTMENT' ? dto.recipientDepartment?.trim() ?? null : staff?.department ?? dto.recipientDepartment?.trim() ?? null, employmentType: staff?.staffProfile?.employmentType ?? null, workLocation: staff?.staffProfile?.workLocation ?? null, reportingManager: staff?.manager?.name ?? null, joiningDate: staff?.staffProfile?.joiningDate?.toISOString().slice(0, 10) ?? null, email: staff?.email ?? null, mobile: staff?.staffProfile?.mobile ?? null, roleKeys, roleTrack },
+      company: dto.type === 'OFFER' || dto.type === 'APPOINTMENT'
         ? { legalName: 'Treebond Cosmetics Pvt Ltd', displayName: 'Treebond Cosmetics Pvt Ltd', address: 'Plot No-146/1, GIDC Phase-2, Rajpipla, Dist-Narmada-393145', phone: '+91 7878040050', email: 'treebondcosmetics2025@gmail.com', website: 'bondtherapy.co.in', authorisedSignatory: 'Parth Patel', authorisedSignatoryDesignation: 'Director' }
         : { legalName: company.legalName, displayName: company.tradeName, address: [company.registeredAddress, company.city, company.state, company.pincode].filter(Boolean).join(', '), phone: company.phone || '+91 78780 40050', email: company.email || 'hr@bondtherapy.co.in', website: company.website || 'bondtherapy.co.in', authorisedSignatory: company.accountManagerName ?? 'Parth Patel', authorisedSignatoryDesignation: company.accountManagerTitle ?? 'Authorised Signatory' },
     };

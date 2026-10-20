@@ -1,7 +1,21 @@
 export const LETTER_TYPES = ['OFFER', 'APPOINTMENT', 'PROBATION', 'CONFIRMATION', 'INTERNSHIP', 'PROMOTION', 'SALARY_INCREMENT', 'WARNING', 'NOC', 'EXPERIENCE', 'RESIGNATION_ACCEPTANCE', 'RELIEVING', 'TERMINATION'] as const;
 export type LetterType = (typeof LETTER_TYPES)[number];
 
-export const COMPENSATION_LETTER_TYPES = ['APPOINTMENT', 'PROMOTION', 'SALARY_INCREMENT'] as const;
+export const COMPENSATION_LETTER_TYPES = ['PROMOTION', 'SALARY_INCREMENT'] as const;
+export const APPOINTMENT_SALARY_COMPONENTS = [
+  { key: 'basic', label: 'Basic Salary', part: 'A' },
+  { key: 'hra', label: 'House Rent Allowance (HRA)', part: 'A' },
+  { key: 'otherAllowance', label: 'Other Allowance', part: 'A' },
+  { key: 'employeePf', label: 'Provident Fund – Employee Share, if applicable', part: 'B' },
+  { key: 'employeeEsic', label: 'ESIC – Employee Share, if applicable', part: 'B' },
+  { key: 'professionalTax', label: 'Professional Tax, if applicable', part: 'B' },
+  { key: 'labourWelfare', label: 'Labour Welfare Fund, if applicable', part: 'B' },
+  { key: 'tds', label: 'TDS, if applicable', part: 'B' },
+  { key: 'employerPf', label: 'Provident Fund – Employer Share, if applicable', part: 'C' },
+  { key: 'employerEsic', label: 'ESIC – Employer Share, if applicable', part: 'C' },
+  { key: 'gratuity', label: 'Gratuity – as applicable', part: 'C' },
+  { key: 'bonus', label: 'Bonus – as applicable', part: 'C' },
+] as const;
 export const SALARY_COMPONENTS = [
   { key: 'basic', label: 'Basic', part: 'A' },
   { key: 'hra', label: 'HRA', part: 'A' },
@@ -57,15 +71,17 @@ export const LETTER_FIELDS: Record<LetterType, LetterFieldDef[]> = {
     { key: 'ctc', label: 'Annual CTC (INR)', type: 'money', required: true },
   ],
   APPOINTMENT: [
+    { key: 'recipientAddress', label: 'Employee address', type: 'textarea', required: true },
+    { key: 'parentName', label: "Father's / Mother's name", type: 'text', required: false },
+    { key: 'employeeCode', label: 'Employee code', type: 'text', required: false },
     { key: 'designation', label: 'Designation', type: 'text', required: true },
     { key: 'department', label: 'Department', type: 'text', required: true },
     { key: 'ctc', label: 'Annual CTC', type: 'money', required: true },
     { key: 'joiningDate', label: 'Joining date', type: 'date', required: true },
-    { key: 'probationMonths', label: 'Probation period (months)', type: 'text', required: true, placeholder: 'e.g. 3' },
     { key: 'workLocation', label: 'Work location', type: 'text', required: true },
     { key: 'employmentType', label: 'Employment type', type: 'text', required: true },
     { key: 'reportingManager', label: 'Reporting manager', type: 'text', required: true },
-    { key: 'noticePeriod', label: 'Notice period', type: 'text', required: true, placeholder: 'Use the employee employment record' },
+    { key: 'dateOfBirth', label: 'Date of birth', type: 'date', required: false },
   ],
   PROBATION: [
     { key: 'designation', label: 'Designation', type: 'text', required: true },

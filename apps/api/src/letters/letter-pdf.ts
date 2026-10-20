@@ -5,6 +5,7 @@ import puppeteer from 'puppeteer';
 import { buildLetterContent } from './letter-content.js';
 import type { LetterSnapshot } from './letters.service.js';
 import {
+  APPOINTMENT_SALARY_COMPONENTS,
   LETTER_CATEGORIES,
   LETTER_LABELS,
   SALARY_COMPONENTS,
@@ -31,6 +32,9 @@ const manropeBase64 = readFileSync(
     'manrope-latin-wght-normal.woff2',
   ),
 ).toString('base64');
+const appointmentReference = JSON.parse(readFileSync(join(moduleDir, 'assets', 'appointment-reference.json'), 'utf8')) as Array<
+  { kind: 'paragraph'; text: string } | { kind: 'table'; rows: string[][] }
+>;
 
 const COLORS = {
   ink: '#171918',
@@ -99,6 +103,76 @@ function renderAppointmentHtml(data: LetterPdfData, content: LetterContent) {
 </style></head><body>${pages}</body></html>`;
 }
 
+function renderAppointmentReferenceHtml(data: LetterPdfData) {
+  const d = data.details;
+  const company = data.snapshot.company;
+  const employee = data.snapshot.employee;
+  const date = (value?: string) => value ? `${value.slice(8, 10)}-${value.slice(5, 7)}-${value.slice(0, 4)}` : '';
+  const text = (value: string) => escapeHtml(value
+    .replaceAll('TREEBOND COSMETIC PVT LTD', company.legalName)
+    .replaceAll('Kairamya Journeys LLP', company.legalName)
+    .replaceAll('(Designation & Department)', `${d.designation} in the ${d.department} department`)
+    .replaceAll('07.09.2026', date(d.joiningDate))
+    .replaceAll("the Company's Office", d.workLocation || 'the Company office')
+    .replaceAll("the Company's Head Office", d.workLocation || 'the Company head office')
+    .replace(', address,', `, ${company.address},`));
+  const values: Record<string, string> = {
+    'Employee Name': data.recipientName,
+    "Father's / Mother's Name": d.parentName || '—',
+    'Employee Code': d.employeeCode || employee.employeeCode || 'To be assigned',
+    'Designation': d.designation || '',
+    'Department / Function': d.department || '',
+    'Employment Type': d.employmentType || '',
+    'Date of Joining': date(d.joiningDate),
+    'Place of Posting': d.workLocation || '',
+    'Reporting To': d.reportingManager || '',
+    'Date of Birth': d.dateOfBirth ? date(d.dateOfBirth) : 'As maintained in HR records',
+  };
+  const salarySum = (part: 'A' | 'B' | 'C', period: 'Monthly' | 'Annual') => APPOINTMENT_SALARY_COMPONENTS.filter((item) => item.part === part).reduce((sum, item) => sum + (Number(d[`${item.key}${period}`]) || 0), 0);
+  const moneyCell = (value: number) => `₹ ${inr(String(value))}`;
+  const salaryRow = (label: string, monthly: number, annual: number, className = '') => `<tr class="${className}"><td>${escapeHtml(label)}</td><td class="num">${moneyCell(monthly)}</td><td class="num">${moneyCell(annual)}</td></tr>`;
+  const salary = `<table class="document-table salary-table"><thead><tr><th>Particulars</th><th class="num">Per Month (₹)</th><th class="num">Annual (₹)</th></tr></thead><tbody>${(['A', 'B', 'C'] as const).map((part) => `<tr class="group"><td colspan="3">${part === 'A' ? 'A. Earnings' : part === 'B' ? 'B. Employee Deductions' : 'C. Employer Contributions / Benefits'}</td></tr>${APPOINTMENT_SALARY_COMPONENTS.filter((item) => item.part === part && (Number(d[`${item.key}Monthly`]) > 0 || Number(d[`${item.key}Annual`]) > 0)).map((item) => salaryRow(item.label, Number(d[`${item.key}Monthly`]) || 0, Number(d[`${item.key}Annual`]) || 0)).join('')}${salaryRow(part === 'A' ? 'Gross Earnings (A)' : part === 'B' ? 'Total Deductions (B)' : 'Employer Contributions / Benefits (C)', salarySum(part, 'Monthly'), salarySum(part, 'Annual'), 'total')}${part === 'B' ? salaryRow('Net Salary (A-B)', salarySum('A', 'Monthly') - salarySum('B', 'Monthly'), salarySum('A', 'Annual') - salarySum('B', 'Annual'), 'total') : ''}`).join('')}${salaryRow('CTC (A+C)', salarySum('A', 'Monthly') + salarySum('C', 'Monthly'), salarySum('A', 'Annual') + salarySum('C', 'Annual'), 'ctc')}</tbody></table>`;
+  const stamp = `<div class="signatory"><p>For, ${escapeHtml(company.legalName)}</p><img src="data:image/png;base64,${signatureStampBase64}" alt="Bond Therapy stamp and authorised signature"><div class="signature-line"></div><strong>${escapeHtml(company.authorisedSignatory)}</strong><span>${escapeHtml(company.authorisedSignatoryDesignation)}<br>${escapeHtml(company.displayName)}</span><small>Electronically generated and authorised through Bond Therapy CRM.</small></div>`;
+  const blocks = appointmentReference.slice(4).map((block) => {
+    if (block.kind === 'table') {
+      if (block.rows[0]?.[0] === 'Particulars') return salary;
+      const rows = block.rows.map((row, index) => `<tr>${row.map((cell, column) => {
+        const value = block.rows[0]?.[0] === 'Particular' && column === 1 && index > 0 ? (values[row[0]] || cell) : cell;
+        return index === 0 ? `<th>${text(value)}</th>` : `<td>${text(value)}</td>`;
+      }).join('')}</tr>`).join('');
+      return `<table class="document-table"><tbody>${rows}</tbody></table>`;
+    }
+    const line = block.text;
+    if (line === 'For TREEBOND COSMETIC PVT LTD') return stamp;
+    if (line === 'For Kairamya Journeys LLP' || line === 'Authorised Signatory') return '';
+    if (line === 'EMPLOYEE ACCEPTANCE') return `<h2>${text(line)}</h2>`;
+    if (line.startsWith('I, (Name),')) return `<p>${text(line.replace('(Name)', data.recipientName))}</p>`;
+    if (line === 'Employee Name:') return `<p>Employee Name: ${escapeHtml(data.recipientName)}</p>`;
+    if (line === 'ANNEXURE A – SALARY BREAK-UP') return `<h2 class="annexure-title">${text(line)}</h2>`;
+    if (line === 'Note: Statutory contributions, deductions and benefits shall be calculated and applied as per prevailing law and the employee\'s eligibility.') return `<p class="annexure-note">${text(line)}</p>${stamp}`;
+    if (line === line.toUpperCase() && /[A-Z]/.test(line)) return `<h2>${text(line)}</h2>`;
+    if (line.startsWith('Termination for Misconduct\t') || line.startsWith('Suspension Pending Inquiry\t') || line.startsWith('Termination for Business Reasons\t') || line.startsWith('Exit Formalities and Final Settlement\t') || line.startsWith('Recovery of Loss or Damage\t') || line.startsWith('Retirement / Superannuation\t')) {
+      const [heading, ...rest] = line.split('\t');
+      return `<p><strong>${text(heading)}</strong><br>${text(rest.join('\t'))}</p>`;
+    }
+    return `<p>${text(line)}</p>`;
+  }).join('');
+  const icons = {
+    phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.69 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.33 1.84.56 2.8.69A2 2 0 0 1 22 16.92Z"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
+  };
+  const contact = (icon: string, value: string) => `<span class="contact-item"><b class="contact-icon"><svg viewBox="0 0 24 24">${icon}</svg></b>${escapeHtml(value)}</span>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@font-face{font-family:Manrope;src:url(data:font/woff2;base64,${manropeBase64}) format('woff2');font-weight:200 800;font-display:block}
+body{font-size:11px!important;line-height:1.5!important}.print-page{position:relative}.document-table{font-size:9.5px!important}.document-table th,.document-table td{padding:1.35mm 2mm!important}.signatory small{font-size:7.6px!important}.annexure{break-inside:avoid}
+@page{size:A4;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{font-family:Manrope,Arial,sans-serif;color:${COLORS.text};font-size:10.1px;line-height:1.52;-webkit-print-color-adjust:exact;print-color-adjust:exact}header,footer{display:none}.print-page{width:210mm;height:297mm;padding:12mm 14mm 8mm;display:flex;flex-direction:column;overflow:hidden;page-break-after:always}.print-page:last-child{page-break-after:auto}.print-page>header{display:flex;position:static;flex:0 0 13mm;margin-bottom:5mm;align-items:center;justify-content:space-between;border-bottom:.28mm solid ${COLORS.border};padding-bottom:3mm}.print-page>footer{display:block;position:static;flex:0 0 22mm;margin-top:5mm}.print-content{min-height:0;flex:1;overflow:hidden}.brand-lockup{display:flex;align-items:center;gap:2.6mm}.brand-molecule{width:10.2mm;height:10.7mm;object-fit:contain}.brand-wordmark{width:40mm;height:auto;object-fit:contain}.document-id{text-align:right}.document-department{font-size:7.8px;font-weight:720;letter-spacing:2.15px;text-transform:uppercase;color:${COLORS.faint}}.document-number{margin-top:1.7mm;font-size:10px;font-weight:750;color:${COLORS.ink}}
+footer{position:fixed;bottom:-27mm;left:0;right:0;height:24mm}.contact-row{display:grid;grid-template-columns:1fr 1.18fr 1fr;align-items:center;border-bottom:.28mm solid ${COLORS.border};padding-bottom:2.5mm;font-size:8px;font-weight:590;color:${COLORS.muted}}.contact-item{display:flex;align-items:center;gap:1.7mm}.contact-item:nth-child(2){justify-content:center}.contact-item:nth-child(3){justify-content:flex-end}.contact-icon{display:block;width:4.1mm;height:4.1mm;flex:0 0 auto;color:${COLORS.ink}}.contact-icon svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.footer-meta{display:flex;align-items:flex-start;justify-content:space-between;gap:12mm;margin-top:2.8mm}.footer-company{font-size:8.6px;font-weight:760;color:${COLORS.ink}}.footer-address{margin-top:1mm;font-size:7.3px;line-height:1.45;color:${COLORS.muted}}.footer-document{text-align:right;font-size:7.2px;line-height:1.55;color:${COLORS.muted}}.footer-document strong{display:block;font-size:7.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:${COLORS.ink}}
+h1{margin:0 0 3mm;color:${COLORS.ink};font-size:22px;line-height:1.2}h2{margin:5mm 0 2mm;color:${COLORS.ink};font-size:10.3px;line-height:1.3;break-after:avoid}p{margin:0 0 2.5mm;orphans:2;widows:2}p strong{font-weight:750;color:${COLORS.ink}}.eyebrow{font-size:7.1px;font-weight:760;letter-spacing:1.9px;text-transform:uppercase;color:${COLORS.ink}}.rule{width:11mm;height:.7mm;margin:2mm 0 4mm;background:${COLORS.ink}}.recipient-panel{border:.28mm solid ${COLORS.border};border-radius:2mm;padding:3mm 4mm;background:#F5F7F6;break-inside:avoid}.reference-row{display:flex;justify-content:space-between;color:${COLORS.muted}}.reference-row strong{color:${COLORS.ink}}.recipient{margin-top:2.5mm;padding-top:2mm;border-top:.28mm solid ${COLORS.border}}.recipient strong{display:block;font-size:11px;color:${COLORS.ink}}.subject{margin:3mm 0;padding:2.5mm;border:.28mm solid ${COLORS.border};border-radius:2mm;background:${COLORS.soft};text-align:center;font-weight:700;color:${COLORS.ink}}.document-table{width:100%;margin:2mm 0 3mm;border:.28mm solid ${COLORS.border};border-collapse:collapse;table-layout:fixed;font-size:8.2px;break-inside:auto}.document-table tr{break-inside:avoid}.document-table th,.document-table td{border:.28mm solid ${COLORS.border};padding:1.3mm 2mm;text-align:left;vertical-align:middle}.document-table th{background:#F1F3F2;color:${COLORS.ink};font-weight:750}.document-table .num{text-align:right;font-variant-numeric:tabular-nums}.document-table .group td{background:#F5F7F6;font-weight:750;color:${COLORS.ink}}.document-table .total td{background:#F8F9F8;font-weight:700}.document-table .ctc td{background:#E9ECEA;font-weight:800;color:${COLORS.ink}}.salary-table th:first-child{width:53%}.annexure-title{margin-top:5mm}.annexure-note{margin-top:2mm}.signatory{width:65mm;margin:5mm 0 6mm;break-inside:avoid}.signatory p{margin:0 0 1.8mm}.signatory img{display:block;width:22mm;height:22mm;object-fit:contain;margin-left:1mm}.signature-line{width:62mm;border-top:.3mm solid ${COLORS.border}}.signatory strong,.signatory span,.signatory small{display:block}.signatory strong{margin-top:1.8mm;color:${COLORS.ink}}.signatory span{margin-top:.5mm;font-size:8px;color:${COLORS.muted}}.signatory small{margin-top:1.2mm;font-size:6.7px;color:${COLORS.faint}}.draft{position:absolute;top:45%;left:0;right:0;transform:rotate(-25deg);text-align:center;font-size:42px;font-weight:800;letter-spacing:8px;color:rgba(23,25,24,.06)}
+</style></head><body>${data.preview ? '<div class="draft">DRAFT</div>' : ''}<header><div class="brand-lockup"><img class="brand-molecule" src="data:image/png;base64,${moleculeBase64}"><img class="brand-wordmark" src="data:image/png;base64,${wordmarkBase64}"></div><div class="document-id"><div class="document-department">Human Resources</div><div class="document-number">${escapeHtml(data.letterNumber)}</div></div></header><footer><div class="contact-row">${contact(icons.phone, company.phone)}${contact(icons.mail, company.email)}${contact(icons.globe, company.website)}</div><div class="footer-meta"><div><div class="footer-company">${escapeHtml(company.legalName)}</div><div class="footer-address">${escapeHtml(company.address)}</div></div><div class="footer-document"><strong>Official HR Document</strong>${escapeHtml(data.letterNumber)}<br>Generated securely through Bond Therapy CRM</div></div></footer><main><div class="eyebrow">Hiring / Human Resources</div><h1>Appointment Letter</h1><div class="rule"></div><div class="recipient-panel"><div class="reference-row"><span>Ref: <strong>${escapeHtml(data.letterNumber)}</strong></span><span>Date: <strong>${escapeHtml(dateFmt(data.issuedDate))}</strong></span></div><div class="recipient"><small>To,</small><strong>${escapeHtml(data.recipientName)}</strong>${escapeHtml(d.recipientAddress || '').replaceAll('\n', '<br>')}</div></div><div class="subject">Subject: Appointment Letter for the Position of ${escapeHtml(d.designation)}</div><p>Dear ${escapeHtml(data.recipientName)},</p>${blocks}</main></body></html>`;
+}
+
+
 export function renderLetterHtml(data: LetterPdfData): string {
   data.snapshot.company.phone ||= '+91 78780 40050';
   data.snapshot.company.email ||= 'hr@bondtherapy.co.in';
@@ -113,7 +187,7 @@ export function renderLetterHtml(data: LetterPdfData): string {
     data.details,
     data.snapshot,
   );
-  if (data.type === 'APPOINTMENT') return renderAppointmentHtml(data, content);
+  if (data.type === 'APPOINTMENT') return data.details.appointmentTemplateVersion === 'WORD_2026' ? renderAppointmentReferenceHtml(data) : renderAppointmentHtml(data, content);
   const { subject, paragraphs } = content;
   const label = LETTER_LABELS[data.type];
   const category = LETTER_CATEGORIES[data.type];
@@ -181,7 +255,6 @@ export async function renderLetterPdf(data: LetterPdfData): Promise<Buffer> {
     await page.setContent(renderLetterHtml(data), {
       waitUntil: 'domcontentloaded',
     });
-    await page.emulateMediaType('print');
     await page.evaluateHandle('document.fonts.ready');
     await page.evaluate(() =>
       Promise.all(
@@ -195,6 +268,47 @@ export async function renderLetterPdf(data: LetterPdfData): Promise<Buffer> {
         ),
       ),
     );
+    const appointment = data.type === 'APPOINTMENT' && data.details.appointmentTemplateVersion === 'WORD_2026';
+    if (appointment) await page.evaluate(() => {
+      const source = document.querySelector('main');
+      const header = document.querySelector('header');
+      const footer = document.querySelector('footer');
+      if (!source || !header || !footer) throw new Error('Appointment letter layout is incomplete.');
+      const annexureTitle = source.querySelector('.annexure-title');
+      if (annexureTitle) {
+        const annexure = document.createElement('section');
+        annexure.className = 'annexure';
+        source.insertBefore(annexure, annexureTitle);
+        while (annexure.nextSibling) annexure.append(annexure.nextSibling);
+      }
+      const blocks = Array.from(source.children);
+      const draft = document.querySelector('.draft');
+      document.body.replaceChildren();
+      let content: HTMLElement;
+      const newPage = () => {
+        const sheet = document.createElement('section');
+        sheet.className = 'print-page';
+        if (draft) sheet.append(draft.cloneNode(true));
+        sheet.append(header.cloneNode(true));
+        content = document.createElement('div');
+        content.className = 'print-content';
+        sheet.append(content, footer.cloneNode(true));
+        document.body.append(sheet);
+      };
+      newPage();
+      for (const block of blocks) {
+        content!.append(block);
+        if (content!.scrollHeight <= content!.clientHeight + 1) continue;
+        content!.removeChild(block);
+        const heading = content!.lastElementChild?.tagName === 'H2' ? content!.lastElementChild : null;
+        if (heading) content!.removeChild(heading);
+        newPage();
+        if (heading) content!.append(heading);
+        content!.append(block);
+        if (content!.scrollHeight > content!.clientHeight + 1) throw new Error('Appointment letter content cannot fit on a page.');
+      }
+    });
+    await page.emulateMediaType('print');
     const fits = data.type === 'APPOINTMENT' || await page.evaluate(() => {
       const signatory = document
         .querySelector('.signatory')

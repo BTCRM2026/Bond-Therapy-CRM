@@ -23,3 +23,32 @@ describe('offer letter PDF layout', () => {
     expect(html.replace(/data:[^"']+/g, '')).not.toContain('GST');
   });
 });
+
+describe('appointment letter PDF layout', () => {
+  it('preserves the Word clauses, changes both joining dates, and puts the salary annexure last', () => {
+    const data: LetterPdfData = {
+      letterNumber: 'BT-HRL-2026-0002', type: 'APPOINTMENT', recipientName: 'Asha Patel', issuedDate: new Date('2026-10-19T12:00:00'),
+      details: { appointmentTemplateVersion: 'WORD_2026', recipientAddress: 'Surat, Gujarat', designation: 'Sales Executive', department: 'Sales', joiningDate: '2026-10-01', workLocation: 'Surat', employmentType: 'Permanent', reportingManager: 'Sales Manager', basicMonthly: '20000', basicAnnual: '240000', totalAMonthly: '20000', totalAAnnual: '240000', ctcMonthly: '20000', ctcAnnual: '240000' },
+      snapshot: {
+        employee: { id: null, name: 'Asha Patel', employeeCode: null, designation: 'Sales Executive', department: 'Sales', employmentType: 'Permanent', workLocation: 'Surat', reportingManager: 'Sales Manager', joiningDate: '2026-10-01', email: null, mobile: null, roleKeys: [], roleTrack: 'GENERAL' },
+        company: { legalName: 'Treebond Cosmetics Pvt Ltd', displayName: 'Treebond Cosmetics Pvt Ltd', address: 'Plot No-146/1, GIDC Phase-2, Rajpipla, Dist-Narmada-393145', phone: '+91 7878040050', email: 'treebondcosmetics2025@gmail.com', website: 'bondtherapy.co.in', authorisedSignatory: 'Parth Patel', authorisedSignatoryDesignation: 'Director' },
+      }, verificationToken: 'test', version: 1,
+    };
+    const html = renderLetterHtml(data);
+    expect(html.match(/01-10-2026/g)).toHaveLength(3);
+    expect(html).toContain('WORKING HOURS, WEEKLY OFF, OVERTIME AND LEAVE');
+    expect(html).toContain('GRIEVANCE REDRESSAL AND DISPUTE RESOLUTION');
+    expect(html).toContain('EMPLOYEE ACCEPTANCE');
+    expect(html).toContain('Gross Earnings (A)');
+    expect(html).toContain('Net Salary (A-B)');
+    expect(html).toContain('CTC (A+C)');
+    expect(html.indexOf('ANNEXURE A')).toBeGreaterThan(html.indexOf('EMPLOYEE ACCEPTANCE'));
+    expect(html).toContain('Director<br>Treebond Cosmetics Pvt Ltd');
+    expect(html).toContain('Your principal place of work shall be Surat.');
+    expect(html).toContain('Your initial place of posting shall be Surat.');
+    expect(html).not.toContain('Kairamya Journeys');
+    expect(html).not.toContain('07.09.2026');
+    data.details.joiningDate = '2026-11-05';
+    expect(renderLetterHtml(data).match(/05-11-2026/g)).toHaveLength(3);
+  });
+});
