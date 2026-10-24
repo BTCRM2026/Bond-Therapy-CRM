@@ -11,8 +11,10 @@ import { AdminVisitsDto, CompleteSalonProfileDto, CompleteVisitDto, SalonLocatio
 
 // Arrival must be within this distance of the salon's saved location unless an administrator has set another radius.
 export const DEFAULT_VISIT_RADIUS_METERS = 100;
-// A phone reporting a worse GPS error than this cannot prove where the staff member is.
+// A phone reporting a worse GPS error than this has a weak fix. A weak fix cannot be saved as a salon's location,
+// and it can check in only within WEAK_GPS_RADIUS_METERS of the salon (indoors the phone often cannot do better).
 export const MAX_GPS_ACCURACY_METERS = 100;
+export const WEAK_GPS_RADIUS_METERS = 50;
 
 const salesRoles = new Set(['SALES_MANAGER', 'SALES_EXECUTIVE']);
 const stopInclude = {
@@ -201,11 +203,16 @@ export class RoutesService {
     if (file.size > 8 * 1024 * 1024) throw new BadRequestException('Photo must be 8 MB or smaller.');
     if (dateStr !== this.istDateKey()) throw new BadRequestException('You can check in only on the day of the route.');
     if (stop.client.latitude == null || stop.client.longitude == null) throw new BadRequestException(`${stop.client.salonName} has no saved location yet. Save the salon location first, then check in.`);
-    this.checkAccuracy(dto.accuracy);
     const settings = await this.prisma.operationsSettings.findUnique({ where: { id: 'default' }, select: { visitRadiusMeters: true } });
-    const radius = settings?.visitRadiusMeters ?? DEFAULT_VISIT_RADIUS_METERS;
+    const salonRadius = settings?.visitRadiusMeters ?? DEFAULT_VISIT_RADIUS_METERS;
+    // A missing accuracy is treated as weak, so leaving it out of the request cannot widen the radius.
+    const weakGps = dto.accuracy == null || dto.accuracy > MAX_GPS_ACCURACY_METERS;
+    const radius = weakGps ? Math.min(salonRadius, WEAK_GPS_RADIUS_METERS) : salonRadius;
     const distanceMeters = this.haversineMeters(Number(stop.client.latitude), Number(stop.client.longitude), dto.latitude, dto.longitude);
-    if (distanceMeters > radius) throw new BadRequestException(`You are about ${distanceMeters} m from ${stop.client.salonName}. Move within ${radius} m of the salon to check in.`);
+    if (distanceMeters > radius) {
+      if (weakGps && distanceMeters <= salonRadius) throw new BadRequestException(`Your GPS signal is weak, so you must be within ${radius} m of ${stop.client.salonName} to check in. You appear to be about ${distanceMeters} m away. Wait a few seconds or stand near the door, then try again.`);
+      throw new BadRequestException(`You are about ${distanceMeters} m from ${stop.client.salonName}. Move within ${radius} m of the salon to check in.`);
+    }
     const gpsVerified = true;
     // The arrival photo must come from the in-app camera, must be new, and its camera pass is used up only now that every other check has passed.
     const photoHash = assertLiveCameraPhoto(file.buffer);
@@ -223,7 +230,7 @@ export class RoutesService {
       return visit;
     });
     await markFieldWorked(this.prisma, actor.id, new Date());
-    await this.recordAudit(actor, 'ROUTE_VISIT_START', stopId, { distanceMeters, gpsVerified, mimeType: file.mimetype }, ipAddress);
+    await this.recordAudit(actor, 'ROUTE_VISIT_START', stopId, { distanceMeters, gpsVerified, gpsAccuracyMeters: dto.accuracy ?? null, weakGps, mimeType: file.mimetype }, ipAddress);
     return activity;
   }
 

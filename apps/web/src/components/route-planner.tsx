@@ -8,6 +8,7 @@ import { Field, FormError } from "@/components/ui/field";
 import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
 import { CameraCapture } from "@/components/ui/camera-capture";
+import { allowedRadius, distanceMeters, isWeakFix, useBestPosition, weakSignalHint } from "@/lib/location";
 import { Modal } from "@/components/ui/modal";
 import { SuccessToast } from "@/components/ui/toast";
 
@@ -291,38 +292,25 @@ function StopStatusBadge({ stop }: { stop: RouteStop }) {
   return <span className="inline-flex rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold text-muted">Pending</span>;
 }
 
-const distanceMeters = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-  const rad = (degrees: number) => degrees * Math.PI / 180;
-  const a = Math.sin(rad(lat2 - lat1) / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lng2 - lng1) / 2) ** 2;
-  return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-};
-const MAX_ACCURACY = 100;
-type Position = { latitude: number; longitude: number; accuracy: number };
+const CHECK_IN_DENIED = "Allow location access to check in at the salon.";
+const PROFILE_DENIED = "Allow location access to save the salon’s location.";
+const formatDistance = (meters: number) => meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${meters} m`;
 
-// Strict arrival: the phone must be within the salon's saved radius, with a usable GPS fix, and a selfie taken on the spot.
+// Strict arrival: the phone must be within the salon's saved radius (50 m when the GPS signal is weak), and a selfie taken on the spot.
 function StartVisitModal({ stop, date, radius, onClose, onDone }: { stop: RouteStop; date: string; radius: number; onClose: () => void; onDone: () => Promise<void> }) {
   const [photo, setPhoto] = useState<File | null>(null);
   const [captureToken, setCaptureToken] = useState("");
-  const [position, setPosition] = useState<Position | null>(null);
-  const [gpsMessage, setGpsMessage] = useState("Finding your location…");
+  const { position, problem: gpsMessage } = useBestPosition(CHECK_IN_DENIED);
   const [salonPoint, setSalonPoint] = useState<{ latitude: number; longitude: number } | null>(stop.client.latitude != null && stop.client.longitude != null ? { latitude: Number(stop.client.latitude), longitude: Number(stop.client.longitude) } : null);
   const [savingLocation, setSavingLocation] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    if (!navigator.geolocation) { const timer = window.setTimeout(() => setGpsMessage("Location is not supported on this device."), 0); return () => window.clearTimeout(timer); }
-    const watch = navigator.geolocation.watchPosition(
-      ({ coords }) => { setPosition({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy }); setGpsMessage(""); },
-      () => setGpsMessage("Allow location access to check in at the salon."),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-    return () => navigator.geolocation.clearWatch(watch);
-  }, []);
 
-  const accurate = position ? position.accuracy <= MAX_ACCURACY : false;
+  const accurate = position ? !isWeakFix(position.accuracy) : false;
   const distance = position && salonPoint ? distanceMeters(salonPoint.latitude, salonPoint.longitude, position.latitude, position.longitude) : null;
-  const within = distance != null && distance <= radius;
-  const ready = Boolean(photo && position && accurate && within);
+  const allowed = position ? allowedRadius(radius, position.accuracy) : radius;
+  const within = distance != null && distance <= allowed;
+  const ready = Boolean(photo && position && within);
 
   const saveSalonLocation = async () => {
     if (!position || !accurate) return;
@@ -349,15 +337,16 @@ function StartVisitModal({ stop, date, radius, onClose, onDone }: { stop: RouteS
   const panel = (tone: "ok" | "bad" | "warn", message: string) => <div className={`flex items-start gap-2 rounded-lg border p-3 text-xs ${tone === "ok" ? "border-success/20 bg-success-soft/50 text-success" : tone === "bad" ? "border-red-200 bg-red-50 text-danger" : "border-warning/20 bg-warning-soft/50 text-warning"}`} role="status" aria-live="polite"><MapPin className="mt-0.5 shrink-0" size={15} /><span>{message}</span></div>;
 
   return <Modal title="Check in at salon" subtitle={stop.client.salonName} onClose={onClose}><form onSubmit={submit} className="space-y-4">
-    {gpsMessage && panel("warn", gpsMessage)}
-    {!gpsMessage && position && !accurate && panel("warn", `Your GPS signal is weak (about ${Math.round(position.accuracy)} m off). Step outside or wait a few seconds for a better fix.`)}
-    {!gpsMessage && position && accurate && !salonPoint && <div className="space-y-2.5">
+    {!position && panel("warn", gpsMessage || "Finding your location…")}
+    {position && gpsMessage && panel("warn", gpsMessage)}
+    {!gpsMessage && position && !salonPoint && (accurate ? <div className="space-y-2.5">
       {panel("warn", "This salon has no saved location yet. Stand at the salon and save its location once; later visits are matched against it.")}
       <Button type="button" variant="secondary" className="w-full" disabled={savingLocation} onClick={saveSalonLocation}>{savingLocation ? <LoaderCircle className="animate-spin" size={16} /> : <MapPin size={16} />}{savingLocation ? "Saving…" : "Save salon location here"}</Button>
-    </div>}
-    {!gpsMessage && position && accurate && salonPoint && distance != null && (within
-      ? panel("ok", `You are at the salon (about ${distance} m away). You can check in.`)
-      : panel("bad", `You are about ${distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${distance} m`} from the salon. Move within ${radius} m to check in.`))}
+    </div> : panel("warn", `${weakSignalHint(position.accuracy)} The salon’s location is saved only with a good signal, because every later visit is matched against it. Stand near the door or outside for a few seconds.`))}
+    {!gpsMessage && position && salonPoint && distance != null && (within
+      ? panel("ok", accurate ? `You are at the salon (about ${distance} m away). You can check in.` : `You are at the salon (about ${distance} m away). The GPS signal is weak, but you are within ${allowed} m, so you can check in.`)
+      : !accurate ? panel("warn", `${weakSignalHint(position.accuracy)} With a weak signal you can check in within ${allowed} m of the salon; you appear to be about ${formatDistance(distance)} away. Wait a few seconds or stand near the door for a better fix.`)
+      : panel("bad", `You are about ${formatDistance(distance)} from the salon. Move within ${radius} m to check in.`))}
     <CameraCapture photo={photo} purpose="VISIT_CHECK_IN" scopeId={stop.id} facing="user" label="Take arrival selfie" hint="Opens the front camera. Gallery photos are not accepted." onChange={(file, token) => { setPhoto(file); setCaptureToken(token); }} onError={setError} />
     {error && <FormError message={error} />}
     <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving || !ready}>{saving && <LoaderCircle className="animate-spin" size={16} />}{saving ? "Checking in…" : "I’ve arrived"}</Button></div>
@@ -368,22 +357,12 @@ const CATEGORIES = [["SALON", "Salon"], ["UNISEX", "Unisex salon"], ["STUDIO", "
 
 // At a salon that was typed into the route: fill its client profile. The phone's GPS becomes the salon's location, and only then can the visit be checked in.
 function FillProfileModal({ stop, date, onClose, onDone }: { stop: RouteStop; date: string; onClose: () => void; onDone: () => Promise<void> }) {
-  const [position, setPosition] = useState<Position | null>(null);
-  const [gpsMessage, setGpsMessage] = useState("Finding your location…");
+  const { position, problem: gpsMessage } = useBestPosition(PROFILE_DENIED);
   const [form, setForm] = useState({ salonName: stop.client.salonName, category: "SALON", ownerName: "", primaryContact: "", fullAddress: "", city: stop.client.city, area: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    if (!navigator.geolocation) { const timer = window.setTimeout(() => setGpsMessage("Location is not supported on this device."), 0); return () => window.clearTimeout(timer); }
-    const watch = navigator.geolocation.watchPosition(
-      ({ coords }) => { setPosition({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy }); setGpsMessage(""); },
-      () => setGpsMessage("Allow location access to save the salon’s location."),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-    return () => navigator.geolocation.clearWatch(watch);
-  }, []);
   const set = (key: keyof typeof form) => (event: { target: { value: string } }) => setForm((current) => ({ ...current, [key]: event.target.value }));
-  const accurate = position ? position.accuracy <= MAX_ACCURACY : false;
+  const accurate = position ? !isWeakFix(position.accuracy) : false;
   const filled = form.salonName.trim().length >= 2 && form.ownerName.trim().length >= 2 && form.primaryContact.trim().length >= 7 && form.fullAddress.trim().length >= 5 && form.city.trim().length >= 2;
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -396,8 +375,8 @@ function FillProfileModal({ stop, date, onClose, onDone }: { stop: RouteStop; da
       await onDone();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save the client profile."); setSaving(false); }
   };
-  const gps = gpsMessage ? <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning-soft/50 p-3 text-xs text-warning" role="status"><MapPin size={14} className="mt-0.5 shrink-0" />{gpsMessage}</div>
-    : position && !accurate ? <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning-soft/50 p-3 text-xs text-warning" role="status"><MapPin size={14} className="mt-0.5 shrink-0" />Your GPS signal is weak (about {Math.round(position.accuracy)} m off). Step outside or wait a few seconds for a better fix.</div>
+  const gps = gpsMessage || !position ? <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning-soft/50 p-3 text-xs text-warning" role="status"><MapPin size={14} className="mt-0.5 shrink-0" />{gpsMessage || "Finding your location…"}</div>
+    : !accurate ? <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning-soft/50 p-3 text-xs text-warning" role="status"><MapPin size={14} className="mt-0.5 shrink-0" />{weakSignalHint(position.accuracy)} The salon’s location is saved only with a good signal, because every later visit is matched against it. Stand near the door or outside for a few seconds.</div>
     : position ? <div className="flex items-start gap-2 rounded-lg border border-success/20 bg-success-soft/50 p-3 text-xs text-success" role="status"><CheckCircle2 size={14} className="mt-0.5 shrink-0" />Location found (about {Math.round(position.accuracy)} m accuracy). It will be saved as the salon’s location.</div> : null;
   return <Modal title="Add client profile" subtitle={`${stop.client.salonName} · fill this at the salon`} onClose={onClose}>
     <form onSubmit={submit} className="space-y-4">

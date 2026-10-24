@@ -36,15 +36,14 @@ function build({ client = salon as Record<string, unknown>, activity = null as u
 describe('RoutesService strict salon check-in', () => {
   it('refuses a check-in that is not within the salon radius', async () => {
     const { service, prisma, captures } = build();
-    await expect(service.startVisit(actor, today, 'stop-1', far, photo)).rejects.toThrow(/from Glow Studio.*within 100 m/);
+    await expect(service.startVisit(actor, today, 'stop-1', { ...far, accuracy: 20 } as never, photo)).rejects.toThrow(/from Glow Studio.*within 100 m/);
     expect(prisma.visitProof.upsert).not.toHaveBeenCalled();
     expect(captures.consume).not.toHaveBeenCalled();
     expect(prisma.attendanceRecord.upsert).not.toHaveBeenCalled();
   });
 
-  it('refuses when the salon has no saved location, a weak GPS signal, or the wrong day', async () => {
+  it('refuses when the salon has no saved location or on the wrong day', async () => {
     await expect(build({ client: { ...salon, latitude: null, longitude: null } }).service.startVisit(actor, today, 'stop-1', near, photo)).rejects.toThrow('no saved location');
-    await expect(build().service.startVisit(actor, today, 'stop-1', { ...near, accuracy: 180 } as never, photo)).rejects.toThrow('GPS signal is too weak');
     await expect(build({ routeDate: '2026-01-05' }).service.startVisit(actor, '2026-01-05', 'stop-1', near, photo)).rejects.toThrow('only on the day of the route');
   });
 
@@ -55,6 +54,33 @@ describe('RoutesService strict salon check-in', () => {
     expect(captures.consume).toHaveBeenCalledWith('staff-1', captureToken, 'VISIT_CHECK_IN', 'stop-1');
     expect(prisma.visitProof.upsert.mock.calls[0]![0].create.distanceMeters).toBeLessThanOrEqual(100);
     expect(prisma.attendanceRecord.upsert.mock.calls[0]![0].create).toMatchObject({ userId: 'staff-1', fromVisits: true });
+  });
+});
+
+describe('RoutesService check-in with a weak GPS signal', () => {
+  // About 30 m and about 80 m north of the salon.
+  const close = { latitude: 22.30747, longitude: 73.1812, captureToken };
+  const outside = { latitude: 22.30792, longitude: 73.1812, captureToken };
+
+  it('accepts a weak fix that places the phone within 50 m of the salon', async () => {
+    const { service, prisma, captures } = build();
+    await service.startVisit(actor, today, 'stop-1', { ...close, accuracy: 389 } as never, photo);
+    expect(prisma.visitProof.upsert.mock.calls[0]![0].create.distanceMeters).toBeLessThanOrEqual(50);
+    expect(captures.consume).toHaveBeenCalled();
+  });
+
+  it('refuses a weak fix beyond 50 m even inside the salon radius, without using up the selfie', async () => {
+    const { service, prisma, captures } = build();
+    await expect(service.startVisit(actor, today, 'stop-1', { ...outside, accuracy: 389 } as never, photo)).rejects.toThrow(/GPS signal is weak.*within 50 m/);
+    expect(prisma.visitProof.upsert).not.toHaveBeenCalled();
+    expect(captures.consume).not.toHaveBeenCalled();
+  });
+
+  it('treats a missing accuracy as weak, and keeps the full radius for a good fix', async () => {
+    await expect(build().service.startVisit(actor, today, 'stop-1', outside, photo)).rejects.toThrow(/within 50 m/);
+    const { service, prisma } = build();
+    await service.startVisit(actor, today, 'stop-1', { ...outside, accuracy: 25 } as never, photo);
+    expect(prisma.visitProof.upsert).toHaveBeenCalled();
   });
 });
 
