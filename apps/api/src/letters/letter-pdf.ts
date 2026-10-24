@@ -131,6 +131,8 @@ function renderAppointmentReferenceHtml(data: LetterPdfData) {
     'Place of Posting': d.workLocation || '',
     'Reporting To': d.reportingManager || '',
     'Date of Birth': d.dateOfBirth ? date(d.dateOfBirth) : 'As maintained in HR records',
+    'UAN / EPF': d.uanEpfNumber || '—',
+    'ESIC No.': d.esicNumber || '—',
   };
   const salarySum = (part: 'A' | 'B' | 'C', period: 'Monthly' | 'Annual') => APPOINTMENT_SALARY_COMPONENTS.filter((item) => item.part === part).reduce((sum, item) => sum + (Number(d[`${item.key}${period}`]) || 0), 0);
   const moneyCell = (value: number) => `₹ ${inr(String(value))}`;
@@ -140,6 +142,7 @@ function renderAppointmentReferenceHtml(data: LetterPdfData) {
   const blocks = appointmentReference.slice(4).map((block) => {
     if (block.kind === 'table') {
       if (block.rows[0]?.[0] === 'Particulars') return salary;
+      if (block.rows[0]?.[0] === 'Stage' && d.noticePeriod) return `<table class="document-table"><tbody><tr><th>Notice period</th></tr><tr><td>${text(d.noticePeriod)}</td></tr></tbody></table>`;
       if (block.rows[0]?.[0] === 'Stage' && !d.noticeDuringProbation) return '<table class="document-table"><tbody><tr><th>Level</th><th>During Probation</th><th>After Confirmation</th></tr><tr><td>Office Assistant &amp; Trainee</td><td>One Month</td><td>One Month</td></tr><tr><td>Jr. Executive &amp; up to Sr. Executive</td><td>One Month</td><td>Two Months</td></tr><tr><td>Assistant Manager &amp; above</td><td>One Month</td><td>Three Months</td></tr></tbody></table>';
       const rows = block.rows.map((row, index) => `<tr>${row.map((cell, column) => {
         const value = block.rows[0]?.[0] === 'Particular' && column === 1 && index > 0 ? (values[row[0]] || cell) : cell;

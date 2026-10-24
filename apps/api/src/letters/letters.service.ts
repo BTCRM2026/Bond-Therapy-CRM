@@ -38,11 +38,10 @@ export class LettersService {
     if (dto.type === 'OFFER' && (!Number.isFinite(Number(normalized.ctc)) || Number(normalized.ctc) <= 0))
       throw new BadRequestException('Enter a valid annual CTC greater than zero for this Offer Letter.');
     if (dto.type === 'APPOINTMENT') {
+      normalized.probationMonths = normalized.probationMonths?.replace(/^(\d+)\s+months?$/i, '$1') ?? '';
       const months = Number(normalized.probationMonths);
       if (normalized.probationMonths && (!Number.isInteger(months) || months < 1 || months > 24)) throw new BadRequestException('Probation period must be a whole number from 1 to 24 months.');
-      for (const key of ['noticeDuringProbation', 'noticeAfterConfirmation']) {
-        if (normalized[key] && !/^[1-9]\d*\s+(?:days?|months?)$/i.test(normalized[key])) throw new BadRequestException('Enter each notice period as a number and unit, such as 30 days or 2 months.');
-      }
+      if (normalized.noticePeriod && !/^[1-9]\d*\s+(?:days?|months?)$/i.test(normalized.noticePeriod)) throw new BadRequestException('Enter the notice period as a number and unit, such as 30 days or 2 months.');
       for (const item of APPOINTMENT_SALARY_COMPONENTS) {
         const raw = normalized[`${item.key}Monthly`];
         if (raw && (!Number.isFinite(Number(raw)) || Number(raw) < 0)) throw new BadRequestException(`${item.label} monthly must be a valid non-negative amount.`);

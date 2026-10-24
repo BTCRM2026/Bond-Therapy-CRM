@@ -247,7 +247,7 @@ function LetterCreateModal({ onClose, onCreated }: { onClose: () => void; onCrea
                 {field.type === "textarea" ? (
                   <textarea value={details[field.key] ?? ""} onChange={(event) => setField(field.key)(event.target.value)} required={field.required} maxLength={field.key === "recipientAddress" ? 240 : undefined} rows={field.key === "recipientAddress" ? 2 : 3} placeholder={field.placeholder} className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/10" />
                 ) : (
-                  <Input type={field.type === "date" ? "date" : field.type === "money" ? "number" : "text"} min={field.type === "money" ? 0 : undefined} value={details[field.key] ?? ""} onChange={(event) => setField(field.key)(event.target.value)} required={field.required} placeholder={field.placeholder} />
+                  <Input type={field.type === "date" ? "date" : field.type === "money" || (type === "APPOINTMENT" && field.key === "probationMonths") ? "number" : "text"} min={(type === "APPOINTMENT" && field.key === "probationMonths") ? 1 : field.type === "money" ? 0 : undefined} max={(type === "APPOINTMENT" && field.key === "probationMonths") ? 24 : undefined} step={(type === "APPOINTMENT" && field.key === "probationMonths") ? 1 : undefined} value={details[field.key] ?? ""} onChange={(event) => setField(field.key)(event.target.value)} required={field.required} placeholder={field.placeholder} />
                 )}
               </Field>
             </div>

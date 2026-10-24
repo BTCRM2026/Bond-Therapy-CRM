@@ -31,7 +31,7 @@ describe('Offer Letter creation', () => {
 describe('Appointment Letter creation', () => {
   const appointment: CreateHrLetterDto = {
     type: 'APPOINTMENT', recipientName: 'Asha Patel', recipientDesignation: 'Sales Executive', recipientDepartment: 'Sales', issuedDate: '2026-10-19',
-    details: { recipientAddress: 'Surat, Gujarat', designation: 'Sales Executive', department: 'Sales', joiningDate: '2026-10-01', workLocation: 'Surat', employmentType: 'Permanent', probationMonths: '3', noticeDuringProbation: '30 days', noticeAfterConfirmation: '2 months', reportingManager: 'Sales Manager', basicMonthly: '20000', employeePfMonthly: '1800', employerPfMonthly: '1800' },
+    details: { recipientAddress: 'Surat, Gujarat', designation: 'Sales Executive', department: 'Sales', joiningDate: '2026-10-01', workLocation: 'Surat', employmentType: 'Permanent', probationMonths: '3', noticePeriod: '30 days', uanEpfNumber: '001234567890', esicNumber: '0012345678', reportingManager: 'Sales Manager', basicMonthly: '20000', employeePfMonthly: '1800', employerPfMonthly: '1800' },
   };
 
   it('calculates the Word annexure totals and rejects impossible deductions', () => {
@@ -45,8 +45,24 @@ describe('Appointment Letter creation', () => {
     const service = new LettersService({} as PrismaService);
     expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, probationMonths: '' } })).toThrow('probation period');
     expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, probationMonths: 'six' } })).toThrow('whole number');
-    expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, noticeDuringProbation: 'one month' } })).toThrow('number and unit');
-    expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, noticeAfterConfirmation: '' } })).toThrow('notice after confirmation');
+    expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, noticePeriod: 'one month' } })).toThrow('number and unit');
+    expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, noticePeriod: '' } })).toThrow('notice period');
+  });
+
+  it('accepts valid probation periods and rejects out-of-range or fractional values', () => {
+    const service = new LettersService({} as PrismaService);
+    for (const value of ['1', '3', '24', ' 6 ', '3 months', '1 month', '24 MONTHS']) {
+      const result = service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, probationMonths: value } });
+      expect(result.probationMonths).toBe(String(parseInt(value, 10)));
+      expect(result.uanEpfNumber).toBe('001234567890');
+      expect(result.esicNumber).toBe('0012345678');
+    }
+    for (const value of ['0', '25', '-1', '1.5', '3 days', 'six', 'NaN']) {
+      expect(() => service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, probationMonths: value } })).toThrow('whole number');
+    }
+    for (const value of ['30 days', '1 day', '2 months', '1 month']) {
+      expect(service['normalizeAndValidate']({ ...appointment, details: { ...appointment.details, noticePeriod: value } }).noticePeriod).toBe(value);
+    }
   });
 
   it('uses edited employee details and the Treebond company identity', async () => {
